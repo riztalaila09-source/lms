@@ -1,0 +1,10 @@
+server:
+  host: localhost
+  port: 8080
+
+database:
+  path: ./data/lms.db
+
+jwt:
+  secret: changeme-replace-with-random-256bit-key-in-production
+  expiry_hours: 24

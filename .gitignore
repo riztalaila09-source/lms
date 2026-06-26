@@ -1,0 +1,43 @@
+# Build artifacts
+dist/
+backend/bin/
+backend/tmp/
+backend/cmd/server/frontend/
+
+# Generated protobuf code
+backend/gen/
+frontend/src/gen/
+
+# Go
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+backend/coverage.out
+
+# Node
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+
+# SQLite database files
+*.db
+*.db-shm
+*.db-wal
+data/
+
+# Environment & secrets
+.env
+.env.local
+*.local
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo

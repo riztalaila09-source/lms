@@ -1,0 +1,92 @@
+syntax = "proto3";
+
+package user.v1;
+
+option go_package = "lms/backend/gen/user/v1;userv1";
+
+import "common/v1/common.proto";
+import "google/protobuf/timestamp.proto";
+
+enum Role {
+  ROLE_UNSPECIFIED = 0;
+  ROLE_ADMIN = 1;
+  ROLE_TEACHER = 2;
+  ROLE_STUDENT = 3;
+}
+
+message User {
+  string id = 1;
+  string username = 2;
+  string email = 3;
+  string full_name = 4;
+  Role role = 5;
+  bool is_active = 6;
+  google.protobuf.Timestamp created_at = 7;
+  google.protobuf.Timestamp updated_at = 8;
+}
+
+message LoginRequest {
+  string email = 1;
+  string password = 2;
+}
+
+message LoginResponse {
+  string token = 1;
+  User user = 2;
+}
+
+message CreateUserRequest {
+  string username = 1;
+  string email = 2;
+  string password = 3;
+  string full_name = 4;
+  Role role = 5;
+}
+
+message GetUserRequest {
+  string id = 1;
+}
+
+message UpdateUserRequest {
+  string id = 1;
+  optional string full_name = 2;
+  optional string email = 3;
+  optional Role role = 4;
+  optional bool is_active = 5;
+}
+
+message DeleteUserRequest {
+  string id = 1;
+}
+
+message DeleteUserResponse {}
+
+message ListUsersRequest {
+  common.v1.PaginationRequest pagination = 1;
+  optional Role role_filter = 2;
+}
+
+message ListUsersResponse {
+  repeated User users = 1;
+  common.v1.PaginationResponse pagination = 2;
+}
+
+message GetProfileRequest {}
+
+message ChangePasswordRequest {
+  string current_password = 1;
+  string new_password = 2;
+}
+
+message ChangePasswordResponse {}
+
+service UserService {
+  rpc Login(LoginRequest) returns (LoginResponse);
+  rpc CreateUser(CreateUserRequest) returns (User);
+  rpc GetUser(GetUserRequest) returns (User);
+  rpc UpdateUser(UpdateUserRequest) returns (User);
+  rpc DeleteUser(DeleteUserRequest) returns (DeleteUserResponse);
+  rpc ListUsers(ListUsersRequest) returns (ListUsersResponse);
+  rpc GetProfile(GetProfileRequest) returns (User);
+  rpc ChangePassword(ChangePasswordRequest) returns (ChangePasswordResponse);
+}
