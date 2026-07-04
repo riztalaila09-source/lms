@@ -27,6 +27,82 @@ func newTestUser(suffix string) *repository.User {
 	}
 }
 
+func TestUserRepository_PasswordPlainAndMutateClass(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	repo := repository.NewUserRepository(db)
+	ctx := context.Background()
+
+	// Unique class names so demo-seed students don't pollute the counts.
+	const from, to, to2 = "MUT-FROM", "MUT-TO", "MUT-TO2"
+
+	// password_plain round-trips through create/get.
+	u := newTestUser("plain")
+	u.PasswordPlain = "Rahasia123"
+	u.Kelas = from
+	require.NoError(t, repo.Create(ctx, u))
+	got, err := repo.GetByID(ctx, u.ID)
+	require.NoError(t, err)
+	assert.Equal(t, "Rahasia123", got.PasswordPlain)
+
+	// Two more students in `from`, plus one already in `to`.
+	s2 := newTestUser("plain2"); s2.Kelas = from
+	s3 := newTestUser("plain3"); s3.Kelas = from
+	other := newTestUser("plainother"); other.Kelas = to
+	for _, s := range []*repository.User{s2, s3, other} {
+		require.NoError(t, repo.Create(ctx, s))
+	}
+
+	// Bulk move: everyone in `from` → `to` (3 students), not the existing `to` one.
+	n, err := repo.MoveStudentsByClass(ctx, from, to)
+	require.NoError(t, err)
+	assert.Equal(t, int64(3), n)
+	after, _ := repo.GetByID(ctx, u.ID)
+	assert.Equal(t, to, after.Kelas)
+
+	// Per-id move: send two of them to `to2`.
+	n2, err := repo.MoveStudentsByIDs(ctx, []string{u.ID, s2.ID}, to2)
+	require.NoError(t, err)
+	assert.Equal(t, int64(2), n2)
+	a1, _ := repo.GetByID(ctx, u.ID)
+	a2, _ := repo.GetByID(ctx, s3.ID)
+	assert.Equal(t, to2, a1.Kelas)
+	assert.Equal(t, to, a2.Kelas, "untouched student stays")
+}
+
+func TestUserRepository_StoryAndListStories(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	repo := repository.NewUserRepository(db)
+	ctx := context.Background()
+
+	withStory := newTestUser("story1")
+	withStory.Story = "Belajar di sini sangat membantu!"
+	require.NoError(t, repo.Create(ctx, withStory))
+
+	noStory := newTestUser("story2")
+	require.NoError(t, repo.Create(ctx, noStory))
+
+	inactive := newTestUser("story3")
+	inactive.Story = "Cerita tapi nonaktif"
+	inactive.IsActive = false
+	require.NoError(t, repo.Create(ctx, inactive))
+
+	// Story round-trips.
+	got, err := repo.GetByID(ctx, withStory.ID)
+	require.NoError(t, err)
+	assert.Equal(t, "Belajar di sini sangat membantu!", got.Story)
+
+	// ListStories returns only active users with a non-empty story.
+	stories, err := repo.ListStories(ctx, 50)
+	require.NoError(t, err)
+	ids := map[string]string{}
+	for _, s := range stories {
+		ids[s.UserID] = s.Story
+	}
+	assert.Contains(t, ids, withStory.ID)
+	assert.NotContains(t, ids, noStory.ID, "empty story excluded")
+	assert.NotContains(t, ids, inactive.ID, "inactive user excluded")
+}
+
 func TestUserRepository_Create(t *testing.T) {
 	db := testutil.SetupTestDB(t)
 	repo := repository.NewUserRepository(db)
@@ -159,10 +235,10 @@ func TestUserRepository_List(t *testing.T) {
 	})
 
 	t.Run("filter by role", func(t *testing.T) {
+		// at least the 2 students created above (demo seed may add more)
 		users, total, err := repo.List(ctx, repository.ListFilter{Page: 1, PageSize: 20, RoleFilter: "student"})
 		require.NoError(t, err)
-		assert.Equal(t, 2, total)
-		assert.Len(t, users, 2)
+		assert.GreaterOrEqual(t, total, 2)
 		for _, u := range users {
 			assert.Equal(t, "student", u.Role)
 		}

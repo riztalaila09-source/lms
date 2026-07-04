@@ -1,7 +1,17 @@
 import { createClient } from '@connectrpc/connect'
 import { UserService } from '@/gen/user/v1/user_pb'
+import { CourseService } from '@/gen/course/v1/course_pb'
+import { MaterialService } from '@/gen/material/v1/material_pb'
+import { AssignmentService } from '@/gen/assignment/v1/assignment_pb'
+import { DashboardService } from '@/gen/dashboard/v1/dashboard_pb'
+import { ClassService } from '@/gen/class/v1/class_pb'
+import { JurusanService } from '@/gen/jurusan/v1/jurusan_pb'
 import { transport } from './transport'
 
-// Typed ConnectRPC client for the UserService.
-// Generated types in @/gen/user/v1/user_pb come from `buf generate` / `make proto`.
 export const userClient = createClient(UserService, transport)
+export const courseClient = createClient(CourseService, transport)
+export const materialClient = createClient(MaterialService, transport)
+export const assignmentClient = createClient(AssignmentService, transport)
+export const dashboardClient = createClient(DashboardService, transport)
+export const classClient = createClient(ClassService, transport)
+export const jurusanClient = createClient(JurusanService, transport)

@@ -1,0 +1,50 @@
+syntax = "proto3";
+
+package dashboard.v1;
+
+option go_package = "lms/backend/gen/dashboard/v1;dashboardv1";
+
+import "google/protobuf/timestamp.proto";
+
+message JurusanCount {
+  string jurusan = 1;
+  int32 count = 2;
+}
+
+message RecentAssignment {
+  string id = 1;
+  string title = 2;
+  string course_name = 3;
+  google.protobuf.Timestamp deadline = 4;
+  int32 submission_count = 5;
+}
+
+message RecentSubmission {
+  string student_name = 1;
+  string kelas = 2;
+  string assignment_title = 3;
+  google.protobuf.Timestamp submitted_at = 4;
+  bool graded = 5;
+}
+
+message TeacherDashboard {
+  int32 total_kelas = 1;
+  int32 total_siswa = 2;
+  int32 total_materi = 3;
+  int32 total_tugas = 4;
+  int32 total_pengumpulan = 5;     // submissions made
+  int32 belum_kumpul = 6;          // expected submissions not yet made
+  int32 perlu_dinilai = 7;         // submitted but not graded
+  int32 materi_publikasi = 8;
+  int32 materi_draft = 9;
+  double rata_rata_nilai = 10;     // average of graded scores
+  repeated JurusanCount siswa_per_jurusan = 11;
+  repeated RecentAssignment tugas_terbaru = 12;
+  repeated RecentSubmission pengumpulan_terbaru = 13;
+}
+
+message GetTeacherDashboardRequest {}
+
+service DashboardService {
+  rpc GetTeacherDashboard(GetTeacherDashboardRequest) returns (TeacherDashboard);
+}

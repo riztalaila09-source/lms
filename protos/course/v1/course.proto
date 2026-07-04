@@ -1,0 +1,106 @@
+syntax = "proto3";
+
+package course.v1;
+
+option go_package = "lms/backend/gen/course/v1;coursev1";
+
+import "common/v1/common.proto";
+import "user/v1/user.proto";
+import "google/protobuf/timestamp.proto";
+
+message Course {
+  string id = 1;
+  string code = 2;
+  string name = 3;
+  string description = 4;
+  user.v1.User teacher = 5;
+  bool is_active = 6;
+  int32 student_count = 7;
+  google.protobuf.Timestamp created_at = 8;
+  google.protobuf.Timestamp updated_at = 9;
+  repeated string kelas = 10;
+  string background_image = 11;
+}
+
+message Enrollment {
+  string id = 1;
+  string course_id = 2;
+  user.v1.User student = 3;
+  google.protobuf.Timestamp enrolled_at = 4;
+}
+
+message CreateCourseRequest {
+  string code = 1;
+  string name = 2;
+  string description = 3;
+  string teacher_id = 4;
+  repeated string class_ids = 5;
+  string background_image = 6;
+}
+
+message GetCourseRequest {
+  string id = 1;
+}
+
+message UpdateCourseRequest {
+  string id = 1;
+  optional string code = 2;
+  optional string name = 3;
+  optional string description = 4;
+  optional string teacher_id = 5;
+  optional bool is_active = 6;
+  repeated string class_ids = 7;
+  optional string background_image = 8;
+}
+
+message DeleteCourseRequest {
+  string id = 1;
+}
+
+message DeleteCourseResponse {}
+
+message ListCoursesRequest {
+  common.v1.PaginationRequest pagination = 1;
+}
+
+message ListCoursesResponse {
+  repeated Course courses = 1;
+  common.v1.PaginationResponse pagination = 2;
+}
+
+message EnrollStudentsRequest {
+  string course_id = 1;
+  repeated string student_ids = 2;
+}
+
+message EnrollStudentsResponse {
+  int32 enrolled_count = 1;
+}
+
+message UnenrollStudentRequest {
+  string course_id = 1;
+  string student_id = 2;
+}
+
+message UnenrollStudentResponse {}
+
+message GetCourseStudentsRequest {
+  string course_id = 1;
+  common.v1.PaginationRequest pagination = 2;
+}
+
+message GetCourseStudentsResponse {
+  repeated Enrollment enrollments = 1;
+  common.v1.PaginationResponse pagination = 2;
+}
+
+service CourseService {
+  rpc CreateCourse(CreateCourseRequest) returns (Course);
+  rpc GetCourse(GetCourseRequest) returns (Course);
+  rpc UpdateCourse(UpdateCourseRequest) returns (Course);
+  rpc DeleteCourse(DeleteCourseRequest) returns (DeleteCourseResponse);
+  rpc ListCourses(ListCoursesRequest) returns (ListCoursesResponse);
+  rpc EnrollStudents(EnrollStudentsRequest) returns (EnrollStudentsResponse);
+  rpc UnenrollStudent(UnenrollStudentRequest) returns (UnenrollStudentResponse);
+  rpc GetCourseStudents(GetCourseStudentsRequest) returns (GetCourseStudentsResponse);
+}

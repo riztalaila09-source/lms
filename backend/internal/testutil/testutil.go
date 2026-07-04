@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/pressly/goose/v3"
 	"github.com/stretchr/testify/require"
 
 	"lms/backend/internal/database"

@@ -17,6 +17,31 @@ export default defineConfig({
         target: 'http://localhost:8080',
         changeOrigin: true,
       },
+      '/course.v1.CourseService': {
+        target: 'http://localhost:8080',
+        changeOrigin: true,
+      },
+      '/material.v1.MaterialService': {
+        target: 'http://localhost:8080',
+        changeOrigin: true,
+      },
+      '/assignment.v1.AssignmentService': {
+        target: 'http://localhost:8080',
+        changeOrigin: true,
+      },
+      '/dashboard.v1.DashboardService': {
+        target: 'http://localhost:8080',
+        changeOrigin: true,
+      },
+      '/class.v1.ClassService': {
+        target: 'http://localhost:8080',
+        changeOrigin: true,
+      },
+      // Material cover images served as binary by the Go backend
+      '/covers': {
+        target: 'http://localhost:8080',
+        changeOrigin: true,
+      },
     },
   },
 })

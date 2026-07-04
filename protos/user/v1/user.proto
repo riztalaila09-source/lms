@@ -21,8 +21,18 @@ message User {
   string full_name = 4;
   Role role = 5;
   bool is_active = 6;
+  string kelas = 9;
+  string jurusan = 10;
+  string photo_url = 11;
   google.protobuf.Timestamp created_at = 7;
   google.protobuf.Timestamp updated_at = 8;
+  // Plaintext password, populated ONLY in manager-only ListUsers responses so
+  // staff can read student/teacher credentials. Empty for accounts created
+  // before this feature (reset the password once to populate it).
+  string password_plain = 12;
+  // Free-text "story" the user writes about their learning; editable anytime,
+  // shown as a testimonial on the home page.
+  string story = 13;
 }
 
 message LoginRequest {
@@ -41,6 +51,8 @@ message CreateUserRequest {
   string password = 3;
   string full_name = 4;
   Role role = 5;
+  string kelas = 6;
+  string jurusan = 7;
 }
 
 message GetUserRequest {
@@ -53,6 +65,62 @@ message UpdateUserRequest {
   optional string email = 3;
   optional Role role = 4;
   optional bool is_active = 5;
+  optional string username = 6;
+  optional string kelas = 7;
+  optional string jurusan = 8;
+  optional string password = 9;
+}
+
+// Self-service profile update (any logged-in user updates their own account).
+message UpdateProfileRequest {
+  optional string full_name = 1;
+  optional string username = 2;
+  optional string email = 3;
+  optional string photo_url = 4;
+  optional string story = 5;
+}
+
+// A user's testimonial/story for the home page.
+message StoryEntry {
+  string user_id   = 1;
+  string full_name = 2;
+  string role      = 3;
+  string kelas     = 4;
+  string jurusan   = 5;
+  string photo_url = 6;
+  string story     = 7;
+}
+
+message ListStoriesRequest {}
+message ListStoriesResponse {
+  repeated StoryEntry stories = 1;
+}
+
+message ListActivityLogsRequest {
+  common.v1.PaginationRequest pagination = 1;
+  optional string user_id = 2;
+}
+
+message ActivityLogEntry {
+  string user_id = 1;
+  string full_name = 2;
+  string username = 3;
+  string role = 4;
+  string kelas = 5;
+  int32 login_count = 6;
+  google.protobuf.Timestamp last_login = 7;
+  google.protobuf.Timestamp first_login = 8;
+}
+
+message ListActivityLogsResponse {
+  repeated ActivityLogEntry entries = 1;
+  common.v1.PaginationResponse pagination = 2;
+}
+
+message ListUsersRequestFilters {
+  optional string kelas = 1;
+  optional string jurusan = 2;
+  optional string search = 3;
 }
 
 message DeleteUserRequest {
@@ -61,9 +129,23 @@ message DeleteUserRequest {
 
 message DeleteUserResponse {}
 
+// Move students between classes. Provide either student_ids (specific students)
+// or from_kelas (all students currently in that class). to_kelas is required.
+message MutateClassRequest {
+  string to_kelas = 1;
+  optional string from_kelas = 2;
+  repeated string student_ids = 3;
+}
+message MutateClassResponse {
+  int32 moved = 1;
+}
+
 message ListUsersRequest {
   common.v1.PaginationRequest pagination = 1;
   optional Role role_filter = 2;
+  optional string kelas = 3;
+  optional string jurusan = 4;
+  optional string search = 5;
 }
 
 message ListUsersResponse {
@@ -86,7 +168,11 @@ service UserService {
   rpc GetUser(GetUserRequest) returns (User);
   rpc UpdateUser(UpdateUserRequest) returns (User);
   rpc DeleteUser(DeleteUserRequest) returns (DeleteUserResponse);
+  rpc MutateClass(MutateClassRequest) returns (MutateClassResponse);
   rpc ListUsers(ListUsersRequest) returns (ListUsersResponse);
   rpc GetProfile(GetProfileRequest) returns (User);
+  rpc UpdateProfile(UpdateProfileRequest) returns (User);
   rpc ChangePassword(ChangePasswordRequest) returns (ChangePasswordResponse);
+  rpc ListActivityLogs(ListActivityLogsRequest) returns (ListActivityLogsResponse);
+  rpc ListStories(ListStoriesRequest) returns (ListStoriesResponse);
 }

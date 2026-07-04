@@ -1,0 +1,215 @@
+syntax = "proto3";
+
+package assignment.v1;
+
+option go_package = "lms/backend/gen/assignment/v1;assignmentv1";
+
+import "common/v1/common.proto";
+import "google/protobuf/timestamp.proto";
+
+message Assignment {
+  string id = 1;
+  string course_id = 2;
+  string course_name = 3;
+  string title = 4;
+  string description = 5;
+  google.protobuf.Timestamp deadline = 6;
+  int32 max_score = 7;
+  bool is_active = 8;
+  string created_by_id = 9;
+  int32 submission_count = 10;
+  google.protobuf.Timestamp created_at = 11;
+  google.protobuf.Timestamp updated_at = 12;
+  bool submitted = 13; // (student view) caller has already submitted
+  bool blocked = 14;   // (student view) caller is blocked from submitting
+  string created_by_name = 15; // teacher who created the assignment
+  string type = 16;            // 'uraian' | 'pilihan_ganda'
+}
+
+message Submission {
+  string id = 1;
+  string assignment_id = 2;
+  string student_id = 3;
+  string student_name = 4;
+  string student_kelas = 5;
+  string content = 6;
+  string file_url = 7;
+  bool submitted = 8;
+  google.protobuf.Timestamp submitted_at = 9;
+  bool graded = 10;
+  int32 score = 11;
+  string feedback = 12;
+  google.protobuf.Timestamp graded_at = 13;
+  int32 time_taken_seconds = 14; // MCQ: seconds the student spent
+}
+
+message CreateAssignmentRequest {
+  string course_id = 1;
+  string title = 2;
+  string description = 3;
+  google.protobuf.Timestamp deadline = 4;
+  int32 max_score = 5;
+  string type = 6; // 'uraian' | 'pilihan_ganda'
+}
+
+// ── Soal pilihan ganda untuk tugas ──
+message AssignmentQuestion {
+  string id = 1;
+  string assignment_id = 2;
+  string question = 3;
+  repeated string options = 4;
+  int32 correct_index = 5; // hidden (=-1) for students
+  int32 order_index = 6;
+  string image = 7;        // optional image (data URL)
+}
+
+message QuestionInput {
+  string question = 1;
+  repeated string options = 2;
+  int32 correct_index = 3;
+  string image = 4;        // optional image (data URL)
+}
+
+// Replace the full set of questions for an assignment.
+message SetAssignmentQuestionsRequest {
+  string assignment_id = 1;
+  repeated QuestionInput questions = 2;
+}
+message SetAssignmentQuestionsResponse {}
+
+message ListAssignmentQuestionsRequest  { string assignment_id = 1; }
+message ListAssignmentQuestionsResponse { repeated AssignmentQuestion questions = 1; }
+
+message QuizAnswer { string question_id = 1; int32 option_index = 2; }
+
+message SubmitQuizRequest {
+  string assignment_id = 1;
+  repeated QuizAnswer answers = 2;
+  int32 time_taken_seconds = 3;
+}
+message SubmitQuizResponse {
+  bool  accepted = 1; // false when wrong > 5% (must retry)
+  int32 correct  = 2;
+  int32 total    = 3;
+  int32 score    = 4;
+}
+
+message UpdateAssignmentRequest {
+  string id = 1;
+  optional string title = 2;
+  optional string description = 3;
+  optional google.protobuf.Timestamp deadline = 4;
+  optional int32 max_score = 5;
+  optional bool is_active = 6;
+}
+
+message GetAssignmentRequest { string id = 1; }
+message DeleteAssignmentRequest { string id = 1; }
+message DeleteAssignmentResponse {}
+
+message ListAssignmentsRequest {
+  optional string course_id = 1;
+  common.v1.PaginationRequest pagination = 2;
+}
+
+message ListAssignmentsResponse {
+  repeated Assignment assignments = 1;
+  common.v1.PaginationResponse pagination = 2;
+}
+
+// Student submits (or re-submits) their own work.
+message SubmitAssignmentRequest {
+  string assignment_id = 1;
+  string content = 2;
+  string file_url = 3;
+}
+
+// Teacher view: all enrolled students with submission status (submitted or not).
+message ListSubmissionsRequest {
+  string assignment_id = 1;
+}
+
+message ListSubmissionsResponse {
+  repeated Submission submissions = 1;
+}
+
+message GradeSubmissionRequest {
+  string submission_id = 1;
+  int32 score = 2;
+  string feedback = 3;
+}
+
+// ── Blokir siswa dari mengumpulkan tugas tertentu ──
+message BlockStudentRequest   { string assignment_id = 1; string student_id = 2; }
+message BlockStudentResponse  {}
+message UnblockStudentRequest { string assignment_id = 1; string student_id = 2; }
+message UnblockStudentResponse {}
+
+message ListBlockedStudentsRequest  { string assignment_id = 1; }
+message ListBlockedStudentsResponse { repeated string student_ids = 1; }
+
+// Grades grid for the Nilai page (rows = students, scores per assignment).
+message ListGradesRequest {
+  optional string course_id = 1;
+  optional string kelas = 2;
+  optional string search = 3;
+}
+
+message GradeRow {
+  string student_id = 1;
+  string student_name = 2;
+  string kelas = 3;
+  string jurusan = 4;
+  repeated GradeCell cells = 5;
+  double average = 6;
+}
+
+message GradeCell {
+  string assignment_id = 1;
+  string assignment_title = 2;
+  bool has_score = 3;
+  int32 score = 4;
+  int32 max_score = 5;
+}
+
+message ListGradesResponse {
+  repeated GradeRow rows = 1;
+  repeated GradeCell columns = 2;  // assignment headers (score/max ignored)
+}
+
+// ── Student self-view: own grades per subject (mata pelajaran) ──
+message ListMyGradesRequest {}
+
+message SubjectGrade {
+  string course_id = 1;
+  string course_name = 2;
+  int32 graded_count = 3;     // graded assignments in this subject
+  int32 assignment_count = 4; // total assignments in this subject
+  double average = 5;         // 0-100, average % of graded assignments
+  bool has_grade = 6;
+}
+
+message ListMyGradesResponse {
+  repeated SubjectGrade subjects = 1;
+  double overall_average = 2; // mean of graded subjects' averages
+  bool has_grade = 3;
+}
+
+service AssignmentService {
+  rpc CreateAssignment(CreateAssignmentRequest) returns (Assignment);
+  rpc GetAssignment(GetAssignmentRequest) returns (Assignment);
+  rpc UpdateAssignment(UpdateAssignmentRequest) returns (Assignment);
+  rpc DeleteAssignment(DeleteAssignmentRequest) returns (DeleteAssignmentResponse);
+  rpc ListAssignments(ListAssignmentsRequest) returns (ListAssignmentsResponse);
+  rpc SubmitAssignment(SubmitAssignmentRequest) returns (Submission);
+  rpc ListSubmissions(ListSubmissionsRequest) returns (ListSubmissionsResponse);
+  rpc GradeSubmission(GradeSubmissionRequest) returns (Submission);
+  rpc ListGrades(ListGradesRequest) returns (ListGradesResponse);
+  rpc ListMyGrades(ListMyGradesRequest) returns (ListMyGradesResponse);
+  rpc BlockStudent(BlockStudentRequest) returns (BlockStudentResponse);
+  rpc UnblockStudent(UnblockStudentRequest) returns (UnblockStudentResponse);
+  rpc ListBlockedStudents(ListBlockedStudentsRequest) returns (ListBlockedStudentsResponse);
+  rpc SetAssignmentQuestions(SetAssignmentQuestionsRequest) returns (SetAssignmentQuestionsResponse);
+  rpc ListAssignmentQuestions(ListAssignmentQuestionsRequest) returns (ListAssignmentQuestionsResponse);
+  rpc SubmitQuiz(SubmitQuizRequest) returns (SubmitQuizResponse);
+}

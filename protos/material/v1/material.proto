@@ -1,0 +1,273 @@
+syntax = "proto3";
+
+package material.v1;
+
+option go_package = "lms/backend/gen/material/v1;materialv1";
+
+import "common/v1/common.proto";
+import "google/protobuf/timestamp.proto";
+
+enum ContentType {
+  CONTENT_TYPE_UNSPECIFIED = 0;
+  CONTENT_TYPE_LINK = 1;
+  CONTENT_TYPE_DOCUMENT = 2;
+  CONTENT_TYPE_VIDEO = 3;
+  CONTENT_TYPE_TEXT = 4;
+}
+
+message Material {
+  string id = 1;
+  string course_id = 2;
+  string title = 3;
+  string description = 4;
+  ContentType content_type = 5;
+  string content_url = 6;
+  string content_text = 7;
+  int32 order_index = 8;
+  bool is_published = 9;
+  string created_by_id = 10;
+  google.protobuf.Timestamp created_at = 11;
+  google.protobuf.Timestamp updated_at = 12;
+  string category_id = 13;
+  string category_code = 14;
+  string category_name = 15;
+  string created_by_name = 16;
+  string updated_by_id = 17;
+  string updated_by_name = 18;
+  string cover_image = 19;
+  double avg_rating = 20;   // average student rating (0 if none)
+  int32  rating_count = 21; // number of ratings
+}
+
+message CreateMaterialRequest {
+  string course_id = 1;
+  string title = 2;
+  string description = 3;
+  ContentType content_type = 4;
+  string content_url = 5;
+  string content_text = 6;
+  int32 order_index = 7;
+  string category_id = 8;
+  string cover_image = 9;
+}
+
+message GetMaterialRequest {
+  string id = 1;
+}
+
+message UpdateMaterialRequest {
+  string id = 1;
+  optional string title = 2;
+  optional string description = 3;
+  optional ContentType content_type = 4;
+  optional string content_url = 5;
+  optional string content_text = 6;
+  optional int32 order_index = 7;
+  optional bool is_published = 8;
+  optional string category_id = 9;
+  optional string cover_image = 10;
+}
+
+// ── Kategori materi (kode + nama, global) ──
+message Category {
+  string id   = 1;
+  string code = 2;
+  string name = 3;
+}
+
+message CreateCategoryRequest {
+  string code = 1;
+  string name = 2;
+}
+
+message ListCategoriesRequest {}
+message ListCategoriesResponse { repeated Category categories = 1; }
+
+message DeleteCategoryRequest  { string id = 1; }
+message DeleteCategoryResponse {}
+
+message DeleteMaterialRequest {
+  string id = 1;
+}
+
+message DeleteMaterialResponse {}
+
+message ListMaterialsRequest {
+  string course_id = 1;
+  common.v1.PaginationRequest pagination = 2;
+}
+
+message ListMaterialsResponse {
+  repeated Material materials = 1;
+  common.v1.PaginationResponse pagination = 2;
+}
+
+// Global material search across the caller's accessible courses + Materi Umum.
+message SearchMaterialsRequest {
+  string query = 1;
+}
+
+message MaterialSearchHit {
+  Material material    = 1;
+  string   course_id   = 2;
+  string   course_name = 3;
+}
+
+message SearchMaterialsResponse {
+  repeated MaterialSearchHit hits = 1;
+}
+
+// ── Student rating (1–5 stars) ──
+message RateMaterialRequest {
+  string material_id = 1;
+  int32  stars       = 2; // 1..5
+}
+message RateMaterialResponse {
+  double avg_rating   = 1;
+  int32  rating_count = 2;
+  int32  my_rating    = 3;
+}
+
+// ── Soal (quiz questions attached to a material) ──
+message Question {
+  string id = 1;
+  string material_id = 2;
+  string question = 3;
+  repeated string options = 4;
+  int32 correct_index = 5;
+  int32 order_index = 6;
+  string image = 7; // optional image (data URL)
+}
+
+message CreateQuestionRequest {
+  string material_id = 1;
+  string question = 2;
+  repeated string options = 3;
+  int32 correct_index = 4;
+  string image = 5; // optional image (data URL)
+}
+
+message ListQuestionsRequest {
+  string material_id = 1;
+}
+
+message ListQuestionsResponse {
+  repeated Question questions = 1;
+}
+
+message DeleteQuestionRequest {
+  string id = 1;
+}
+
+message DeleteQuestionResponse {}
+
+// ── Completion tracking ──
+message MaterialCompletion {
+  string id            = 1;
+  string material_id   = 2;
+  string student_id    = 3;
+  string student_name  = 4;
+  string student_kelas = 5;
+  int32  read_percent  = 6;
+  bool   quiz_passed   = 7;
+  google.protobuf.Timestamp completed_at = 8;
+}
+
+message MarkCompleteRequest {
+  string material_id  = 1;
+  int32  read_percent = 2;
+  bool   quiz_passed  = 3;
+}
+
+message GetMyCompletionRequest {
+  string material_id = 1;
+}
+
+message StudentCompletionSummary {
+  string student_id      = 1;
+  string student_name    = 2;
+  string student_kelas   = 3;
+  int32  completed_count = 4;
+  int32  total_materials = 5;
+  int32  percent         = 6;
+}
+
+message ListCompletionsRequest {
+  string course_id = 1;
+}
+
+message ListCompletionsResponse {
+  repeated StudentCompletionSummary students = 1;
+}
+
+// Resets a single student's progress in a course: deletes their material
+// completion records and essay answers so they must redo everything.
+message ResetStudentProgressRequest {
+  string course_id  = 1;
+  string student_id = 2;
+}
+
+message ResetStudentProgressResponse {}
+
+// ── Soal Uraian (essay questions with comments) ──
+message EssayQuestion {
+  string id          = 1;
+  string material_id = 2;
+  string question    = 3;
+  int32  order_index = 4;
+}
+
+message EssayComment {
+  string id                 = 1;
+  string essay_question_id  = 2;
+  string author_id          = 3;
+  string author_name        = 4;
+  string author_role        = 5;
+  string content            = 6;
+  google.protobuf.Timestamp created_at = 7;
+}
+
+message CreateEssayQuestionRequest {
+  string material_id = 1;
+  string question    = 2;
+  int32  order_index = 3;
+}
+
+message ListEssayQuestionsRequest  { string material_id = 1; }
+message ListEssayQuestionsResponse { repeated EssayQuestion questions = 1; }
+
+message DeleteEssayQuestionRequest  { string id = 1; }
+message DeleteEssayQuestionResponse {}
+
+message AddEssayCommentRequest {
+  string essay_question_id = 1;
+  string content           = 2;
+}
+
+message ListEssayCommentsRequest  { string essay_question_id = 1; }
+message ListEssayCommentsResponse { repeated EssayComment comments = 1; }
+
+service MaterialService {
+  rpc CreateMaterial(CreateMaterialRequest) returns (Material);
+  rpc GetMaterial(GetMaterialRequest) returns (Material);
+  rpc UpdateMaterial(UpdateMaterialRequest) returns (Material);
+  rpc DeleteMaterial(DeleteMaterialRequest) returns (DeleteMaterialResponse);
+  rpc ListMaterials(ListMaterialsRequest) returns (ListMaterialsResponse);
+  rpc SearchMaterials(SearchMaterialsRequest) returns (SearchMaterialsResponse);
+  rpc RateMaterial(RateMaterialRequest) returns (RateMaterialResponse);
+  rpc CreateQuestion(CreateQuestionRequest) returns (Question);
+  rpc ListQuestions(ListQuestionsRequest) returns (ListQuestionsResponse);
+  rpc DeleteQuestion(DeleteQuestionRequest) returns (DeleteQuestionResponse);
+  rpc MarkComplete(MarkCompleteRequest) returns (MaterialCompletion);
+  rpc GetMyCompletion(GetMyCompletionRequest) returns (MaterialCompletion);
+  rpc ListCompletions(ListCompletionsRequest) returns (ListCompletionsResponse);
+  rpc ResetStudentProgress(ResetStudentProgressRequest) returns (ResetStudentProgressResponse);
+  rpc CreateCategory(CreateCategoryRequest) returns (Category);
+  rpc ListCategories(ListCategoriesRequest) returns (ListCategoriesResponse);
+  rpc DeleteCategory(DeleteCategoryRequest) returns (DeleteCategoryResponse);
+  rpc CreateEssayQuestion(CreateEssayQuestionRequest) returns (EssayQuestion);
+  rpc ListEssayQuestions(ListEssayQuestionsRequest)   returns (ListEssayQuestionsResponse);
+  rpc DeleteEssayQuestion(DeleteEssayQuestionRequest) returns (DeleteEssayQuestionResponse);
+  rpc AddEssayComment(AddEssayCommentRequest)         returns (EssayComment);
+  rpc ListEssayComments(ListEssayCommentsRequest)     returns (ListEssayCommentsResponse);
+}

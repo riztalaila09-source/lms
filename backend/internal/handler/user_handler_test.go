@@ -80,10 +80,31 @@ func (m *mockRepo) List(ctx context.Context, f repository.ListFilter) ([]*reposi
 	return args.Get(0).([]*repository.User), args.Int(1), args.Error(2)
 }
 
+func (m *mockRepo) MoveStudentsByClass(ctx context.Context, fromKelas, toKelas string) (int64, error) {
+	args := m.Called(ctx, fromKelas, toKelas)
+	return int64(args.Int(0)), args.Error(1)
+}
+
+func (m *mockRepo) MoveStudentsByIDs(ctx context.Context, ids []string, toKelas string) (int64, error) {
+	args := m.Called(ctx, ids, toKelas)
+	return int64(args.Int(0)), args.Error(1)
+}
+
+func (m *mockRepo) ListStories(ctx context.Context, limit int) ([]*repository.StoryEntry, error) {
+	args := m.Called(ctx, limit)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]*repository.StoryEntry), args.Error(1)
+}
+
 func newTestHandler(repo repository.UserRepository) *handler.UserHandler {
 	jwtSvc := service.NewJWTService("test-secret", 24)
-	userSvc := service.NewUserService(repo, jwtSvc)
-	return handler.NewUserHandler(userSvc)
+	userSvc := service.NewUserService(repo, jwtSvc, nil)
+	// courseSvc is only used by CreateUser auto-enroll (student + kelas); these
+	// handler tests never trigger that path, so nil repos are safe here.
+	courseSvc := service.NewCourseService(nil, nil, repo)
+	return handler.NewUserHandler(userSvc, courseSvc)
 }
 
 func TestUserHandler_GetProfile(t *testing.T) {
@@ -126,10 +147,10 @@ func TestUserHandler_GetUser_StudentCannotGetOther(t *testing.T) {
 	assert.Equal(t, connect.CodePermissionDenied, connectErr.Code())
 }
 
-func TestUserHandler_DeleteUser_NonAdminDenied(t *testing.T) {
+func TestUserHandler_DeleteUser_StudentDenied(t *testing.T) {
 	repo := &mockRepo{}
 	h := newTestHandler(repo)
-	ctx := makeAuthContext("teacher-1", "teacher")
+	ctx := makeAuthContext("student-1", "student")
 
 	_, err := h.DeleteUser(ctx, connect.NewRequest(&userv1.DeleteUserRequest{Id: "some-id"}))
 	require.Error(t, err)

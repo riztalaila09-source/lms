@@ -1,0 +1,30 @@
+syntax = "proto3";
+
+package jurusan.v1;
+
+option go_package = "lms/backend/gen/jurusan/v1;jurusanv1";
+
+import "google/protobuf/timestamp.proto";
+
+message Jurusan {
+  string id = 1;
+  string name = 2;
+  int32 student_count = 3;
+  google.protobuf.Timestamp created_at = 4;
+}
+
+message CreateJurusanRequest { string name = 1; }
+message UpdateJurusanRequest { string id = 1; string name = 2; }
+
+message ListJurusansRequest {}
+message ListJurusansResponse { repeated Jurusan jurusans = 1; }
+
+message DeleteJurusanRequest { string id = 1; }
+message DeleteJurusanResponse {}
+
+service JurusanService {
+  rpc CreateJurusan(CreateJurusanRequest) returns (Jurusan);
+  rpc UpdateJurusan(UpdateJurusanRequest) returns (Jurusan);
+  rpc ListJurusans(ListJurusansRequest) returns (ListJurusansResponse);
+  rpc DeleteJurusan(DeleteJurusanRequest) returns (DeleteJurusanResponse);
+}

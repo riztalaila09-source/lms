@@ -1,0 +1,42 @@
+syntax = "proto3";
+
+package class.v1;
+
+option go_package = "lms/backend/gen/class/v1;classv1";
+
+import "google/protobuf/timestamp.proto";
+
+message Class {
+  string id = 1;
+  string name = 2;
+  int32 student_count = 3;
+  google.protobuf.Timestamp created_at = 4;
+}
+
+message CreateClassRequest {
+  string name = 1;
+}
+
+message UpdateClassRequest {
+  string id = 1;
+  string name = 2;
+}
+
+message ListClassesRequest {}
+
+message ListClassesResponse {
+  repeated Class classes = 1;
+}
+
+message DeleteClassRequest {
+  string id = 1;
+}
+
+message DeleteClassResponse {}
+
+service ClassService {
+  rpc CreateClass(CreateClassRequest) returns (Class);
+  rpc UpdateClass(UpdateClassRequest) returns (Class);
+  rpc ListClasses(ListClassesRequest) returns (ListClassesResponse);
+  rpc DeleteClass(DeleteClassRequest) returns (DeleteClassResponse);
+}

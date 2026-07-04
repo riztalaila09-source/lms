@@ -29,15 +29,28 @@ type UpdateUserInput struct {
 	Email    *string
 	Role     *string
 	IsActive *bool
+	Username *string
+	Kelas    *string
+	Jurusan  *string
+	Password *string
+}
+
+type UpdateProfileInput struct {
+	FullName *string
+	Username *string
+	Email    *string
+	PhotoURL *string
+	Story    *string
 }
 
 type UserService struct {
-	repo    repository.UserRepository
-	jwtSvc  *JWTService
+	repo         repository.UserRepository
+	jwtSvc       *JWTService
+	activityRepo repository.ActivityRepository
 }
 
-func NewUserService(repo repository.UserRepository, jwtSvc *JWTService) *UserService {
-	return &UserService{repo: repo, jwtSvc: jwtSvc}
+func NewUserService(repo repository.UserRepository, jwtSvc *JWTService, activityRepo repository.ActivityRepository) *UserService {
+	return &UserService{repo: repo, jwtSvc: jwtSvc, activityRepo: activityRepo}
 }
 
 func (s *UserService) Login(ctx context.Context, email, password string) (*LoginResult, error) {
@@ -62,11 +75,23 @@ func (s *UserService) Login(ctx context.Context, email, password string) (*Login
 		return nil, fmt.Errorf("generate token: %w", err)
 	}
 
+	// Best-effort login tracking — never block login on a logging failure.
+	if s.activityRepo != nil {
+		_ = s.activityRepo.Record(ctx, uuid.New().String(), user.ID, "login")
+	}
+
 	return &LoginResult{Token: token, User: user}, nil
 }
 
-func (s *UserService) CreateUser(ctx context.Context, callerRole, username, email, password, fullName, role string) (*repository.User, error) {
-	if callerRole != "admin" {
+func (s *UserService) CreateUser(ctx context.Context, callerRole, username, email, password, fullName, role, kelas, jurusan string) (*repository.User, error) {
+	// Managers (teacher / legacy admin) may add students or other teachers, not admins.
+	switch callerRole {
+	case "admin":
+	case "teacher":
+		if role != "student" && role != "teacher" {
+			return nil, ErrPermissionDenied
+		}
+	default:
 		return nil, ErrPermissionDenied
 	}
 
@@ -81,15 +106,18 @@ func (s *UserService) CreateUser(ctx context.Context, callerRole, username, emai
 
 	now := time.Now().UTC()
 	u := &repository.User{
-		ID:           uuid.New().String(),
-		Username:     username,
-		Email:        email,
-		PasswordHash: string(hash),
-		Role:         role,
-		FullName:     fullName,
-		IsActive:     true,
-		CreatedAt:    now,
-		UpdatedAt:    now,
+		ID:            uuid.New().String(),
+		Username:      username,
+		Email:         email,
+		PasswordHash:  string(hash),
+		PasswordPlain: password,
+		Role:          role,
+		FullName:      fullName,
+		IsActive:      true,
+		Kelas:         kelas,
+		Jurusan:       jurusan,
+		CreatedAt:     now,
+		UpdatedAt:     now,
 	}
 
 	if err := s.repo.Create(ctx, u); err != nil {
@@ -117,7 +145,7 @@ func (s *UserService) GetUser(ctx context.Context, callerID, callerRole, targetI
 }
 
 func (s *UserService) UpdateUser(ctx context.Context, callerRole, targetID string, input UpdateUserInput) (*repository.User, error) {
-	if callerRole != "admin" {
+	if !isManager(callerRole) {
 		return nil, ErrPermissionDenied
 	}
 
@@ -144,6 +172,23 @@ func (s *UserService) UpdateUser(ctx context.Context, callerRole, targetID strin
 	if input.IsActive != nil {
 		u.IsActive = *input.IsActive
 	}
+	if input.Username != nil {
+		u.Username = *input.Username
+	}
+	if input.Kelas != nil {
+		u.Kelas = *input.Kelas
+	}
+	if input.Jurusan != nil {
+		u.Jurusan = *input.Jurusan
+	}
+	if input.Password != nil && *input.Password != "" {
+		hash, err := bcrypt.GenerateFromPassword([]byte(*input.Password), bcrypt.DefaultCost)
+		if err != nil {
+			return nil, fmt.Errorf("hash password: %w", err)
+		}
+		u.PasswordHash = string(hash)
+		u.PasswordPlain = *input.Password
+	}
 
 	if err := s.repo.Update(ctx, u); err != nil {
 		if errors.Is(err, repository.ErrDuplicate) {
@@ -154,8 +199,57 @@ func (s *UserService) UpdateUser(ctx context.Context, callerRole, targetID strin
 	return u, nil
 }
 
+// UpdateProfile lets a user update their own account (no admin required).
+func (s *UserService) UpdateProfile(ctx context.Context, callerID string, input UpdateProfileInput) (*repository.User, error) {
+	u, err := s.repo.GetByID(ctx, callerID)
+	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			return nil, ErrNotFound
+		}
+		return nil, fmt.Errorf("get user: %w", err)
+	}
+	if input.FullName != nil {
+		u.FullName = *input.FullName
+	}
+	if input.Username != nil {
+		u.Username = *input.Username
+	}
+	if input.Email != nil {
+		u.Email = *input.Email
+	}
+	if input.PhotoURL != nil {
+		u.PhotoURL = *input.PhotoURL
+	}
+	if input.Story != nil {
+		u.Story = *input.Story
+	}
+	if err := s.repo.Update(ctx, u); err != nil {
+		if errors.Is(err, repository.ErrDuplicate) {
+			return nil, ErrDuplicate
+		}
+		return nil, fmt.Errorf("update profile: %w", err)
+	}
+	return u, nil
+}
+
+// ListStories returns users' testimonials for the home page (any logged-in user).
+func (s *UserService) ListStories(ctx context.Context) ([]*repository.StoryEntry, error) {
+	return s.repo.ListStories(ctx, 50)
+}
+
+// ListActivityLogs returns aggregated login stats (admin/teacher only).
+func (s *UserService) ListActivityLogs(ctx context.Context, callerRole, userID string, page, pageSize int) ([]*repository.ActivityLogEntry, int, error) {
+	if callerRole != "admin" && callerRole != "teacher" {
+		return nil, 0, ErrPermissionDenied
+	}
+	if s.activityRepo == nil {
+		return nil, 0, nil
+	}
+	return s.activityRepo.Aggregate(ctx, userID, page, pageSize)
+}
+
 func (s *UserService) DeleteUser(ctx context.Context, callerRole, targetID string) error {
-	if callerRole != "admin" {
+	if !isManager(callerRole) {
 		return ErrPermissionDenied
 	}
 
@@ -169,7 +263,7 @@ func (s *UserService) DeleteUser(ctx context.Context, callerRole, targetID strin
 }
 
 func (s *UserService) ListUsers(ctx context.Context, callerRole string, f repository.ListFilter) ([]*repository.User, int, error) {
-	if callerRole != "admin" {
+	if !isManager(callerRole) {
 		return nil, 0, ErrPermissionDenied
 	}
 
@@ -210,10 +304,35 @@ func (s *UserService) ChangePassword(ctx context.Context, callerID, currentPassw
 	}
 
 	u.PasswordHash = string(hash)
+	u.PasswordPlain = newPassword
 	if err := s.repo.Update(ctx, u); err != nil {
 		return fmt.Errorf("update password: %w", err)
 	}
 	return nil
+}
+
+// MutateClass moves students between classes (manager only). Provide either a
+// set of studentIDs (specific students) or fromKelas (everyone in that class).
+// toKelas must be non-empty. Returns the number of students moved.
+func (s *UserService) MutateClass(ctx context.Context, callerRole, toKelas, fromKelas string, studentIDs []string) (int, error) {
+	if !isManager(callerRole) {
+		return 0, ErrPermissionDenied
+	}
+	if toKelas == "" {
+		return 0, fmt.Errorf("kelas tujuan wajib diisi")
+	}
+	if len(studentIDs) > 0 {
+		n, err := s.repo.MoveStudentsByIDs(ctx, studentIDs, toKelas)
+		return int(n), err
+	}
+	if fromKelas == "" {
+		return 0, fmt.Errorf("pilih kelas asal atau siswa yang dimutasi")
+	}
+	if fromKelas == toKelas {
+		return 0, fmt.Errorf("kelas asal dan tujuan sama")
+	}
+	n, err := s.repo.MoveStudentsByClass(ctx, fromKelas, toKelas)
+	return int(n), err
 }
 
 func isValidRole(role string) bool {

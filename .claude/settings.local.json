@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run *)",
+      "PowerShell($env:PATH += \";C:\\\\Program Files\\\\nodejs\"; cd \"c:\\\\Users\\\\hp\\\\Pictures\\\\project\\\\lms\\\\frontend\"; node --version 2>&1; npm --version 2>&1)",
+      "PowerShell($env:PATH += \";C:\\\\Program Files\\\\nodejs\"; cd \"c:\\\\Users\\\\hp\\\\Pictures\\\\project\\\\lms\\\\frontend\"; npm run build 2>&1 | Select-Object -First 80)",
+      "PowerShell($env:PATH += \";C:\\\\Program Files\\\\nodejs\"; cd \"c:\\\\Users\\\\hp\\\\Pictures\\\\project\\\\lms\\\\frontend\"; npm run build 2>&1 | Select-Object -First 60)",
+      "PowerShell(Get-NetTCPConnection -LocalPort 8080 -State Listen -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue }; Start-Sleep -Seconds 1; Write-Output \"Done\")",
+      "PowerShell(cd \"c:\\\\Users\\\\hp\\\\Pictures\\\\project\\\\lms\"; & \"C:\\\\Users\\\\hp\\\\go\\\\bin\\\\buf.exe\" generate 2>&1 | Select-Object -First 30; \"buf exit: $LASTEXITCODE\")",
+      "PowerShell($env:PATH += \";C:\\\\Program Files\\\\nodejs\"; cd \"c:\\\\Users\\\\hp\\\\Pictures\\\\project\\\\lms\\\\frontend\"; npm run build 2>&1 | Select-String -Pattern \"error TS|Cannot find|✓ built|Could not resolve\" | Select-Object -First 40)",
+      "PowerShell(Get-NetTCPConnection -LocalPort 8080 -State Listen -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue }; Start-Sleep -Seconds 1; cd \"c:\\\\Users\\\\hp\\\\Pictures\\\\project\\\\lms\\\\backend\"; Start-Process -FilePath \"go\" -ArgumentList \"run\",\"-tags\",\"dev\",\"./cmd/server\" -RedirectStandardOutput \"C:\\\\Users\\\\hp\\\\AppData\\\\Local\\\\Temp\\\\backend.log\" -RedirectStandardError \"C:\\\\Users\\\\hp\\\\AppData\\\\Local\\\\Temp\\\\backend-err.log\" -PassThru | Select-Object Id; Start-Sleep -Seconds 11; \"--- stdout ---\"; Get-Content \"C:\\\\Users\\\\hp\\\\AppData\\\\Local\\\\Temp\\\\backend.log\"; \"--- stderr ---\"; Get-Content \"C:\\\\Users\\\\hp\\\\AppData\\\\Local\\\\Temp\\\\backend-err.log\")",
+      "PowerShell(\"--- stderr ---\")",
+      "PowerShell(\"--- stdout ---\")",
+      "PowerShell(cd \"c:\\\\Users\\\\hp\\\\Pictures\\\\project\\\\lms\"; & \"C:\\\\Users\\\\hp\\\\go\\\\bin\\\\buf.exe\" generate 2>&1 | Select-Object -First 20; \"buf exit: $LASTEXITCODE\")",
+      "PowerShell(cd \"c:\\\\Users\\\\hp\\\\Pictures\\\\project\\\\lms\\\\backend\"; go build -tags dev ./... 2>&1; \"build exit: $LASTEXITCODE\")",
+      "PowerShell(Get-NetTCPConnection -LocalPort 8080 -State Listen -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue }; Start-Sleep -Seconds 1; cd \"c:\\\\Users\\\\hp\\\\Pictures\\\\project\\\\lms\\\\backend\"; Start-Process -FilePath \"go\" -ArgumentList \"run\",\"-tags\",\"dev\",\"./cmd/server\" -RedirectStandardOutput \"C:\\\\Users\\\\hp\\\\AppData\\\\Local\\\\Temp\\\\backend.log\" -RedirectStandardError \"C:\\\\Users\\\\hp\\\\AppData\\\\Local\\\\Temp\\\\backend-err.log\" -PassThru | Select-Object Id; Start-Sleep -Seconds 11; \"--- stderr ---\"; Get-Content \"C:\\\\Users\\\\hp\\\\AppData\\\\Local\\\\Temp\\\\backend-err.log\"; \"--- stdout ---\"; Get-Content \"C:\\\\Users\\\\hp\\\\AppData\\\\Local\\\\Temp\\\\backend.log\")",
+      "Bash(buf generate *)",
+      "Bash(go build *)",
+      "PowerShell($env:PATH += \";C:\\\\Program Files\\\\nodejs\"; npm run build 2>&1)",
+      "PowerShell($env:PATH += \";C:\\\\Program Files\\\\nodejs\"; cd \"c:\\\\Users\\\\hp\\\\Pictures\\\\project\\\\lms\\\\frontend\"; npm run build 2>&1)",
+      "PowerShell(Get-Process | Where-Object { $_.Name -match 'lms|server' } | Select-Object Id, Name, Path 2>&1)"
+    ]
+  }
+}
