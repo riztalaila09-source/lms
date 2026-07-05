@@ -1,40 +1,42 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import {
-  Badge, Box, Button, Dialog, Field, Flex, Icon, Input, NativeSelect, Stack, Table, Text,
+  Badge, Box, Button, Dialog, Field, Flex, Icon, Input, NativeSelect, Stack, Table, Text, Textarea,
 } from '@chakra-ui/react'
 import {
   LuPlus, LuTrash2, LuPencil, LuSearch, LuUpload, LuDownload, LuFileText, LuCopy, LuArrowRightLeft,
+  LuSave, LuCircleCheck, LuBuilding,
 } from 'react-icons/lu'
-import { userClient, classClient, jurusanClient } from '@/lib/client'
+import { userClient, classClient, jurusanClient, schoolClient } from '@/lib/client'
 import type { User } from '@/gen/user/v1/user_pb'
 import { Role } from '@/gen/user/v1/user_pb'
 import type { Class } from '@/gen/class/v1/class_pb'
 import type { Jurusan } from '@/gen/jurusan/v1/jurusan_pb'
+import type { Semester } from '@/gen/school/v1/school_pb'
 import AppLayout from '@/components/AppLayout'
 import { Card } from '@/components/Card'
 import ConfirmDialog, { type ConfirmState } from '@/components/ConfirmDialog'
 import Pagination, { usePaged } from '@/components/Pagination'
 import { COLORS, labelColor } from '@/theme/tokens'
 
-type Tab = 'kelas' | 'jurusan' | 'guru' | 'siswa'
+type Tab = 'sekolah' | 'semester' | 'kelas' | 'jurusan' | 'guru' | 'siswa'
 
 interface EditForm {
   fullName: string
   username: string
   email: string
   kelas: string
-  jurusan: string
+  mapel: string
   password: string
 }
 
 interface ImportRow {
-  fullName: string; username: string; email: string; password: string; kelas: string; jurusan: string
+  fullName: string; username: string; email: string; password: string; kelas: string
 }
 
 const TEMPLATE_CSV = [
-  'Nama Lengkap,Username,Email,Password,Kelas,Jurusan',
-  'Andi Pratama,andi.pratama,andi@sekolah.com,Password123,X-TKJ1,TKJ',
-  'Budi Santoso,budi.santoso,budi@sekolah.com,Password123,X-TKR1,TKR',
+  'Nama Lengkap,Username,Email,Password,Kelas',
+  'Andi Pratama,andi.pratama,andi@sekolah.com,Password123,X-TKJ-1',
+  'Budi Santoso,budi.santoso,budi@sekolah.com,Password123,X-TKR-1',
 ].join('\n')
 
 function downloadCSV(content: string, filename: string) {
@@ -55,17 +57,16 @@ function parseCSV(text: string): ImportRow[] {
     email: headers.findIndex(h => h === 'email'),
     password: headers.findIndex(h => h === 'password'),
     kelas: headers.findIndex(h => h === 'kelas'),
-    jurusan: headers.findIndex(h => h === 'jurusan'),
   }
   return lines.slice(1).map(line => {
     const vals = line.split(',').map(s => s.trim().replace(/^["']|["']$/g, ''))
     const get = (i: number) => (i >= 0 ? vals[i] || '' : '')
-    return { fullName: get(idx.fullName), username: get(idx.username), email: get(idx.email), password: get(idx.password), kelas: get(idx.kelas), jurusan: get(idx.jurusan) }
+    return { fullName: get(idx.fullName), username: get(idx.username), email: get(idx.email), password: get(idx.password), kelas: get(idx.kelas) }
   }).filter(r => r.fullName || r.username || r.email)
 }
 
 export default function UsersPage() {
-  const [tab, setTab] = useState<Tab>('kelas')
+  const [tab, setTab] = useState<Tab>('sekolah')
   const [confirm, setConfirm] = useState<ConfirmState | null>(null)
 
   // plain passwords typed this session (fallback before the list reloads)
@@ -73,7 +74,8 @@ export default function UsersPage() {
 
   // edit dialog
   const [editTarget, setEditTarget] = useState<{ user: User; role: 'guru' | 'siswa' } | null>(null)
-  const [editForm, setEditForm] = useState<EditForm>({ fullName: '', username: '', email: '', kelas: '', jurusan: '', password: '' })
+  const [editForm, setEditForm] = useState<EditForm>({ fullName: '', username: '', email: '', kelas: '', mapel: '', password: '' })
+  const [editGuruKelas, setEditGuruKelas] = useState<string[]>([])
   const [editSaving, setEditSaving] = useState(false)
   const [editError, setEditError] = useState('')
 
@@ -96,18 +98,22 @@ export default function UsersPage() {
     } catch { setTeachers([]) }
   }, [])
 
-  // ── Kelas ──
-  const [newKelas, setNewKelas] = useState('')
+  // ── Kelas (format gabungan: Tingkat-Jurusan-Nomor, mis. X-TKJ-1) ──
+  const [kTingkat, setKTingkat] = useState('X')
+  const [kJurusan, setKJurusan] = useState('')
+  const [kNomor, setKNomor] = useState('1')
   const [kelasErr, setKelasErr] = useState('')
   const [editKelas, setEditKelas] = useState<Class | null>(null)
   const [editKelasName, setEditKelasName] = useState('')
   const [editKelasErr, setEditKelasErr] = useState('')
   const [savingKelas, setSavingKelas] = useState(false)
+  const kelasPreview = `${kTingkat}-${kJurusan || '…'}-${kNomor || '…'}`
   const addKelas = async () => {
-    const name = newKelas.trim()
-    if (!name) return
+    const t = kTingkat.trim(), j = kJurusan.trim(), n = kNomor.trim()
+    if (!t || !j || !n) { setKelasErr('Lengkapi Tingkat, Jurusan, dan Nomor.'); return }
+    const name = `${t}-${j}-${n}`
     setKelasErr('')
-    try { await classClient.createClass({ name }); setNewKelas(''); await loadClasses() }
+    try { await classClient.createClass({ name }); setKNomor('1'); await loadClasses() }
     catch (err: unknown) { setKelasErr(err instanceof Error ? err.message : 'Gagal membuat kelas') }
   }
   const startEditKelas = (c: Class) => { setEditKelas(c); setEditKelasName(c.name); setEditKelasErr('') }
@@ -165,16 +171,57 @@ export default function UsersPage() {
   })
 
   // ── Guru ──
-  const emptyGuru = { fullName: '', username: '', email: '', password: '' }
+  // ── Data Sekolah ──
+  const [schoolName, setSchoolName] = useState('')
+  const [schoolAddr, setSchoolAddr] = useState('')
+  const [schoolMsg, setSchoolMsg] = useState('')
+  const [savingSchool, setSavingSchool] = useState(false)
+  const loadSchool = useCallback(async () => {
+    try { const s = await schoolClient.getSchool({}); setSchoolName(s.name); setSchoolAddr(s.address) } catch { /* ignore */ }
+  }, [])
+  const saveSchool = async () => {
+    setSchoolMsg(''); setSavingSchool(true)
+    try { await schoolClient.updateSchool({ name: schoolName, address: schoolAddr }); setSchoolMsg('Data sekolah tersimpan.') }
+    catch (e: unknown) { setSchoolMsg(e instanceof Error ? e.message : 'Gagal menyimpan') }
+    finally { setSavingSchool(false) }
+  }
+
+  // ── Semester ──
+  const [semesters, setSemesters] = useState<Semester[]>([])
+  const [semSel, setSemSel] = useState('ganjil')
+  const [semTahun, setSemTahun] = useState('')
+  const [semErr, setSemErr] = useState('')
+  const loadSemesters = useCallback(async () => {
+    try { const r = await schoolClient.listSemesters({}); setSemesters(r.semesters) } catch { setSemesters([]) }
+  }, [])
+  const addSemester = async () => {
+    if (!semTahun.trim()) { setSemErr('Isi tahun ajaran, mis. 2026/2027.'); return }
+    setSemErr('')
+    try { await schoolClient.createSemester({ semester: semSel, tahunAjaran: semTahun.trim() }); setSemTahun(''); await loadSemesters() }
+    catch (e: unknown) { setSemErr(e instanceof Error ? e.message : 'Gagal menambah semester') }
+  }
+  const activateSemester = async (id: string) => {
+    try { await schoolClient.setActiveSemester({ id }); await loadSemesters() } catch (e: unknown) { alert(e instanceof Error ? e.message : 'Gagal') }
+  }
+  const delSemester = (s: Semester) => setConfirm({
+    title: 'Hapus Semester', message: `Hapus ${s.semester} ${s.tahunAjaran}?`,
+    variant: 'danger', confirmLabel: 'Ya, Hapus',
+    onConfirm: async () => { try { await schoolClient.deleteSemester({ id: s.id }); await loadSemesters() } catch (e: unknown) { alert(e instanceof Error ? e.message : 'Gagal') } },
+  })
+
+  const emptyGuru = { fullName: '', username: '', email: '', password: '', mapel: '' }
   const [guruForm, setGuruForm] = useState(emptyGuru)
+  const [guruKelas, setGuruKelas] = useState<string[]>([])
   const [guruErr, setGuruErr] = useState('')
   const [guruSaving, setGuruSaving] = useState(false)
+  const toggleGuruKelas = (name: string) =>
+    setGuruKelas((arr) => (arr.includes(name) ? arr.filter((x) => x !== name) : [...arr, name]))
   const addGuru = async (e: React.FormEvent) => {
     e.preventDefault(); setGuruErr(''); setGuruSaving(true)
     try {
-      const u = await userClient.createUser({ ...guruForm, role: Role.TEACHER, kelas: '', jurusan: '' })
+      const u = await userClient.createUser({ ...guruForm, role: Role.TEACHER, kelas: guruKelas.join(', '), jurusan: '' })
       if (guruForm.password) setPasswords(p => ({ ...p, [u.id]: guruForm.password }))
-      setGuruForm(emptyGuru); await loadTeachers()
+      setGuruForm(emptyGuru); setGuruKelas([]); await loadTeachers()
     } catch (err: unknown) { setGuruErr(err instanceof Error ? err.message : 'Gagal menambah guru') }
     finally { setGuruSaving(false) }
   }
@@ -185,7 +232,7 @@ export default function UsersPage() {
   })
 
   // ── Siswa ──
-  const emptySiswa = { fullName: '', username: '', email: '', password: '', kelas: '', jurusan: '' }
+  const emptySiswa = { fullName: '', username: '', email: '', password: '', kelas: '' }
   const [siswaForm, setSiswaForm] = useState(emptySiswa)
   const [siswaErr, setSiswaErr] = useState('')
   const [siswaSaving, setSiswaSaving] = useState(false)
@@ -235,7 +282,8 @@ export default function UsersPage() {
   // ── Edit ──
   const startEdit = (user: User, role: 'guru' | 'siswa') => {
     setEditTarget({ user, role })
-    setEditForm({ fullName: user.fullName, username: user.username, email: user.email, kelas: user.kelas, jurusan: user.jurusan, password: '' })
+    setEditForm({ fullName: user.fullName, username: user.username, email: user.email, kelas: user.kelas, mapel: user.mapel, password: '' })
+    setEditGuruKelas(role === 'guru' && user.kelas ? user.kelas.split(',').map((k) => k.trim()).filter(Boolean) : [])
     setEditError('')
   }
   const cancelEdit = () => { setEditTarget(null); setEditError('') }
@@ -248,8 +296,8 @@ export default function UsersPage() {
         fullName: editForm.fullName || undefined,
         email: editForm.email || undefined,
         username: editForm.username || undefined,
-        kelas: editTarget.role === 'siswa' ? editForm.kelas : undefined,
-        jurusan: editTarget.role === 'siswa' ? editForm.jurusan : undefined,
+        kelas: editTarget.role === 'siswa' ? editForm.kelas : editGuruKelas.join(', '),
+        mapel: editTarget.role === 'guru' ? editForm.mapel : undefined,
         password: editForm.password || undefined,
       })
       if (editForm.password) setPasswords(p => ({ ...p, [editTarget.user.id]: editForm.password }))
@@ -313,7 +361,7 @@ export default function UsersPage() {
         try {
           const u = await userClient.createUser({
             fullName: row.fullName, username: row.username, email: row.email,
-            password: row.password || 'Password123', kelas: row.kelas, jurusan: row.jurusan,
+            password: row.password || 'Password123', kelas: row.kelas,
             role: Role.STUDENT,
           })
           if (row.password) setPasswords(p => ({ ...p, [u.id]: row.password }))
@@ -334,14 +382,14 @@ export default function UsersPage() {
 
   const handleExport = () => {
     const rows = [
-      'Nama Lengkap,Username,Email,Kelas,Jurusan',
-      ...students.map(s => `"${s.fullName}","${s.username}","${s.email}","${s.kelas}","${s.jurusan}"`),
+      'Nama Lengkap,Username,Email,Kelas',
+      ...students.map(s => `"${s.fullName}","${s.username}","${s.email}","${s.kelas}"`),
     ]
     downloadCSV(rows.join('\n'), 'data-siswa.csv')
   }
 
   // ── Load per tab ──
-  useEffect(() => { loadClasses(); loadJurusans() }, [loadClasses, loadJurusans])
+  useEffect(() => { loadClasses(); loadJurusans(); loadSchool(); loadSemesters() }, [loadClasses, loadJurusans, loadSchool, loadSemesters])
   useEffect(() => { if (tab === 'guru') loadTeachers() }, [tab, loadTeachers])
   useEffect(() => {
     if (tab !== 'siswa') return
@@ -376,25 +424,130 @@ export default function UsersPage() {
   )
 
   return (
-    <AppLayout title="Kelola Akun" subtitle="Kelola data Kelas, Jurusan, Guru, dan Siswa">
+    <AppLayout title="Master Data" subtitle="Data Sekolah, Semester, Kelas, Jurusan, Guru, dan Siswa">
       <Stack gap="16px">
         <Flex gap={0} borderBottom="2px solid" borderColor="gray.200">
+          <TabBtn id="sekolah" label="Data Sekolah" />
+          <TabBtn id="semester" label={`Semester (${semesters.length})`} />
           <TabBtn id="kelas" label={`Kelas (${classes.length})`} />
           <TabBtn id="jurusan" label={`Jurusan (${jurusans.length})`} />
           <TabBtn id="guru" label="Guru" />
           <TabBtn id="siswa" label="Siswa" />
         </Flex>
 
+        {/* ── DATA SEKOLAH ── */}
+        {tab === 'sekolah' && (
+          <Card title={<><Icon as={LuBuilding} /> Data Sekolah</>}>
+            <Stack gap="12px" maxW="560px">
+              <Field.Root>
+                <Field.Label>Nama Sekolah</Field.Label>
+                <Input value={schoolName} onChange={(e) => setSchoolName(e.target.value)} placeholder="mis. SMK ISLAM 2 WLINGI" />
+              </Field.Root>
+              <Field.Root>
+                <Field.Label>Alamat</Field.Label>
+                <Textarea rows={3} value={schoolAddr} onChange={(e) => setSchoolAddr(e.target.value)} placeholder="Alamat sekolah" />
+              </Field.Root>
+              {schoolMsg && <Text fontSize="12px" color={schoolMsg.includes('tersimpan') ? COLORS.success : COLORS.danger}>{schoolMsg}</Text>}
+              <Button alignSelf="flex-start" bg={COLORS.primary} color="white" _hover={{ bg: COLORS.primaryDark }} loading={savingSchool} onClick={saveSchool}>
+                <Icon as={LuSave} /> Simpan
+              </Button>
+            </Stack>
+          </Card>
+        )}
+
+        {/* ── SEMESTER ── */}
+        {tab === 'semester' && (
+          <Stack gap="14px">
+            <Card title={<><Icon as={LuPlus} /> Tambah Semester</>}>
+              <Flex gap="8px" flexWrap="wrap" align="flex-end">
+                <Field.Root maxW="140px"><Field.Label>Semester</Field.Label>
+                  <NativeSelect.Root>
+                    <NativeSelect.Field value={semSel} onChange={(e) => setSemSel(e.target.value)}>
+                      <option value="ganjil">Ganjil</option>
+                      <option value="genap">Genap</option>
+                    </NativeSelect.Field>
+                    <NativeSelect.Indicator />
+                  </NativeSelect.Root>
+                </Field.Root>
+                <Field.Root maxW="160px"><Field.Label>Tahun Ajaran</Field.Label>
+                  <Input value={semTahun} onChange={(e) => setSemTahun(e.target.value)} placeholder="2026/2027"
+                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addSemester() } }} />
+                </Field.Root>
+                <Button bg={COLORS.primary} color="white" _hover={{ bg: COLORS.primaryDark }} onClick={addSemester}>Tambah</Button>
+              </Flex>
+              {semErr && <Text color={COLORS.danger} fontSize="12px" mt="6px">{semErr}</Text>}
+            </Card>
+            <Card>
+              <Box overflowX="auto"><Table.Root size="sm">
+                <Table.Header>
+                  <Table.Row>
+                    <Table.ColumnHeader>Semester</Table.ColumnHeader>
+                    <Table.ColumnHeader>Tahun Ajaran</Table.ColumnHeader>
+                    <Table.ColumnHeader>Status</Table.ColumnHeader>
+                    <Table.ColumnHeader>Aksi</Table.ColumnHeader>
+                  </Table.Row>
+                </Table.Header>
+                <Table.Body>
+                  {semesters.length === 0 ? (
+                    <Table.Row><Table.Cell colSpan={4} textAlign="center" color={COLORS.muted}>Belum ada semester</Table.Cell></Table.Row>
+                  ) : semesters.map((s) => (
+                    <Table.Row key={s.id} bg={s.isActive ? COLORS.primaryTint : undefined}>
+                      <Table.Cell textTransform="capitalize" fontWeight="medium">{s.semester}</Table.Cell>
+                      <Table.Cell>{s.tahunAjaran}</Table.Cell>
+                      <Table.Cell>
+                        {s.isActive
+                          ? <Badge colorPalette="green"><Icon as={LuCircleCheck} /> Aktif</Badge>
+                          : <Text fontSize="12px" color={COLORS.muted}>–</Text>}
+                      </Table.Cell>
+                      <Table.Cell>
+                        <Flex gap="6px">
+                          {!s.isActive && <Button size="xs" colorPalette="blue" variant="outline" onClick={() => activateSemester(s.id)}>Jadikan Aktif</Button>}
+                          <Button size="xs" colorPalette="red" variant="outline" onClick={() => delSemester(s)}><Icon as={LuTrash2} /> Hapus</Button>
+                        </Flex>
+                      </Table.Cell>
+                    </Table.Row>
+                  ))}
+                </Table.Body>
+              </Table.Root></Box>
+            </Card>
+          </Stack>
+        )}
+
         {/* ── KELAS ── */}
         {tab === 'kelas' && (
           <Stack gap="14px">
             <Card title={<><Icon as={LuPlus} /> Tambah Kelas</>}>
-              <Flex gap="8px" maxW="460px">
-                <Input placeholder="Nama kelas (mis. X TKJ 1)" value={newKelas}
-                  onChange={(e) => setNewKelas(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addKelas() } }} />
+              <Flex gap="8px" flexWrap="wrap" align="flex-end">
+                <Field.Root maxW="110px"><Field.Label>Tingkat</Field.Label>
+                  <NativeSelect.Root>
+                    <NativeSelect.Field value={kTingkat} onChange={(e) => setKTingkat(e.target.value)}>
+                      <option value="X">X</option>
+                      <option value="XI">XI</option>
+                      <option value="XII">XII</option>
+                    </NativeSelect.Field>
+                    <NativeSelect.Indicator />
+                  </NativeSelect.Root>
+                </Field.Root>
+                <Field.Root maxW="150px"><Field.Label>Jurusan</Field.Label>
+                  <NativeSelect.Root>
+                    <NativeSelect.Field value={kJurusan} onChange={(e) => setKJurusan(e.target.value)}>
+                      <option value="">— Pilih —</option>
+                      {jurusans.map((j) => <option key={j.id} value={j.name}>{j.name}</option>)}
+                    </NativeSelect.Field>
+                    <NativeSelect.Indicator />
+                  </NativeSelect.Root>
+                </Field.Root>
+                <Field.Root maxW="90px"><Field.Label>Nomor</Field.Label>
+                  <Input type="number" min={1} value={kNomor} onChange={(e) => setKNomor(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addKelas() } }} />
+                </Field.Root>
+                <Box>
+                  <Text fontSize="11px" color={COLORS.muted} mb="4px">Nama kelas</Text>
+                  <Badge {...labelColor(kelasPreview)} fontSize="13px" px="10px" py="4px">{kelasPreview}</Badge>
+                </Box>
                 <Button bg={COLORS.primary} color="white" _hover={{ bg: COLORS.primaryDark }} onClick={addKelas}>Tambah</Button>
               </Flex>
+              {jurusans.length === 0 && <Text fontSize="12px" color={COLORS.warning} mt="6px">Buat jurusan dulu di tab "Jurusan".</Text>}
               {kelasErr && <Text color={COLORS.danger} fontSize="12px" mt="6px">{kelasErr}</Text>}
             </Card>
             <Card>
@@ -483,8 +636,30 @@ export default function UsersPage() {
                     <Input type="email" value={guruForm.email} onChange={(e) => setGuruForm({ ...guruForm, email: e.target.value })} required /></Field.Root>
                   <Field.Root required maxW="150px"><Field.Label>Password</Field.Label>
                     <Input type="text" value={guruForm.password} onChange={(e) => setGuruForm({ ...guruForm, password: e.target.value })} required minLength={6} /></Field.Root>
+                  <Field.Root maxW="170px"><Field.Label>Mata Pelajaran</Field.Label>
+                    <Input value={guruForm.mapel} onChange={(e) => setGuruForm({ ...guruForm, mapel: e.target.value })} placeholder="mis. Matematika" /></Field.Root>
                   <Button type="submit" bg={COLORS.primary} color="white" _hover={{ bg: COLORS.primaryDark }} loading={guruSaving}>Tambah Guru</Button>
                 </Flex>
+                <Box mt="10px">
+                  <Text fontSize="12px" fontWeight="500" mb="6px">Kelas yang diajar</Text>
+                  {classes.length === 0 ? (
+                    <Text fontSize="12px" color={COLORS.muted}>Belum ada kelas. Buat di tab "Kelas".</Text>
+                  ) : (
+                    <Flex gap="8px" wrap="wrap">
+                      {classes.map((c) => {
+                        const on = guruKelas.includes(c.name)
+                        return (
+                          <Flex key={c.id} as="label" align="center" gap="6px" px="10px" py="6px" borderRadius="7px"
+                            border="1px solid" cursor="pointer" borderColor={on ? COLORS.primary : COLORS.border}
+                            bg={on ? COLORS.primaryTint : COLORS.surface}>
+                            <input type="checkbox" checked={on} onChange={() => toggleGuruKelas(c.name)} />
+                            <Text fontSize="13px">{c.name}</Text>
+                          </Flex>
+                        )
+                      })}
+                    </Flex>
+                  )}
+                </Box>
                 {guruErr && <Text color={COLORS.danger} fontSize="12px" mt="6px">{guruErr}</Text>}
               </form>
             </Card>
@@ -495,18 +670,26 @@ export default function UsersPage() {
                     <Table.ColumnHeader>Nama</Table.ColumnHeader>
                     <Table.ColumnHeader>Username</Table.ColumnHeader>
                     <Table.ColumnHeader>Email</Table.ColumnHeader>
+                    <Table.ColumnHeader>Mapel</Table.ColumnHeader>
+                    <Table.ColumnHeader>Kelas</Table.ColumnHeader>
                     <Table.ColumnHeader>Password</Table.ColumnHeader>
                     <Table.ColumnHeader>Aksi</Table.ColumnHeader>
                   </Table.Row>
                 </Table.Header>
                 <Table.Body>
                   {teachers.length === 0 ? (
-                    <Table.Row><Table.Cell colSpan={5} textAlign="center" color={COLORS.muted}>Belum ada guru</Table.Cell></Table.Row>
+                    <Table.Row><Table.Cell colSpan={7} textAlign="center" color={COLORS.muted}>Belum ada guru</Table.Cell></Table.Row>
                   ) : teachersPaged.pageItems.map((u) => (
                     <Table.Row key={u.id}>
                       <Table.Cell fontWeight="medium">{u.fullName || '-'}</Table.Cell>
                       <Table.Cell>{u.username}</Table.Cell>
                       <Table.Cell>{u.email}</Table.Cell>
+                      <Table.Cell>{u.mapel || '-'}</Table.Cell>
+                      <Table.Cell>
+                        <Flex gap="4px" wrap="wrap">
+                          {u.kelas ? u.kelas.split(',').map((k) => k.trim()).filter(Boolean).map((k) => <Badge key={k} {...labelColor(k)}>{k}</Badge>) : '-'}
+                        </Flex>
+                      </Table.Cell>
                       <Table.Cell><PwdCell user={u} /></Table.Cell>
                       <Table.Cell>
                         <Flex gap="6px">
@@ -542,15 +725,6 @@ export default function UsersPage() {
                       <NativeSelect.Field value={siswaForm.kelas} onChange={(e) => setSiswaForm({ ...siswaForm, kelas: e.target.value })}>
                         <option value="">— Pilih Kelas —</option>
                         {classes.map((c) => <option key={c.id} value={c.name}>{c.name}</option>)}
-                      </NativeSelect.Field>
-                      <NativeSelect.Indicator />
-                    </NativeSelect.Root>
-                  </Field.Root>
-                  <Field.Root maxW="140px"><Field.Label>Jurusan</Field.Label>
-                    <NativeSelect.Root>
-                      <NativeSelect.Field value={siswaForm.jurusan} onChange={(e) => setSiswaForm({ ...siswaForm, jurusan: e.target.value })}>
-                        <option value="">— Pilih Jurusan —</option>
-                        {jurusans.map((j) => <option key={j.id} value={j.name}>{j.name}</option>)}
                       </NativeSelect.Field>
                       <NativeSelect.Indicator />
                     </NativeSelect.Root>
@@ -650,14 +824,13 @@ export default function UsersPage() {
                     <Table.ColumnHeader>Username</Table.ColumnHeader>
                     <Table.ColumnHeader>Email</Table.ColumnHeader>
                     <Table.ColumnHeader>Kelas</Table.ColumnHeader>
-                    <Table.ColumnHeader>Jurusan</Table.ColumnHeader>
                     <Table.ColumnHeader>Password</Table.ColumnHeader>
                     <Table.ColumnHeader>Aksi</Table.ColumnHeader>
                   </Table.Row>
                 </Table.Header>
                 <Table.Body>
                   {students.length === 0 ? (
-                    <Table.Row><Table.Cell colSpan={8} textAlign="center" color={COLORS.muted}>Tidak ada siswa</Table.Cell></Table.Row>
+                    <Table.Row><Table.Cell colSpan={7} textAlign="center" color={COLORS.muted}>Tidak ada siswa</Table.Cell></Table.Row>
                   ) : studentsPaged.pageItems.map((u) => (
                     <Table.Row key={u.id} bg={selected[u.id] ? COLORS.primaryTint : undefined}>
                       <Table.Cell>
@@ -669,7 +842,6 @@ export default function UsersPage() {
                       <Table.Cell>{u.username}</Table.Cell>
                       <Table.Cell>{u.email}</Table.Cell>
                       <Table.Cell>{u.kelas ? <Badge {...labelColor(u.kelas)}>{u.kelas}</Badge> : '-'}</Table.Cell>
-                      <Table.Cell>{u.jurusan ? <Badge {...labelColor(u.jurusan)}>{u.jurusan}</Badge> : '-'}</Table.Cell>
                       <Table.Cell><PwdCell user={u} /></Table.Cell>
                       <Table.Cell>
                         <Flex gap="6px">
@@ -710,26 +882,39 @@ export default function UsersPage() {
                   <Input type="email" value={editForm.email} onChange={(e) => setEditForm({ ...editForm, email: e.target.value })} />
                 </Field.Root>
                 {editTarget?.role === 'siswa' && (
+                  <Field.Root>
+                    <Field.Label>Kelas</Field.Label>
+                    <NativeSelect.Root>
+                      <NativeSelect.Field value={editForm.kelas} onChange={(e) => setEditForm({ ...editForm, kelas: e.target.value })}>
+                        <option value="">— Pilih Kelas —</option>
+                        {classes.map((c) => <option key={c.id} value={c.name}>{c.name}</option>)}
+                      </NativeSelect.Field>
+                      <NativeSelect.Indicator />
+                    </NativeSelect.Root>
+                  </Field.Root>
+                )}
+                {editTarget?.role === 'guru' && (
                   <>
                     <Field.Root>
-                      <Field.Label>Kelas</Field.Label>
-                      <NativeSelect.Root>
-                        <NativeSelect.Field value={editForm.kelas} onChange={(e) => setEditForm({ ...editForm, kelas: e.target.value })}>
-                          <option value="">— Pilih Kelas —</option>
-                          {classes.map((c) => <option key={c.id} value={c.name}>{c.name}</option>)}
-                        </NativeSelect.Field>
-                        <NativeSelect.Indicator />
-                      </NativeSelect.Root>
+                      <Field.Label>Mata Pelajaran</Field.Label>
+                      <Input value={editForm.mapel} onChange={(e) => setEditForm({ ...editForm, mapel: e.target.value })} placeholder="mis. Matematika" />
                     </Field.Root>
                     <Field.Root>
-                      <Field.Label>Jurusan</Field.Label>
-                      <NativeSelect.Root>
-                        <NativeSelect.Field value={editForm.jurusan} onChange={(e) => setEditForm({ ...editForm, jurusan: e.target.value })}>
-                          <option value="">— Pilih Jurusan —</option>
-                          {jurusans.map((j) => <option key={j.id} value={j.name}>{j.name}</option>)}
-                        </NativeSelect.Field>
-                        <NativeSelect.Indicator />
-                      </NativeSelect.Root>
+                      <Field.Label>Kelas yang diajar</Field.Label>
+                      <Flex gap="8px" wrap="wrap">
+                        {classes.length === 0 ? <Text fontSize="12px" color={COLORS.muted}>Belum ada kelas.</Text> : classes.map((c) => {
+                          const on = editGuruKelas.includes(c.name)
+                          return (
+                            <Flex key={c.id} as="label" align="center" gap="6px" px="10px" py="6px" borderRadius="7px"
+                              border="1px solid" cursor="pointer" borderColor={on ? COLORS.primary : COLORS.border}
+                              bg={on ? COLORS.primaryTint : COLORS.surface}>
+                              <input type="checkbox" checked={on}
+                                onChange={() => setEditGuruKelas((arr) => arr.includes(c.name) ? arr.filter((x) => x !== c.name) : [...arr, c.name])} />
+                              <Text fontSize="13px">{c.name}</Text>
+                            </Flex>
+                          )
+                        })}
+                      </Flex>
                     </Field.Root>
                   </>
                 )}

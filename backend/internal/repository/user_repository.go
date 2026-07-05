@@ -25,6 +25,7 @@ type User struct {
 	Jurusan       string
 	PhotoURL      string
 	Story         string
+	Mapel         string
 	CreatedAt     time.Time
 	UpdatedAt     time.Time
 }
@@ -72,20 +73,20 @@ func NewUserRepository(db *sql.DB) UserRepository {
 	return &sqliteUserRepository{db: db}
 }
 
-const userColumns = `id, username, email, password_hash, password_plain, role, full_name, is_active, kelas, jurusan, photo_url, story, created_at, updated_at`
+const userColumns = `id, username, email, password_hash, password_plain, role, full_name, is_active, kelas, jurusan, photo_url, story, mapel, created_at, updated_at`
 
 func scanUser(s interface {
 	Scan(dest ...any) error
 }, u *User) error {
 	return s.Scan(&u.ID, &u.Username, &u.Email, &u.PasswordHash, &u.PasswordPlain, &u.Role, &u.FullName,
-		&u.IsActive, &u.Kelas, &u.Jurusan, &u.PhotoURL, &u.Story, &u.CreatedAt, &u.UpdatedAt)
+		&u.IsActive, &u.Kelas, &u.Jurusan, &u.PhotoURL, &u.Story, &u.Mapel, &u.CreatedAt, &u.UpdatedAt)
 }
 
 func (r *sqliteUserRepository) Create(ctx context.Context, u *User) error {
 	_, err := r.db.ExecContext(ctx, `
-		INSERT INTO users (id, username, email, password_hash, password_plain, role, full_name, is_active, kelas, jurusan, photo_url, story, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		u.ID, u.Username, u.Email, u.PasswordHash, u.PasswordPlain, u.Role, u.FullName, u.IsActive, u.Kelas, u.Jurusan, u.PhotoURL, u.Story, u.CreatedAt, u.UpdatedAt,
+		INSERT INTO users (id, username, email, password_hash, password_plain, role, full_name, is_active, kelas, jurusan, photo_url, story, mapel, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		u.ID, u.Username, u.Email, u.PasswordHash, u.PasswordPlain, u.Role, u.FullName, u.IsActive, u.Kelas, u.Jurusan, u.PhotoURL, u.Story, u.Mapel, u.CreatedAt, u.UpdatedAt,
 	)
 	if err != nil {
 		if isSQLiteConstraintError(err) {
@@ -124,9 +125,9 @@ func (r *sqliteUserRepository) Update(ctx context.Context, u *User) error {
 	u.UpdatedAt = time.Now()
 	res, err := r.db.ExecContext(ctx, `
 		UPDATE users
-		SET username=?, email=?, password_hash=?, password_plain=?, role=?, full_name=?, is_active=?, kelas=?, jurusan=?, photo_url=?, story=?, updated_at=?
+		SET username=?, email=?, password_hash=?, password_plain=?, role=?, full_name=?, is_active=?, kelas=?, jurusan=?, photo_url=?, story=?, mapel=?, updated_at=?
 		WHERE id=?`,
-		u.Username, u.Email, u.PasswordHash, u.PasswordPlain, u.Role, u.FullName, u.IsActive, u.Kelas, u.Jurusan, u.PhotoURL, u.Story, u.UpdatedAt, u.ID,
+		u.Username, u.Email, u.PasswordHash, u.PasswordPlain, u.Role, u.FullName, u.IsActive, u.Kelas, u.Jurusan, u.PhotoURL, u.Story, u.Mapel, u.UpdatedAt, u.ID,
 	)
 	if err != nil {
 		if isSQLiteConstraintError(err) {
@@ -210,10 +211,22 @@ func (r *sqliteUserRepository) List(ctx context.Context, f ListFilter) ([]*User,
 	return users, total, rows.Err()
 }
 
+// JurusanFromKelas extracts the major from a class name like "X-TKJ-1" → "TKJ".
+// Returns "" for names that don't follow the tingkat-jurusan-nomor format.
+func JurusanFromKelas(kelas string) string {
+	parts := strings.Split(kelas, "-")
+	if len(parts) >= 3 {
+		return strings.Join(parts[1:len(parts)-1], "-")
+	}
+	return ""
+}
+
 func (r *sqliteUserRepository) MoveStudentsByClass(ctx context.Context, fromKelas, toKelas string) (int64, error) {
+	jur := JurusanFromKelas(toKelas)
 	res, err := r.db.ExecContext(ctx,
-		`UPDATE users SET kelas=?, updated_at=? WHERE kelas=? AND role='student'`,
-		toKelas, time.Now(), fromKelas)
+		`UPDATE users SET kelas=?, jurusan=CASE WHEN ?<>'' THEN ? ELSE jurusan END, updated_at=?
+		 WHERE kelas=? AND role='student'`,
+		toKelas, jur, jur, time.Now(), fromKelas)
 	if err != nil {
 		return 0, fmt.Errorf("move students by class: %w", err)
 	}
@@ -225,15 +238,17 @@ func (r *sqliteUserRepository) MoveStudentsByIDs(ctx context.Context, ids []stri
 	if len(ids) == 0 {
 		return 0, nil
 	}
+	jur := JurusanFromKelas(toKelas)
 	placeholders := make([]string, len(ids))
-	args := make([]any, 0, len(ids)+2)
-	args = append(args, toKelas, time.Now())
+	args := make([]any, 0, len(ids)+4)
+	args = append(args, toKelas, jur, jur, time.Now())
 	for i, id := range ids {
 		placeholders[i] = "?"
 		args = append(args, id)
 	}
 	res, err := r.db.ExecContext(ctx,
-		`UPDATE users SET kelas=?, updated_at=? WHERE role='student' AND id IN (`+strings.Join(placeholders, ",")+`)`,
+		`UPDATE users SET kelas=?, jurusan=CASE WHEN ?<>'' THEN ? ELSE jurusan END, updated_at=?
+		 WHERE role='student' AND id IN (`+strings.Join(placeholders, ",")+`)`,
 		args...)
 	if err != nil {
 		return 0, fmt.Errorf("move students by ids: %w", err)

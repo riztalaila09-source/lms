@@ -11,6 +11,11 @@ message JurusanCount {
   int32 count = 2;
 }
 
+message KelasCount {
+  string kelas = 1;
+  int32 count = 2;
+}
+
 message RecentAssignment {
   string id = 1;
   string title = 2;
@@ -41,6 +46,8 @@ message TeacherDashboard {
   repeated JurusanCount siswa_per_jurusan = 11;
   repeated RecentAssignment tugas_terbaru = 12;
   repeated RecentSubmission pengumpulan_terbaru = 13;
+  int32 total_guru = 14;
+  repeated KelasCount siswa_per_kelas = 15;
 }
 
 message GetTeacherDashboardRequest {}

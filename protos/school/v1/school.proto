@@ -1,0 +1,39 @@
+syntax = "proto3";
+
+package school.v1;
+
+option go_package = "lms/backend/gen/school/v1;schoolv1";
+
+import "google/protobuf/timestamp.proto";
+
+message School {
+  string name    = 1;
+  string address = 2;
+}
+
+message Semester {
+  string id           = 1;
+  string semester     = 2; // 'ganjil' | 'genap'
+  string tahun_ajaran = 3; // '2026/2027'
+  bool   is_active    = 4;
+  google.protobuf.Timestamp created_at = 5;
+}
+
+message GetSchoolRequest {}
+message UpdateSchoolRequest { string name = 1; string address = 2; }
+
+message CreateSemesterRequest { string semester = 1; string tahun_ajaran = 2; }
+message ListSemestersRequest {}
+message ListSemestersResponse { repeated Semester semesters = 1; }
+message SetActiveSemesterRequest { string id = 1; }
+message DeleteSemesterRequest { string id = 1; }
+message DeleteSemesterResponse {}
+
+service SchoolService {
+  rpc GetSchool(GetSchoolRequest) returns (School);
+  rpc UpdateSchool(UpdateSchoolRequest) returns (School);
+  rpc CreateSemester(CreateSemesterRequest) returns (Semester);
+  rpc ListSemesters(ListSemestersRequest) returns (ListSemestersResponse);
+  rpc SetActiveSemester(SetActiveSemesterRequest) returns (Semester);
+  rpc DeleteSemester(DeleteSemesterRequest) returns (DeleteSemesterResponse);
+}

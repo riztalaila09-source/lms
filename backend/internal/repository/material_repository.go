@@ -91,6 +91,9 @@ type MaterialRepository interface {
 	// RateMaterial upserts a student's 1–5 star rating and returns the new average
 	// and total number of ratings for the material.
 	RateMaterial(ctx context.Context, materialID, studentID string, stars int) (float64, int, error)
+	// ListExplore returns Materi Umum + categorised materials from accessible
+	// courses (for the student "Jelajahi Materi Umum"). studentID empty = manager.
+	ListExplore(ctx context.Context, studentID string, limit int) ([]*Material, error)
 }
 
 type sqliteMaterialRepository struct{ db *sql.DB }
@@ -258,6 +261,42 @@ func (r *sqliteMaterialRepository) SearchMaterials(ctx context.Context, query, s
 			return nil, fmt.Errorf("scan search result: %w", err)
 		}
 		out = append(out, &MaterialSearchResult{Material: m, CourseName: courseName})
+	}
+	return out, rows.Err()
+}
+
+func (r *sqliteMaterialRepository) ListExplore(ctx context.Context, studentID string, limit int) ([]*Material, error) {
+	if limit <= 0 {
+		limit = 300
+	}
+	var where string
+	args := []any{}
+	if studentID != "" {
+		// Students: published Materi Umum + published categorised materials in
+		// courses they're enrolled in.
+		where = `WHERE m.is_published = 1 AND (m.course_id = 'general'
+			OR (m.category_id <> '' AND m.course_id IN (SELECT course_id FROM course_enrollments WHERE student_id = ?)))`
+		args = append(args, studentID)
+	} else {
+		// Managers: all Materi Umum + all categorised materials.
+		where = `WHERE (m.course_id = 'general' OR m.category_id <> '')`
+	}
+	args = append(args, limit)
+
+	rows, err := r.db.QueryContext(ctx, materialSelect+` `+where+`
+		ORDER BY m.order_index ASC, m.created_at ASC LIMIT ?`, args...)
+	if err != nil {
+		return nil, fmt.Errorf("list explore: %w", err)
+	}
+	defer rows.Close()
+
+	var out []*Material
+	for rows.Next() {
+		m, err := scanMaterial(rows)
+		if err != nil {
+			return nil, fmt.Errorf("scan explore: %w", err)
+		}
+		out = append(out, m)
 	}
 	return out, rows.Err()
 }

@@ -24,6 +24,7 @@ message User {
   string kelas = 9;
   string jurusan = 10;
   string photo_url = 11;
+  string mapel = 14; // teacher's subject taught
   google.protobuf.Timestamp created_at = 7;
   google.protobuf.Timestamp updated_at = 8;
   // Plaintext password, populated ONLY in manager-only ListUsers responses so
@@ -53,6 +54,7 @@ message CreateUserRequest {
   Role role = 5;
   string kelas = 6;
   string jurusan = 7;
+  string mapel = 8;
 }
 
 message GetUserRequest {
@@ -69,6 +71,7 @@ message UpdateUserRequest {
   optional string kelas = 7;
   optional string jurusan = 8;
   optional string password = 9;
+  optional string mapel = 10;
 }
 
 // Self-service profile update (any logged-in user updates their own account).

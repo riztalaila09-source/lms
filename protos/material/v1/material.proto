@@ -117,6 +117,13 @@ message SearchMaterialsResponse {
   repeated MaterialSearchHit hits = 1;
 }
 
+// Materials for the student "Jelajahi Materi Umum" browser: all Materi Umum
+// plus any categorised material from the caller's accessible courses.
+message ExploreMaterialsRequest {}
+message ExploreMaterialsResponse {
+  repeated Material materials = 1;
+}
+
 // ── Student rating (1–5 stars) ──
 message RateMaterialRequest {
   string material_id = 1;
@@ -254,6 +261,7 @@ service MaterialService {
   rpc DeleteMaterial(DeleteMaterialRequest) returns (DeleteMaterialResponse);
   rpc ListMaterials(ListMaterialsRequest) returns (ListMaterialsResponse);
   rpc SearchMaterials(SearchMaterialsRequest) returns (SearchMaterialsResponse);
+  rpc ExploreMaterials(ExploreMaterialsRequest) returns (ExploreMaterialsResponse);
   rpc RateMaterial(RateMaterialRequest) returns (RateMaterialResponse);
   rpc CreateQuestion(CreateQuestionRequest) returns (Question);
   rpc ListQuestions(ListQuestionsRequest) returns (ListQuestionsResponse);

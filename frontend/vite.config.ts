@@ -12,28 +12,9 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
-      // Forward all ConnectRPC calls to the Go backend during development
-      '/user.v1.UserService': {
-        target: 'http://localhost:8080',
-        changeOrigin: true,
-      },
-      '/course.v1.CourseService': {
-        target: 'http://localhost:8080',
-        changeOrigin: true,
-      },
-      '/material.v1.MaterialService': {
-        target: 'http://localhost:8080',
-        changeOrigin: true,
-      },
-      '/assignment.v1.AssignmentService': {
-        target: 'http://localhost:8080',
-        changeOrigin: true,
-      },
-      '/dashboard.v1.DashboardService': {
-        target: 'http://localhost:8080',
-        changeOrigin: true,
-      },
-      '/class.v1.ClassService': {
+      // Forward ALL ConnectRPC calls (/<pkg>.v1.<Service>/<Method>) to the Go
+      // backend during development. Regex so new services need no config change.
+      '^/[a-z0-9_]+\\.v1\\.[A-Za-z0-9]+Service/': {
         target: 'http://localhost:8080',
         changeOrigin: true,
       },

@@ -341,6 +341,19 @@ func (s *MaterialService) SearchMaterials(ctx context.Context, callerID, callerR
 	}
 }
 
+// ExploreMaterials returns Materi Umum + categorised materials from the caller's
+// accessible courses, for the student "Jelajahi Materi Umum" browser.
+func (s *MaterialService) ExploreMaterials(ctx context.Context, callerID, callerRole string) ([]*repository.Material, error) {
+	switch {
+	case callerRole == "student":
+		return s.materialRepo.ListExplore(ctx, callerID, 300)
+	case isManager(callerRole):
+		return s.materialRepo.ListExplore(ctx, "", 300)
+	default:
+		return nil, ErrPermissionDenied
+	}
+}
+
 // RateMaterial lets a student give a 1–5 star rating to an accessible material.
 // Returns the new average, total ratings, and the caller's rating.
 func (s *MaterialService) RateMaterial(ctx context.Context, callerID, callerRole, materialID string, stars int) (float64, int, int, error) {

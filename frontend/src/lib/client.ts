@@ -6,6 +6,7 @@ import { AssignmentService } from '@/gen/assignment/v1/assignment_pb'
 import { DashboardService } from '@/gen/dashboard/v1/dashboard_pb'
 import { ClassService } from '@/gen/class/v1/class_pb'
 import { JurusanService } from '@/gen/jurusan/v1/jurusan_pb'
+import { SchoolService } from '@/gen/school/v1/school_pb'
 import { transport } from './transport'
 
 export const userClient = createClient(UserService, transport)
@@ -15,3 +16,4 @@ export const assignmentClient = createClient(AssignmentService, transport)
 export const dashboardClient = createClient(DashboardService, transport)
 export const classClient = createClient(ClassService, transport)
 export const jurusanClient = createClient(JurusanService, transport)
+export const schoolClient = createClient(SchoolService, transport)

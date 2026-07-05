@@ -33,6 +33,7 @@ type UpdateUserInput struct {
 	Kelas    *string
 	Jurusan  *string
 	Password *string
+	Mapel    *string
 }
 
 type UpdateProfileInput struct {
@@ -83,7 +84,7 @@ func (s *UserService) Login(ctx context.Context, email, password string) (*Login
 	return &LoginResult{Token: token, User: user}, nil
 }
 
-func (s *UserService) CreateUser(ctx context.Context, callerRole, username, email, password, fullName, role, kelas, jurusan string) (*repository.User, error) {
+func (s *UserService) CreateUser(ctx context.Context, callerRole, username, email, password, fullName, role, kelas, jurusan, mapel string) (*repository.User, error) {
 	// Managers (teacher / legacy admin) may add students or other teachers, not admins.
 	switch callerRole {
 	case "admin":
@@ -104,6 +105,13 @@ func (s *UserService) CreateUser(ctx context.Context, callerRole, username, emai
 		return nil, fmt.Errorf("hash password: %w", err)
 	}
 
+	// Jurusan is derived from the combined class name (e.g. "X-TKJ-1" → "TKJ").
+	if role == "student" {
+		if d := repository.JurusanFromKelas(kelas); d != "" {
+			jurusan = d
+		}
+	}
+
 	now := time.Now().UTC()
 	u := &repository.User{
 		ID:            uuid.New().String(),
@@ -116,6 +124,7 @@ func (s *UserService) CreateUser(ctx context.Context, callerRole, username, emai
 		IsActive:      true,
 		Kelas:         kelas,
 		Jurusan:       jurusan,
+		Mapel:         mapel,
 		CreatedAt:     now,
 		UpdatedAt:     now,
 	}
@@ -180,6 +189,15 @@ func (s *UserService) UpdateUser(ctx context.Context, callerRole, targetID strin
 	}
 	if input.Jurusan != nil {
 		u.Jurusan = *input.Jurusan
+	}
+	if input.Mapel != nil {
+		u.Mapel = *input.Mapel
+	}
+	// Keep jurusan in sync with the combined class name for students.
+	if u.Role == "student" {
+		if d := repository.JurusanFromKelas(u.Kelas); d != "" {
+			u.Jurusan = d
+		}
 	}
 	if input.Password != nil && *input.Password != "" {
 		hash, err := bcrypt.GenerateFromPassword([]byte(*input.Password), bcrypt.DefaultCost)

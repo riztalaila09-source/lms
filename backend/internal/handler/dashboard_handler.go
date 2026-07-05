@@ -48,10 +48,16 @@ func (h *DashboardHandler) GetTeacherDashboard(ctx context.Context, _ *connect.R
 		MateriPublikasi:  int32(d.MateriPublikasi),
 		MateriDraft:      int32(d.MateriDraft),
 		RataRataNilai:    d.RataRataNilai,
+		TotalGuru:        int32(d.TotalGuru),
 	}
 	for _, jc := range d.SiswaPerJurusan {
 		out.SiswaPerJurusan = append(out.SiswaPerJurusan, &dashboardv1.JurusanCount{
 			Jurusan: jc.Jurusan, Count: int32(jc.Count),
+		})
+	}
+	for _, kc := range d.SiswaPerKelas {
+		out.SiswaPerKelas = append(out.SiswaPerKelas, &dashboardv1.KelasCount{
+			Kelas: kc.Kelas, Count: int32(kc.Count),
 		})
 	}
 	for _, ra := range d.TugasTerbaru {

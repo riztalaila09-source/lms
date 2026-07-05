@@ -2,6 +2,13 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Documentation
+
+Project documentation and development guides live in the [`docs/`](docs/) folder — consult them before making changes:
+- [docs/readme.md](docs/readme.md) — project overview / documentation.
+- [docs/frontend-devel-guideline.md](docs/frontend-devel-guideline.md) — frontend development guidelines.
+- [docs/frontend-implementation.md](docs/frontend-implementation.md) — frontend implementation notes.
+
 ## Project Rules (hard rules)
 
 - **Testing is mandatory.** Setiap kali selesai membuat fitur atau mengimplementasikan service/RPC baru, **buat unit test-nya juga** (jangan dianggap selesai tanpa test). Untuk kasus kompleks, tambahkan **integration test** dan **end-to-end test** bila diperlukan. Ikuti pola test yang sudah ada di `*_test.go` (lihat _Testing_ di bawah).

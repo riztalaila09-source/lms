@@ -12,6 +12,11 @@ type JurusanCount struct {
 	Count   int
 }
 
+type KelasCount struct {
+	Kelas string
+	Count int
+}
+
 type RecentAssignment struct {
 	ID              string
 	Title           string
@@ -39,7 +44,9 @@ type TeacherDashboard struct {
 	MateriPublikasi  int
 	MateriDraft      int
 	RataRataNilai    float64
+	TotalGuru        int
 	SiswaPerJurusan  []JurusanCount
+	SiswaPerKelas    []KelasCount
 	TugasTerbaru     []*RecentAssignment
 	PengumpulanTerbaru []*RecentSubmission
 }
@@ -69,6 +76,9 @@ func (r *sqliteDashboardRepository) TeacherStats(ctx context.Context) (*TeacherD
 	}
 	if d.TotalSiswa, err = scalar(`SELECT COUNT(*) FROM users WHERE role='student'`); err != nil {
 		return nil, fmt.Errorf("count students: %w", err)
+	}
+	if d.TotalGuru, err = scalar(`SELECT COUNT(*) FROM users WHERE role='teacher'`); err != nil {
+		return nil, fmt.Errorf("count teachers: %w", err)
 	}
 	if d.TotalMateri, err = scalar(`SELECT COUNT(*) FROM course_materials`); err != nil {
 		return nil, fmt.Errorf("count materials: %w", err)
@@ -125,6 +135,23 @@ func (r *sqliteDashboardRepository) TeacherStats(ctx context.Context) (*TeacherD
 		d.SiswaPerJurusan = append(d.SiswaPerJurusan, jc)
 	}
 	rows.Close()
+
+	// Students per class (each distinct class name, e.g. X-TKJ-1 vs X-TKJ-2).
+	krows, err := r.db.QueryContext(ctx, `
+		SELECT CASE WHEN kelas='' THEN '(Tanpa Kelas)' ELSE kelas END AS k, COUNT(*)
+		FROM users WHERE role='student' GROUP BY k ORDER BY k ASC`)
+	if err != nil {
+		return nil, fmt.Errorf("students per class: %w", err)
+	}
+	for krows.Next() {
+		var kc KelasCount
+		if err := krows.Scan(&kc.Kelas, &kc.Count); err != nil {
+			krows.Close()
+			return nil, err
+		}
+		d.SiswaPerKelas = append(d.SiswaPerKelas, kc)
+	}
+	krows.Close()
 
 	// Recent assignments.
 	arows, err := r.db.QueryContext(ctx, `

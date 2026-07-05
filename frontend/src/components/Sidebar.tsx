@@ -46,7 +46,7 @@ const NAV: NavEntry[] = [
       { label: 'Log Aktivitas', path: '/log', icon: LuActivity, roles: MANAGER },
     ],
   },
-  { label: 'Kelola Akun', path: '/users', icon: LuSettings, roles: MANAGER },
+  { label: 'Master Data', path: '/users', icon: LuSettings, roles: MANAGER },
   { label: 'Pengaturan', path: '/pengaturan', icon: LuWrench },
 ]
 

@@ -57,7 +57,7 @@ func (h *UserHandler) CreateUser(
 	}
 
 	role := protoRoleToString(req.Msg.Role)
-	u, err := h.userSvc.CreateUser(ctx, claims.Role, req.Msg.Username, req.Msg.Email, req.Msg.Password, req.Msg.FullName, role, req.Msg.Kelas, req.Msg.Jurusan)
+	u, err := h.userSvc.CreateUser(ctx, claims.Role, req.Msg.Username, req.Msg.Email, req.Msg.Password, req.Msg.FullName, role, req.Msg.Kelas, req.Msg.Jurusan, req.Msg.Mapel)
 	if err != nil {
 		return nil, mapServiceError(err)
 	}
@@ -121,6 +121,9 @@ func (h *UserHandler) UpdateUser(
 	}
 	if req.Msg.Password != nil {
 		input.Password = req.Msg.Password
+	}
+	if req.Msg.Mapel != nil {
+		input.Mapel = req.Msg.Mapel
 	}
 
 	u, err := h.userSvc.UpdateUser(ctx, claims.Role, req.Msg.Id, input)
@@ -372,6 +375,7 @@ func domainToProto(u *repository.User) *userv1.User {
 		Jurusan:   u.Jurusan,
 		PhotoUrl:  u.PhotoURL,
 		Story:     u.Story,
+		Mapel:     u.Mapel,
 		CreatedAt: timestamppb.New(u.CreatedAt),
 		UpdatedAt: timestamppb.New(u.UpdatedAt),
 	}

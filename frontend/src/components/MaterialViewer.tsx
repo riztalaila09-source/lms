@@ -1,15 +1,19 @@
-import { useEffect, useState, useCallback, useRef } from 'react'
-import { Badge, Box, Button, Dialog, Flex, Icon, Input, Stack, Text } from '@chakra-ui/react'
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
+import { Badge, Box, Button, Dialog, Flex, Heading, Icon, Input, Spinner, Stack, Text, useBreakpointValue } from '@chakra-ui/react'
 import {
-  LuCircleCheck, LuPaperclip, LuLink, LuClipboardList, LuPartyPopper,
-  LuCheck, LuPencil, LuLock,
+  LuCircleCheck, LuPaperclip, LuPencil, LuCheck, LuClock, LuExternalLink,
+  LuGraduationCap, LuCalendar, LuList, LuChevronDown,
 } from 'react-icons/lu'
+import { timestampDate } from '@bufbuild/protobuf/wkt'
+import { useEditor, EditorContent } from '@tiptap/react'
 import { materialClient } from '@/lib/client'
 import type { Material, Question, MaterialCompletion, EssayQuestion, EssayComment } from '@/gen/material/v1/material_pb'
 import { Role } from '@/gen/user/v1/user_pb'
 import { decodeLinks } from './MaterialFormDialog'
 import { StarsDisplay, StarsInput } from '@/components/StarRating'
-import { COLORS } from '@/theme/tokens'
+import { buildExtensions, READER_CSS } from './tiptap'
+import { MCQContext } from './MCQNode'
+import { COLORS, courseGradient, labelColor } from '@/theme/tokens'
 import { useAuth } from '@/hooks/useAuth'
 
 interface Props {
@@ -18,8 +22,11 @@ interface Props {
   material: Material | null
 }
 
+const LINK_WAIT = 120 // detik: siswa harus membuka link lalu tunggu 2 menit → auto-centang
+
 interface ShuffledOption { text: string; correct: boolean }
 interface ShuffledQuestion { question: string; image: string; options: ShuffledOption[] }
+interface TocItem { level: number; text: string }
 
 function shuffle<T>(arr: T[]): T[] {
   const a = [...arr]
@@ -29,7 +36,6 @@ function shuffle<T>(arr: T[]): T[] {
   }
   return a
 }
-
 function buildQuiz(questions: Question[]): ShuffledQuestion[] {
   return shuffle(questions)
     .filter((q) => q.options.length > 0)
@@ -39,73 +45,137 @@ function buildQuiz(questions: Question[]): ShuffledQuestion[] {
       options: shuffle(q.options.map((text, i) => ({ text, correct: i === q.correctIndex }))),
     }))
 }
-
-// Parse HTML content into individual checkable sections
-function parseSections(html: string): string[] {
-  if (!html.trim()) return []
-  const doc = new DOMParser().parseFromString(html, 'text/html')
-  const nodes = Array.from(doc.body.childNodes)
-  const sections: string[] = []
-  for (const n of nodes) {
-    if (n.nodeType === Node.ELEMENT_NODE) {
-      sections.push((n as Element).outerHTML)
-    } else if (n.nodeType === Node.TEXT_NODE && n.textContent?.trim()) {
-      sections.push(`<p>${n.textContent}</p>`)
-    }
-  }
-  return sections.length > 0 ? sections : [html]
-}
-
-interface ProgressState {
-  checked: boolean[]
-  locked: boolean[]
-}
-
-function loadProgress(materialId: string, count: number): ProgressState {
+function parseDoc(html: string): Document { return new DOMParser().parseFromString(html || '', 'text/html') }
+function parseHeadings(html: string): TocItem[] {
   try {
-    const raw = localStorage.getItem(`lms_prog_${materialId}`)
-    if (raw) {
-      const p = JSON.parse(raw) as ProgressState
-      if (p.checked?.length === count) return p
-    }
-  } catch { /* ignore */ }
-  return { checked: Array(count).fill(false), locked: Array(count).fill(false) }
+    return Array.from(parseDoc(html).querySelectorAll('h1,h2,h3'))
+      .map((h) => ({ level: Number(h.tagName[1]) || 1, text: h.textContent?.trim() || '' }))
+      .filter((h) => h.text)
+  } catch { return [] }
 }
-
-function saveProgress(materialId: string, state: ProgressState) {
-  try { localStorage.setItem(`lms_prog_${materialId}`, JSON.stringify(state)) } catch { /* ignore */ }
+function readingMinutes(html: string): number {
+  const text = parseDoc(html).body.textContent || ''
+  const words = text.trim().split(/\s+/).filter(Boolean).length
+  return Math.max(1, Math.round(words / 200))
 }
 
 export default function MaterialViewer({ open, onClose, material }: Props) {
   const { user } = useAuth()
+  const isStudent = user?.role === Role.STUDENT
+  const isDesktop = useBreakpointValue({ base: false, lg: true }) ?? false
 
+  const [fontScale, setFontScale] = useState(() => {
+    try { return parseFloat(localStorage.getItem('lms_fontscale') || '1') || 1 } catch { return 1 }
+  })
+  const bumpScale = (d: number) => setFontScale((s) => {
+    const n = Math.min(1.6, Math.max(0.85, Math.round((s + d) * 100) / 100))
+    try { localStorage.setItem('lms_fontscale', String(n)) } catch { /* ignore */ }
+    return n
+  })
+
+  // ── MCQ grading (inline + bottom digabung) ──
+  const [phase, setPhase] = useState<'answer' | 'pass'>('answer')
+  const [resetNonce, setResetNonce] = useState(0)
+  const [mcqKeys, setMcqKeys] = useState<Set<string>>(new Set())
+  const [mcqReports, setMcqReports] = useState<Map<string, { picked: number | null; correct: boolean }>>(new Map())
+  const onRegister = useCallback((key: string) => setMcqKeys((s) => (s.has(key) ? s : new Set(s).add(key))), [])
+  const onReport = useCallback((key: string, picked: number | null, correct: boolean) =>
+    setMcqReports((m) => { const n = new Map(m); n.set(key, { picked, correct }); return n }), [])
+  const mcqCtx = useMemo(
+    () => ({ interactive: true, phase, resetNonce, onRegister, onReport }),
+    [phase, resetNonce, onRegister, onReport])
+
+  const contentEditor = useEditor({
+    editable: false,
+    extensions: buildExtensions(),
+    content: material?.contentText || '',
+    editorProps: { attributes: { class: 'lms-reader' } },
+  })
+  useEffect(() => {
+    if (contentEditor && material) contentEditor.commands.setContent(material.contentText || '')
+  }, [contentEditor, material])
+
+  // reading meta + TOC
+  const [toc, setToc] = useState<TocItem[]>([])
+  const readMin = useMemo(() => readingMinutes(material?.contentText || ''), [material?.contentText])
+  const dateStr = material?.createdAt ? timestampDate(material.createdAt).toLocaleDateString('id-ID', { dateStyle: 'medium' }) : ''
+
+  // scroll progress + active TOC
+  const bodyRef = useRef<HTMLDivElement | null>(null)
+  const contentRef = useRef<HTMLDivElement | null>(null)
+  const [scrollPct, setScrollPct] = useState(0)
+  const [activeToc, setActiveToc] = useState(0)
+  const [tocOpenMobile, setTocOpenMobile] = useState(false)
+  const tocVisible = isDesktop || tocOpenMobile
+
+  const onBodyScroll = () => {
+    const el = bodyRef.current
+    if (!el) return
+    const max = el.scrollHeight - el.clientHeight
+    setScrollPct(max > 0 ? Math.min(100, Math.round((el.scrollTop / max) * 100)) : 0)
+    const heads = contentRef.current?.querySelectorAll('h1,h2,h3')
+    if (heads && heads.length) {
+      const threshold = el.getBoundingClientRect().top + 100
+      let idx = 0
+      heads.forEach((h, i) => { if ((h as HTMLElement).getBoundingClientRect().top <= threshold) idx = i })
+      setActiveToc(idx)
+    }
+  }
+  const scrollToHeading = (i: number) => {
+    const heads = contentRef.current?.querySelectorAll('h1,h2,h3')
+    ;(heads?.[i] as HTMLElement | undefined)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    setTocOpenMobile(false)
+  }
+
+  // bottom quiz (material_questions)
+  const [rawQuestions, setRawQuestions] = useState<Question[]>([])
   const [quiz, setQuiz] = useState<ShuffledQuestion[]>([])
-  const [answers, setAnswers] = useState<Record<number, number>>({})
-  const [quizResult, setQuizResult] = useState<'idle' | 'pass'>('idle')
-  const [loadingQuiz, setLoadingQuiz] = useState(false)
+  const [quizPick, setQuizPick] = useState<Record<number, number>>({})
 
-  // essay questions + comments
+  // essays
   const [essayQuestions, setEssayQuestions] = useState<EssayQuestion[]>([])
   const [essayComments, setEssayComments] = useState<Record<string, EssayComment[]>>({})
   const [commentDraft, setCommentDraft] = useState<Record<string, string>>({})
   const [submittingComment, setSubmittingComment] = useState<string | null>(null)
-  const [loadingEssay, setLoadingEssay] = useState(false)
 
-  // reading progress
-  const [sections, setSections] = useState<string[]>([])
+  // lampiran + timer
   const [links, setLinks] = useState<{ label: string; url: string }[]>([])
-  const [checked, setChecked] = useState<boolean[]>([])
-  const [locked, setLocked] = useState<boolean[]>([])
-  const [marked, setMarked] = useState(false)
+  const [linkStart, setLinkStart] = useState<(number | null)[]>([])
+  const [linkDone, setLinkDone] = useState<boolean[]>([])
+  const [now, setNow] = useState(Date.now())
+
   const [completion, setCompletion] = useState<MaterialCompletion | null>(null)
   const [completing, setCompleting] = useState(false)
+  const [readNoInteractive, setReadNoInteractive] = useState(false)
 
-  // star ratings
+  // ratings
   const [ratingAvg, setRatingAvg] = useState(0)
   const [ratingCount, setRatingCount] = useState(0)
   const [myRating, setMyRating] = useState(0)
   const [ratingSaving, setRatingSaving] = useState(false)
-  const isStudent = user?.role === Role.STUDENT
+
+  const isComplete = !!completion
+  const hasMCQ = mcqKeys.size + quiz.length > 0
+  const mcqPassed = !hasMCQ || phase === 'pass'
+
+  const hasEssay = essayQuestions.length > 0
+  const essaysAnswered = essayQuestions.filter((eq) => (essayComments[eq.id] ?? []).some((c) => c.authorId === user?.id)).length
+  const allEssaysAnswered = !hasEssay || essaysAnswered === essayQuestions.length
+
+  const lampiranDoneCount = linkDone.filter(Boolean).length
+  const allLampiranDone = links.length === 0 || linkDone.every(Boolean)
+
+  const interactiveTotal = links.length + essayQuestions.length + (hasMCQ ? 1 : 0)
+  const interactiveDone = lampiranDoneCount + essaysAnswered + (hasMCQ && mcqPassed ? 1 : 0)
+  const readPercent = interactiveTotal === 0
+    ? (isComplete || readNoInteractive ? 100 : 0)
+    : Math.round((interactiveDone / interactiveTotal) * 100)
+  const canComplete = !isComplete && mcqPassed && allEssaysAnswered && allLampiranDone
+
+  useEffect(() => {
+    if (!material) return
+    try { localStorage.setItem(`lms_pct_${material.id}`, String(isComplete ? 100 : readPercent)) } catch { /* ignore */ }
+  }, [material, readPercent, isComplete])
 
   useEffect(() => {
     if (!material) return
@@ -123,61 +193,15 @@ export default function MaterialViewer({ open, onClose, material }: Props) {
       const r = await materialClient.rateMaterial({ materialId: material.id, stars: n })
       setRatingAvg(r.avgRating); setRatingCount(r.ratingCount); setMyRating(r.myRating || n)
       try { localStorage.setItem(`lms_rating_${material.id}`, String(r.myRating || n)) } catch { /* ignore */ }
-    } catch (e: unknown) {
-      alert(e instanceof Error ? e.message : 'Gagal memberi rating')
-    } finally {
-      setRatingSaving(false)
-    }
+    } catch (e: unknown) { alert(e instanceof Error ? e.message : 'Gagal memberi rating') }
+    finally { setRatingSaving(false) }
   }
-
-  const sectionRefs = useRef<(HTMLDivElement | null)[]>([])
-
-  const quizPassed = quizResult === 'pass'
-
-  const descSlot = material?.description ? 1 : 0
-  const totalSlots = descSlot + sections.length + links.length // reading checkboxes
-  const readingDone = checked.filter(Boolean).length
-
-  const hasQuiz = quiz.length > 0
-  const hasEssay = essayQuestions.length > 0
-
-  // allEssaysAnswered: current user has commented on all essay questions
-  const allEssaysAnswered = !hasEssay ||
-    essayQuestions.every((eq) => (essayComments[eq.id] ?? []).some((c) => c.authorId === user?.id))
-
-  // Progress counts reading + quiz (all answers correct) + essays (answered) as
-  // units, so the percentage only reaches 100% when EVERYTHING is done — not
-  // when only the reading checkboxes are ticked.
-  const totalUnits = totalSlots + (hasQuiz ? 1 : 0) + (hasEssay ? 1 : 0)
-  const doneUnits = readingDone + (hasQuiz && quizPassed ? 1 : 0) + (hasEssay && allEssaysAnswered ? 1 : 0)
-  const readPercent = totalUnits === 0 ? 100 : Math.round(doneUnits / totalUnits * 100)
-
-  const isComplete = !!completion
-  const canComplete = readingDone === totalSlots && (!hasQuiz || quizPassed) && allEssaysAnswered && !isComplete
-
-  // Mirror reading percent to localStorage so the material list (outside this
-  // viewer) can show each material's progress without re-opening it.
-  useEffect(() => {
-    if (!material) return
-    const pct = isComplete ? 100 : readPercent
-    try { localStorage.setItem(`lms_pct_${material.id}`, String(pct)) } catch { /* ignore */ }
-  }, [material, readPercent, isComplete])
-
-  const reshuffle = useCallback((questions: Question[]) => {
-    setQuiz(buildQuiz(questions))
-    setAnswers({})
-    setQuizResult('idle')
-  }, [])
 
   const loadEssayComments = useCallback(async (questions: EssayQuestion[]) => {
     const map: Record<string, EssayComment[]> = {}
     await Promise.all(questions.map(async (eq) => {
-      try {
-        const res = await materialClient.listEssayComments({ essayQuestionId: eq.id })
-        map[eq.id] = res.comments
-      } catch {
-        map[eq.id] = []
-      }
+      try { map[eq.id] = (await materialClient.listEssayComments({ essayQuestionId: eq.id })).comments }
+      catch { map[eq.id] = [] }
     }))
     setEssayComments(map)
   }, [])
@@ -185,93 +209,92 @@ export default function MaterialViewer({ open, onClose, material }: Props) {
   // Reset + reload when material changes
   useEffect(() => {
     if (!open || !material) return
-
-    const secs = parseSections(material.contentText)
+    const mid = material.id
+    setToc(parseHeadings(material.contentText))
+    setScrollPct(0); setActiveToc(0); setTocOpenMobile(false)
     const lnks = decodeLinks(material.contentUrl).filter((l) => l.url)
-    setSections(secs)
     setLinks(lnks)
+    const starts: (number | null)[] = []
+    const dones: boolean[] = []
+    lnks.forEach((_, i) => {
+      let done = false, start: number | null = null
+      try {
+        done = localStorage.getItem(`lms_linkdone_${mid}_${i}`) === '1'
+        const s = localStorage.getItem(`lms_link_${mid}_${i}`)
+        start = s ? parseInt(s, 10) : null
+        if (!done && start && (Date.now() - start) / 1000 >= LINK_WAIT) { done = true; localStorage.setItem(`lms_linkdone_${mid}_${i}`, '1') }
+      } catch { /* ignore */ }
+      starts.push(start); dones.push(done)
+    })
+    setLinkStart(starts); setLinkDone(dones)
 
-    const totalSlots = (material.description ? 1 : 0) + secs.length + lnks.length
-    const prog = loadProgress(material.id, totalSlots)
-    setChecked(prog.checked)
-    setLocked(prog.locked)
-    setMarked(prog.locked.some(Boolean))
-    setCompletion(null)
-    setQuizResult('idle')
-    setAnswers({})
-    setEssayQuestions([])
-    setEssayComments({})
-    setCommentDraft({})
+    setPhase('answer'); setResetNonce(0)
+    setMcqKeys(new Set()); setMcqReports(new Map())
+    setQuizPick({}); setReadNoInteractive(false); setCompletion(null)
+    setEssayQuestions([]); setEssayComments({}); setCommentDraft({})
 
-    // load quiz
-    setLoadingQuiz(true)
-    materialClient.listQuestions({ materialId: material.id })
-      .then((res) => reshuffle(res.questions))
-      .catch(() => setQuiz([]))
-      .finally(() => setLoadingQuiz(false))
-
-    // load essay questions + comments
-    setLoadingEssay(true)
-    materialClient.listEssayQuestions({ materialId: material.id })
-      .then(async (res) => {
-        setEssayQuestions(res.questions)
-        await loadEssayComments(res.questions)
-      })
+    materialClient.listQuestions({ materialId: mid })
+      .then((res) => { setRawQuestions(res.questions); setQuiz(buildQuiz(res.questions)) })
+      .catch(() => { setRawQuestions([]); setQuiz([]) })
+    materialClient.listEssayQuestions({ materialId: mid })
+      .then(async (res) => { setEssayQuestions(res.questions); await loadEssayComments(res.questions) })
       .catch(() => setEssayQuestions([]))
-      .finally(() => setLoadingEssay(false))
+    materialClient.getMyCompletion({ materialId: mid })
+      .then((c) => { setCompletion(c); setPhase('pass') })
+      .catch(() => { /* not completed */ })
+  }, [open, material, loadEssayComments])
 
-    // hydrate completion from backend
-    materialClient.getMyCompletion({ materialId: material.id })
-      .then((c) => {
-        setCompletion(c)
-        if (c.readPercent === 100) {
-          const full = Array(totalSlots).fill(true)
-          setChecked(full)
-          setLocked(full)
-          setMarked(true)
-        }
-      })
-      .catch(() => { /* not found = not completed yet */ })
-  }, [open, material, reshuffle, loadEssayComments])
+  useEffect(() => {
+    if (!open) return
+    const t = setInterval(() => setNow(Date.now()), 1000)
+    return () => clearInterval(t)
+  }, [open])
+  useEffect(() => {
+    if (!material) return
+    linkStart.forEach((st, i) => {
+      if (st && !linkDone[i] && (now - st) / 1000 >= LINK_WAIT) {
+        setLinkDone((d) => { const n = [...d]; n[i] = true; return n })
+        try { localStorage.setItem(`lms_linkdone_${material.id}_${i}`, '1') } catch { /* ignore */ }
+      }
+    })
+  }, [now, linkStart, linkDone, material])
 
-  const toggleCheck = (i: number) => {
-    if (locked[i]) return
-    const next = [...checked]
-    next[i] = !next[i]
-    setChecked(next)
-    if (material) saveProgress(material.id, { checked: next, locked })
+  const openLink = (i: number, url: string) => {
+    window.open(url, '_blank', 'noopener')
+    if (linkDone[i] || !material) return
+    const st = Date.now()
+    setLinkStart((s) => { const n = [...s]; n[i] = st; return n })
+    try { localStorage.setItem(`lms_link_${material.id}_${i}`, String(st)) } catch { /* ignore */ }
   }
 
-  const autoCheck = (i: number) => {
-    if (checked[i]) return
-    const next = [...checked]
-    next[i] = true
-    setChecked(next)
-    if (material) saveProgress(material.id, { checked: next, locked })
-  }
-
-  const handleMark = () => {
-    const nextLocked = [...checked]
-    setLocked(nextLocked)
-    setMarked(true)
-    if (material) saveProgress(material.id, { checked, locked: nextLocked })
+  const checkAnswers = () => {
+    const inline = [...mcqKeys].map((k) => mcqReports.get(k) ?? { picked: null, correct: false })
+    const inlineUnanswered = inline.some((r) => r.picked === null)
+    const bottomUnanswered = quiz.some((_, qi) => quizPick[qi] === undefined)
+    if (inlineUnanswered || bottomUnanswered) { alert('Jawab semua soal dulu ya.'); return }
+    const total = inline.length + quiz.length
+    let wrong = inline.filter((r) => !r.correct).length
+    quiz.forEach((q, qi) => { if (!q.options[quizPick[qi]]?.correct) wrong++ })
+    if (total > 0 && wrong * 100 > total * 10) {
+      alert(`Ada ${wrong} jawaban salah (lebih dari 10%). Semua soal & jawaban diacak ulang — silakan coba lagi!`)
+      setResetNonce((n) => n + 1)
+      setMcqReports(new Map())
+      setQuiz(buildQuiz(rawQuestions))
+      setQuizPick({})
+      setPhase('answer')
+    } else {
+      setPhase('pass')
+    }
   }
 
   const handleComplete = async () => {
     if (!material || completing) return
     setCompleting(true)
     try {
-      const c = await materialClient.markComplete({
-        materialId: material.id,
-        readPercent: 100,
-        quizPassed,
-      })
+      const c = await materialClient.markComplete({ materialId: material.id, readPercent: 100, quizPassed: mcqPassed })
       setCompletion(c)
-    } catch (err) {
-      alert(err instanceof Error ? err.message : 'Gagal menyimpan penyelesaian')
-    } finally {
-      setCompleting(false)
-    }
+    } catch (err) { alert(err instanceof Error ? err.message : 'Gagal menyimpan penyelesaian') }
+    finally { setCompleting(false) }
   }
 
   const handleAddComment = async (essayQuestionId: string) => {
@@ -280,37 +303,16 @@ export default function MaterialViewer({ open, onClose, material }: Props) {
     setSubmittingComment(essayQuestionId)
     try {
       await materialClient.addEssayComment({ essayQuestionId, content })
-      // reload comments for this question
       const res = await materialClient.listEssayComments({ essayQuestionId })
       setEssayComments((prev) => ({ ...prev, [essayQuestionId]: res.comments }))
       setCommentDraft((prev) => ({ ...prev, [essayQuestionId]: '' }))
-    } catch (err) {
-      alert(err instanceof Error ? err.message : 'Gagal mengirim komentar')
-    } finally {
-      setSubmittingComment(null)
-    }
+    } catch (err) { alert(err instanceof Error ? err.message : 'Gagal mengirim komentar') }
+    finally { setSubmittingComment(null) }
   }
 
-  const submitQuiz = () => {
-    if (Object.keys(answers).length < quiz.length) {
-      alert('Jawab semua soal dulu ya.')
-      return
-    }
-    let wrong = 0
-    quiz.forEach((q, i) => {
-      const picked = answers[i]
-      if (picked === undefined || !q.options[picked]?.correct) wrong++
-    })
-    if (wrong === 0) {
-      setQuizResult('pass')
-    } else {
-      alert(`Ada ${wrong} jawaban yang salah. Soal & jawaban akan diacak ulang, silakan coba lagi!`)
-      if (material) {
-        materialClient.listQuestions({ materialId: material.id })
-          .then((res) => reshuffle(res.questions))
-          .catch(() => {})
-      }
-    }
+  const chooseQuiz = (qi: number, oi: number) => {
+    if (phase === 'pass') return
+    setQuizPick((p) => ({ ...p, [qi]: oi }))
   }
 
   return (
@@ -318,294 +320,272 @@ export default function MaterialViewer({ open, onClose, material }: Props) {
       <Dialog.Backdrop />
       <Dialog.Positioner>
         <Dialog.Content>
-          <Dialog.Header>
-            <Dialog.Title>{material?.title}</Dialog.Title>
-          </Dialog.Header>
-          <Dialog.Body>
-            <Stack gap="14px" maxW="900px" mx="auto" w="full">
-              {/* Completion badge */}
-              {isComplete && (
-                <Box bg="#DCFCE7" color="#166534" px="12px" py="8px" borderRadius="8px" display="flex" alignItems="center" gap="8px">
-                  <Icon as={LuCircleCheck} boxSize="16px" />
-                  <Text fontSize="13px" fontWeight="600">Materi ini sudah kamu selesaikan!</Text>
-                </Box>
-              )}
-
-              {/* Rating */}
-              <Flex justify="space-between" align="center" wrap="wrap" gap="10px"
-                bg={COLORS.bg} px="12px" py="10px" borderRadius="8px">
-                <Flex align="center" gap="8px" wrap="wrap">
-                  <StarsDisplay value={ratingAvg} count={ratingCount} size={15} />
-                  <Text fontSize="12px" color={COLORS.muted}>peringkat materi</Text>
-                </Flex>
-                {isStudent && (
-                  <Flex align="center" gap="8px">
-                    <Text fontSize="12px" color={COLORS.muted}>{myRating ? 'Ratingmu:' : 'Beri rating:'}</Text>
-                    <StarsInput value={myRating} onRate={rate} size={24} disabled={ratingSaving} />
-                  </Flex>
-                )}
+          <Dialog.Header position="relative">
+            <Flex align="center" justify="space-between" gap="10px" w="full" pr="30px">
+              <Dialog.Title fontSize="14px" color={COLORS.muted} lineClamp={1}>{material?.title}</Dialog.Title>
+              <Flex align="center" gap="4px" flexShrink={0}>
+                <Button size="xs" variant="outline" onClick={() => bumpScale(-0.1)} title="Perkecil huruf" fontSize="12px">A−</Button>
+                <Button size="xs" variant="outline" onClick={() => setFontScale(1)} title="Ukuran normal" fontSize="15px" fontWeight="bold">A</Button>
+                <Button size="xs" variant="outline" onClick={() => bumpScale(0.1)} title="Perbesar huruf" fontSize="18px">A+</Button>
               </Flex>
+            </Flex>
+            {/* scroll progress bar */}
+            <Box position="absolute" bottom="0" left="0" h="3px" bg={COLORS.primary} style={{ width: `${scrollPct}%`, transition: 'width .1s linear' }} />
+          </Dialog.Header>
 
-              {/* Description — with checkbox */}
-              {material?.description && (
-                <Flex gap="8px" align="flex-start">
-                  <input
-                    type="checkbox"
-                    checked={checked[0] ?? false}
-                    onChange={() => toggleCheck(0)}
-                    title="Tandai deskripsi sudah dibaca"
-                    style={{ marginTop: 3, flexShrink: 0, cursor: locked[0] ? 'default' : 'pointer' }}
-                    readOnly={locked[0]}
-                  />
-                  <Text fontSize="13px" color={COLORS.muted} flex={1}>{material.description}</Text>
-                </Flex>
-              )}
-
-              {/* Rich content — parsed sections with checkboxes */}
-              {sections.length > 0 && (
-                <Box borderTop="1px solid" borderColor={COLORS.border} pt="10px">
-                  <Stack gap="8px">
-                    {sections.map((html, i) => {
-                      const slotIdx = descSlot + i
-                      const isChecked = checked[slotIdx] ?? false
-                      const isLocked = locked[slotIdx] ?? false
-                      return (
-                        <Flex key={i} gap="8px" align="flex-start">
-                          <input
-                            type="checkbox"
-                            checked={isChecked}
-                            onChange={() => toggleCheck(slotIdx)}
-                            title={isLocked ? 'Sudah dikunci' : 'Tandai sudah dibaca'}
-                            style={{ marginTop: 4, flexShrink: 0, cursor: isLocked ? 'default' : 'pointer' }}
-                            readOnly={isLocked}
-                          />
-                          <Box
-                            ref={(el: HTMLDivElement | null) => { sectionRefs.current[i] = el }}
-                            flex={1}
-                            fontSize="14px"
-                            lineHeight="1.7"
-                            css={{
-                              '& table td, & table th': { border: '1px solid #ccc', padding: '5px 9px' },
-                              '& table': { borderCollapse: 'collapse', width: '100%' },
-                              '& ul, & ol': { paddingLeft: '22px' },
-                              '& img': { maxWidth: '100%', borderRadius: '6px' },
-                              '& h1': { fontSize: '1.6em', fontWeight: 700, margin: '6px 0' },
-                              '& h2': { fontSize: '1.35em', fontWeight: 700, margin: '6px 0' },
-                              '& h3': { fontSize: '1.15em', fontWeight: 600, margin: '6px 0' },
-                              '& a': { color: COLORS.primary, textDecoration: 'underline' },
-                            }}
-                            onClick={(e) => {
-                              const target = e.target as HTMLElement
-                              if (target.tagName === 'A') autoCheck(slotIdx)
-                            }}
-                            dangerouslySetInnerHTML={{ __html: html }}
-                          />
-                        </Flex>
-                      )
-                    })}
-                  </Stack>
-                </Box>
-              )}
-
-              {/* Links / Lampiran — each with its own checkbox */}
-              {links.length > 0 && (
-                <Box>
-                  <Text fontSize="12px" fontWeight="600" color={COLORS.muted} mb="6px" display="flex" alignItems="center" gap="5px"><Icon as={LuPaperclip} /> LAMPIRAN / VIDEO</Text>
-                  <Stack gap="6px">
-                    {links.map((l, i) => {
-                      const slotIdx = descSlot + sections.length + i
-                      const isChecked = checked[slotIdx] ?? false
-                      const isLocked = locked[slotIdx] ?? false
-                      return (
-                        <Flex key={i} gap="8px" align="center">
-                          <input
-                            type="checkbox"
-                            checked={isChecked}
-                            onChange={() => toggleCheck(slotIdx)}
-                            title={isLocked ? 'Sudah dikunci' : 'Tandai sudah dibuka'}
-                            style={{ flexShrink: 0, cursor: isLocked ? 'default' : 'pointer' }}
-                            readOnly={isLocked}
-                          />
-                          <a href={l.url} target="_blank" rel="noreferrer"
-                            style={{ color: COLORS.primary, fontSize: 13, textDecoration: 'underline', display: 'inline-flex', alignItems: 'center', gap: 4 }}
-                            onClick={() => autoCheck(slotIdx)}>
-                            <Icon as={LuLink} /> {l.label || l.url}
-                          </a>
-                        </Flex>
-                      )
-                    })}
-                  </Stack>
-                </Box>
-              )}
-
-              {/* Progress bar */}
-              {totalSlots > 0 && (
-                <Box>
-                  <Flex justify="space-between" mb="4px">
-                    <Text fontSize="12px" color={COLORS.muted}>Progress Membaca</Text>
-                    <Text fontSize="12px" fontWeight="600" color={readPercent === 100 ? COLORS.success : COLORS.primary}>
-                      {readPercent}%
-                    </Text>
+          <Dialog.Body ref={bodyRef} onScroll={onBodyScroll}>
+            <Box maxW="1140px" mx="auto" w="full">
+              {/* HERO */}
+              {material && (
+                <Box position="relative" borderRadius="14px" overflow="hidden"
+                  minH={{ base: '160px', md: '210px' }}
+                  style={{ background: material.coverImage ? undefined : courseGradient(material.title) }}>
+                  {material.coverImage && (
+                    <>
+                      <Box position="absolute" inset={0} bgImage={`url(${material.coverImage})`} bgSize="cover" bgPos="center" />
+                      <Box position="absolute" inset={0} bg="blackAlpha.600" />
+                    </>
+                  )}
+                  <Flex position="relative" direction="column" justify="flex-end" minH={{ base: '160px', md: '210px' }}
+                    p={{ base: '16px', md: '26px' }} color="white">
+                    <Flex gap="8px" mb="8px" wrap="wrap">
+                      {material.categoryName && <Badge {...labelColor(material.categoryName)}>{material.categoryName}</Badge>}
+                      {!material.isPublished && <Badge colorPalette="yellow">Draft</Badge>}
+                      {isComplete && <Badge colorPalette="green"><Icon as={LuCircleCheck} /> Selesai</Badge>}
+                    </Flex>
+                    <Heading fontSize={{ base: '22px', md: '32px' }} fontWeight="800" lineHeight="1.15" lineClamp={3}>{material.title}</Heading>
+                    <Flex gap={{ base: '12px', md: '18px' }} mt="12px" wrap="wrap" fontSize="12px" color="whiteAlpha.900" align="center">
+                      <Flex gap="5px" align="center"><Icon as={LuGraduationCap} /> {material.createdByName || 'Pengajar'}</Flex>
+                      {dateStr && <Flex gap="5px" align="center"><Icon as={LuCalendar} /> {dateStr}</Flex>}
+                      <Flex gap="5px" align="center"><Icon as={LuClock} /> {readMin} menit baca</Flex>
+                      <StarsDisplay value={ratingAvg} count={ratingCount} size={13} />
+                    </Flex>
                   </Flex>
-                  <Box h="8px" bg={COLORS.border} borderRadius="4px">
-                    <Box
-                      h="8px"
-                      bg={readPercent === 100 ? COLORS.success : COLORS.primary}
-                      borderRadius="4px"
-                      style={{ width: `${readPercent}%`, transition: 'width 0.3s' }}
-                    />
-                  </Box>
                 </Box>
               )}
 
-              {/* Quiz */}
-              {loadingQuiz ? (
-                <Text color={COLORS.muted} fontSize="13px">Memuat soal…</Text>
-              ) : quiz.length > 0 && (
-                <Box borderTop="1px solid" borderColor={COLORS.border} pt="12px">
-                  <Text fontSize="14px" fontWeight="600" mb="10px" display="flex" alignItems="center" gap="6px"><Icon as={LuClipboardList} /> Latihan Soal ({quiz.length})</Text>
-                  {quizResult === 'pass' ? (
-                    <Box bg="#DCFCE7" color="#166534" p="14px" borderRadius="8px" textAlign="center">
-                      <Text fontSize="16px" fontWeight="bold" display="flex" alignItems="center" justifyContent="center" gap="6px"><Icon as={LuPartyPopper} /> Selamat! Semua jawaban benar!</Text>
-                      <Button mt="8px" size="sm" variant="outline"
-                        onClick={() => { if (material) materialClient.listQuestions({ materialId: material.id }).then((r) => reshuffle(r.questions)) }}>
-                        Coba lagi
-                      </Button>
-                    </Box>
-                  ) : (
-                    <Stack gap="14px">
-                      {quiz.map((q, qi) => (
-                        <Box key={qi}>
-                          <Text fontSize="13px" fontWeight="medium" mb="6px">{qi + 1}. {q.question}</Text>
-                          {q.image && <img src={q.image} alt="" style={{ maxHeight: 200, marginBottom: 6, borderRadius: 8, border: `1px solid ${COLORS.border}` }} />}
-                          <Stack gap="5px">
-                            {q.options.map((o, oi) => {
-                              const picked = answers[qi] === oi
-                              return (
-                                <Flex key={oi} gap="8px" align="center" cursor="pointer"
-                                  bg={picked ? '#DBEAFE' : COLORS.bg} px="10px" py="7px" borderRadius="6px"
-                                  border="1px solid" borderColor={picked ? COLORS.primary : COLORS.border}
-                                  onClick={() => setAnswers((a) => ({ ...a, [qi]: oi }))}>
-                                  <input type="radio" name={`q-${qi}`} checked={picked} readOnly />
-                                  <Text fontSize="13px">{String.fromCharCode(65 + oi)}. {o.text}</Text>
-                                </Flex>
-                              )
-                            })}
-                          </Stack>
-                        </Box>
-                      ))}
-                      <Button bg={COLORS.success} color="white" _hover={{ opacity: 0.9 }} onClick={submitQuiz}>
-                        <Icon as={LuCheck} /> Kumpulkan Jawaban
-                      </Button>
-                      <Text fontSize="11px" color={COLORS.muted} textAlign="center">
-                        Jika ada 1 saja yang salah, semua soal & jawaban akan diacak ulang.
-                      </Text>
-                    </Stack>
-                  )}
-                </Box>
-              )}
-
-              {/* Soal Uraian */}
-              {loadingEssay ? (
-                <Text color={COLORS.muted} fontSize="13px">Memuat soal uraian…</Text>
-              ) : essayQuestions.length > 0 && (
-                <Box borderTop="1px solid" borderColor={COLORS.border} pt="12px">
-                  <Text fontSize="14px" fontWeight="600" mb="10px" display="flex" alignItems="center" gap="6px"><Icon as={LuPencil} /> Soal Uraian ({essayQuestions.length})</Text>
+              {/* BODY: main + rail */}
+              <Flex direction={{ base: 'column', lg: 'row' }} gap={{ base: '18px', lg: '28px' }} align="flex-start" mt="18px">
+                {/* MAIN */}
+                <Box flex="1" minW={0} maxW={{ lg: '760px' }} w="full">
                   <Stack gap="16px">
-                    {essayQuestions.map((eq, qi) => {
-                      const comments = essayComments[eq.id] ?? []
-                      const myAnswer = comments.some((c) => c.authorId === user?.id)
-                      return (
-                        <Box key={eq.id} bg={COLORS.bg} p="12px" borderRadius="8px"
-                          border="1px solid" borderColor={myAnswer ? COLORS.success : COLORS.border}>
-                          <Text fontSize="13px" fontWeight="600" mb="8px">{qi + 1}. {eq.question}</Text>
-                          {myAnswer && (
-                            <Badge colorPalette="green" variant="subtle" mb="8px" fontSize="11px"><Icon as={LuCheck} /> Sudah dijawab</Badge>
-                          )}
-                          {/* List komentar */}
-                          {comments.length > 0 && (
-                            <Stack gap="8px" mb="10px">
-                              {comments.map((c) => (
-                                <Flex key={c.id} gap="8px" align="flex-start"
-                                  bg={COLORS.surface} p="8px" borderRadius="6px" border="1px solid" borderColor={COLORS.border}>
-                                  <Badge
-                                    colorPalette={c.authorRole === 'teacher' || c.authorRole === 'admin' ? 'purple' : 'blue'}
-                                    variant="subtle" fontSize="10px" flexShrink={0} mt="1px">
-                                    {c.authorRole === 'teacher' || c.authorRole === 'admin' ? 'Guru' : 'Siswa'}
-                                  </Badge>
-                                  <Box flex={1}>
-                                    <Text fontSize="12px" fontWeight="600" color={COLORS.text}>{c.authorName}</Text>
-                                    <Text fontSize="13px" color={COLORS.text} mt="2px">{c.content}</Text>
-                                  </Box>
-                                </Flex>
-                              ))}
-                            </Stack>
-                          )}
-                          {/* Input komentar baru */}
-                          <Flex gap="8px">
-                            <Input
-                              size="sm" flex={1}
-                              placeholder={myAnswer ? 'Tambah komentar lagi…' : 'Tulis jawabanmu di sini…'}
-                              value={commentDraft[eq.id] ?? ''}
-                              onChange={(e) => setCommentDraft((prev) => ({ ...prev, [eq.id]: e.target.value }))}
-                              onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleAddComment(eq.id) } }}
-                            />
-                            <Button
-                              size="sm" bg={COLORS.primary} color="white" _hover={{ opacity: 0.85 }}
-                              loading={submittingComment === eq.id}
-                              onClick={() => handleAddComment(eq.id)}>
-                              Kirim
-                            </Button>
-                          </Flex>
-                        </Box>
-                      )
-                    })}
-                  </Stack>
-                  {!allEssaysAnswered && (
-                    <Text fontSize="11px" color={COLORS.muted} mt="8px">
-                      * Jawab semua soal uraian di atas agar tombol Selesai bisa diklik.
-                    </Text>
-                  )}
-                </Box>
-              )}
+                    {material?.description && (
+                      <Text fontSize={`${17 * fontScale}px`} color={COLORS.text} fontWeight="500" lineHeight="1.7"
+                        borderLeft="3px solid" borderColor={COLORS.primary} pl="14px">{material.description}</Text>
+                    )}
 
-              {!material?.isPublished && (
-                <Badge colorPalette="yellow" alignSelf="flex-start">Draft — belum dipublikasi</Badge>
-              )}
-            </Stack>
+                    <MCQContext.Provider value={mcqCtx}>
+                      <Box ref={contentRef} fontSize={`${16 * fontScale}px`} lineHeight="1.9" color={COLORS.text}
+                        css={{ '& .ProseMirror': { outline: 'none' }, ...READER_CSS }}>
+                        <EditorContent editor={contentEditor} />
+                      </Box>
+                    </MCQContext.Provider>
+
+                    {/* LAMPIRAN / VIDEO */}
+                    {links.length > 0 && (
+                      <Box border="2px solid" borderColor={allLampiranDone ? COLORS.success : COLORS.warning} borderRadius="10px"
+                        bg={allLampiranDone ? '#F0FDF4' : '#FFFBEB'} p="14px" mt="4px">
+                        <Flex align="center" gap="8px" mb="10px">
+                          <Icon as={LuPaperclip} boxSize="20px" color={allLampiranDone ? COLORS.success : COLORS.warning} />
+                          <Text fontSize="15px" fontWeight="800" color={COLORS.text}>LAMPIRAN / VIDEO — wajib dikunjungi</Text>
+                        </Flex>
+                        <Text fontSize="12px" color={COLORS.muted} mb="10px">
+                          Klik tiap tautan lalu <b>pelajari minimal 2 menit</b>. Centang hijau muncul otomatis setelah 120 detik.
+                        </Text>
+                        <Stack gap="8px">
+                          {links.map((l, i) => {
+                            const done = linkDone[i]
+                            const st = linkStart[i]
+                            const remain = st && !done ? Math.max(0, LINK_WAIT - Math.floor((now - st) / 1000)) : null
+                            return (
+                              <Flex key={i} align="center" gap="10px" bg="white" border="1px solid" borderColor={done ? COLORS.success : COLORS.border}
+                                borderRadius="8px" px="12px" py="10px">
+                                {done ? (
+                                  <Icon as={LuCircleCheck} boxSize="20px" color={COLORS.success} flexShrink={0} />
+                                ) : remain !== null ? (
+                                  <Spinner size="sm" color={COLORS.warning} flexShrink={0} />
+                                ) : (
+                                  <Box w="20px" h="20px" borderRadius="full" border="2px solid" borderColor={COLORS.border} flexShrink={0} />
+                                )}
+                                <Box flex="1" minW={0}>
+                                  <Flex as="button" align="center" gap="6px" onClick={() => openLink(i, l.url)} color={COLORS.primary}>
+                                    <Icon as={LuExternalLink} /> <Text fontSize="14px" fontWeight="600" textDecoration="underline" lineClamp={1}>{l.label || l.url}</Text>
+                                  </Flex>
+                                  {done ? (
+                                    <Text fontSize="11px" color={COLORS.success} mt="1px">Selesai dipelajari ✓</Text>
+                                  ) : remain !== null ? (
+                                    <Text fontSize="11px" color={COLORS.warning} mt="1px" display="flex" alignItems="center" gap="4px"><Icon as={LuClock} /> Tunggu {remain} detik lagi… (biarkan tab terbuka)</Text>
+                                  ) : (
+                                    <Text fontSize="11px" color={COLORS.muted} mt="1px">Belum dikunjungi — klik untuk membuka.</Text>
+                                  )}
+                                </Box>
+                              </Flex>
+                            )
+                          })}
+                        </Stack>
+                      </Box>
+                    )}
+
+                    {/* Latihan Soal (bawah) */}
+                    {quiz.length > 0 && (
+                      <Box borderTop="1px solid" borderColor={COLORS.border} pt="12px">
+                        <Text fontSize="15px" fontWeight="700" mb="10px">Latihan Soal ({quiz.length})</Text>
+                        <Stack gap="14px">
+                          {quiz.map((q, qi) => {
+                            const picked = quizPick[qi]
+                            const pass = phase === 'pass'
+                            const answeredWrong = pass && picked !== undefined && !q.options[picked].correct
+                            return (
+                              <Box key={qi} border="1px solid" borderColor={pass && !answeredWrong ? COLORS.success : COLORS.border} borderRadius="8px" p="12px" bg={COLORS.bg}>
+                                <Flex align="flex-start" gap="8px" mb="8px">
+                                  <Icon as={LuCircleCheck} boxSize="18px" color={pass && !answeredWrong ? COLORS.success : COLORS.border} mt="1px" />
+                                  <Text fontSize="14px" fontWeight="600" flex="1">{qi + 1}. {q.question}</Text>
+                                </Flex>
+                                {q.image && <img src={q.image} alt="" style={{ maxHeight: 200, marginBottom: 8, borderRadius: 8, border: `1px solid ${COLORS.border}` }} />}
+                                <Stack gap="5px" pl="26px">
+                                  {q.options.map((o, oi) => {
+                                    const isPicked = picked === oi
+                                    const showGreen = pass && o.correct
+                                    const showRed = pass && isPicked && !o.correct
+                                    return (
+                                      <Flex key={oi} as="button" w="full" textAlign="left" gap="8px" align="center"
+                                        px="10px" py="8px" borderRadius="6px" border="1px solid" cursor={pass ? 'default' : 'pointer'}
+                                        borderColor={showGreen ? COLORS.success : showRed ? COLORS.danger : isPicked ? COLORS.primary : COLORS.border}
+                                        bg={showGreen ? '#DCFCE7' : showRed ? '#FEE2E2' : isPicked ? '#EEF2FF' : 'white'}
+                                        onClick={() => chooseQuiz(qi, oi)}>
+                                        <Text fontSize="13px" fontWeight="600" color={COLORS.muted}>{String.fromCharCode(65 + oi)}.</Text>
+                                        <Text fontSize="13px" flex="1">{o.text}</Text>
+                                        {showGreen && <Icon as={LuCircleCheck} color={COLORS.success} />}
+                                      </Flex>
+                                    )
+                                  })}
+                                </Stack>
+                              </Box>
+                            )
+                          })}
+                        </Stack>
+                      </Box>
+                    )}
+
+                    {/* Soal Uraian */}
+                    {essayQuestions.length > 0 && (
+                      <Box borderTop="1px solid" borderColor={COLORS.border} pt="12px">
+                        <Text fontSize="15px" fontWeight="700" mb="10px" display="flex" alignItems="center" gap="6px"><Icon as={LuPencil} /> Soal Uraian ({essayQuestions.length})</Text>
+                        <Stack gap="16px">
+                          {essayQuestions.map((eq, qi) => {
+                            const comments = essayComments[eq.id] ?? []
+                            const myAnswer = comments.some((c) => c.authorId === user?.id)
+                            return (
+                              <Box key={eq.id} bg={COLORS.bg} p="12px" borderRadius="8px" border="1px solid" borderColor={myAnswer ? COLORS.success : COLORS.border}>
+                                <Text fontSize="13px" fontWeight="600" mb="8px">{qi + 1}. {eq.question}</Text>
+                                {myAnswer && <Badge colorPalette="green" variant="subtle" mb="8px" fontSize="11px"><Icon as={LuCheck} /> Sudah dijawab</Badge>}
+                                {comments.length > 0 && (
+                                  <Stack gap="8px" mb="10px">
+                                    {comments.map((c) => (
+                                      <Flex key={c.id} gap="8px" align="flex-start" bg={COLORS.surface} p="8px" borderRadius="6px" border="1px solid" borderColor={COLORS.border}>
+                                        <Badge colorPalette={c.authorRole === 'teacher' || c.authorRole === 'admin' ? 'purple' : 'blue'} variant="subtle" fontSize="10px" flexShrink={0} mt="1px">
+                                          {c.authorRole === 'teacher' || c.authorRole === 'admin' ? 'Guru' : 'Siswa'}
+                                        </Badge>
+                                        <Box flex={1}>
+                                          <Text fontSize="12px" fontWeight="600" color={COLORS.text}>{c.authorName}</Text>
+                                          <Text fontSize="13px" color={COLORS.text} mt="2px">{c.content}</Text>
+                                        </Box>
+                                      </Flex>
+                                    ))}
+                                  </Stack>
+                                )}
+                                <Flex gap="8px">
+                                  <Input size="sm" flex={1} placeholder={myAnswer ? 'Tambah komentar lagi…' : 'Tulis jawabanmu di sini…'}
+                                    value={commentDraft[eq.id] ?? ''}
+                                    onChange={(e) => setCommentDraft((prev) => ({ ...prev, [eq.id]: e.target.value }))}
+                                    onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleAddComment(eq.id) } }} />
+                                  <Button size="sm" bg={COLORS.primary} color="white" _hover={{ opacity: 0.85 }}
+                                    loading={submittingComment === eq.id} onClick={() => handleAddComment(eq.id)}>Kirim</Button>
+                                </Flex>
+                              </Box>
+                            )
+                          })}
+                        </Stack>
+                      </Box>
+                    )}
+                  </Stack>
+                </Box>
+
+                {/* RAIL */}
+                <Box w={{ base: 'full', lg: '260px' }} flexShrink={0} order={{ base: -1, lg: 0 }}
+                  position={{ lg: 'sticky' }} top={{ lg: '4px' }} alignSelf="flex-start">
+                  <Stack gap="14px">
+                    {toc.length > 0 && (
+                      <Box border="1px solid" borderColor={COLORS.border} borderRadius="10px" p="12px" bg={COLORS.surface}>
+                        <Flex as="button" w="full" align="center" justify="space-between"
+                          onClick={() => !isDesktop && setTocOpenMobile((o) => !o)} cursor={isDesktop ? 'default' : 'pointer'}>
+                          <Text fontSize="13px" fontWeight="700" display="flex" alignItems="center" gap="6px" color={COLORS.text}><Icon as={LuList} /> Daftar Isi</Text>
+                          {!isDesktop && <Icon as={LuChevronDown} transform={tocOpenMobile ? 'rotate(180deg)' : undefined} transition="transform .2s" />}
+                        </Flex>
+                        {tocVisible && (
+                          <Stack gap="1px" mt="10px" maxH={{ lg: '50vh' }} overflowY="auto">
+                            {toc.map((h, i) => (
+                              <Text as="button" key={i} textAlign="left" fontSize="12.5px" py="3px"
+                                pl={`${8 + (h.level - 1) * 12}px`} lineClamp={2}
+                                borderLeft="2px solid" borderColor={activeToc === i ? COLORS.primary : 'transparent'}
+                                color={activeToc === i ? COLORS.primary : COLORS.muted}
+                                fontWeight={activeToc === i ? '700' : '400'}
+                                _hover={{ color: COLORS.primary }}
+                                onClick={() => scrollToHeading(i)}>{h.text}</Text>
+                            ))}
+                          </Stack>
+                        )}
+                      </Box>
+                    )}
+
+                    {interactiveTotal > 0 && (
+                      <Box border="1px solid" borderColor={COLORS.border} borderRadius="10px" p="12px" bg={COLORS.surface}>
+                        <Flex justify="space-between" mb="6px">
+                          <Text fontSize="12px" fontWeight="600" color={COLORS.muted}>Progres</Text>
+                          <Text fontSize="12px" fontWeight="700" color={readPercent === 100 ? COLORS.success : COLORS.primary}>{readPercent}%</Text>
+                        </Flex>
+                        <Box h="8px" bg={COLORS.border} borderRadius="4px">
+                          <Box h="8px" bg={readPercent === 100 ? COLORS.success : COLORS.primary} borderRadius="4px"
+                            style={{ width: `${readPercent}%`, transition: 'width .3s' }} />
+                        </Box>
+                      </Box>
+                    )}
+
+                    {isStudent && (
+                      <Box border="1px solid" borderColor={COLORS.border} borderRadius="10px" p="12px" bg={COLORS.surface}>
+                        <Text fontSize="12px" color={COLORS.muted} mb="6px">{myRating ? 'Ratingmu' : 'Beri rating materi'}</Text>
+                        <StarsInput value={myRating} onRate={rate} size={26} disabled={ratingSaving} />
+                      </Box>
+                    )}
+                  </Stack>
+                </Box>
+              </Flex>
+            </Box>
           </Dialog.Body>
+
           <Dialog.Footer>
-            <Flex gap="8px" align="center" w="full" justify="space-between">
-              <Flex gap="8px">
-                {/* Mark button — locks current checked state */}
-                {totalSlots > 0 && !isComplete && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    colorPalette="blue"
-                    onClick={handleMark}
-                    title="Kunci semua yang sudah dicentang"
-                  >
-                    <Icon as={LuLock} /> {marked ? 'Re-Mark' : 'Mark'}
+            <Flex gap="8px" align="center" w="full" justify="space-between" wrap="wrap">
+              <Flex gap="8px" align="center">
+                {hasMCQ && phase === 'answer' && (
+                  <Button size="sm" bg={COLORS.primary} color="white" _hover={{ bg: COLORS.primaryDark }} onClick={checkAnswers}>
+                    <Icon as={LuCheck} /> Periksa Jawaban
                   </Button>
                 )}
-                {/* Complete button — active only when all conditions met */}
                 {!isComplete && (
-                  <Button
-                    size="sm"
-                    bg={canComplete ? COLORS.success : COLORS.border}
-                    color={canComplete ? 'white' : COLORS.muted}
-                    disabled={!canComplete}
+                  <Button size="sm"
+                    bg={(canComplete || interactiveTotal === 0) ? COLORS.success : COLORS.border}
+                    color={(canComplete || interactiveTotal === 0) ? 'white' : COLORS.muted}
+                    disabled={interactiveTotal > 0 && !canComplete}
                     loading={completing}
-                    onClick={handleComplete}
+                    onClick={() => { if (interactiveTotal === 0) setReadNoInteractive(true); handleComplete() }}
                     title={
-                      readingDone < totalSlots ? 'Centang semua bacaan dulu' :
-                      (hasQuiz && !quizPassed) ? 'Jawab benar semua soal pilihan ganda dulu' :
-                      !allEssaysAnswered ? 'Jawab semua soal uraian dulu' :
-                      'Tandai materi sebagai selesai'
-                    }
-                  >
-                    <Icon as={LuCircleCheck} /> Selesai
+                      interactiveTotal === 0 ? 'Tandai sudah dibaca'
+                        : !mcqPassed ? 'Klik "Periksa Jawaban" dan lulus dulu'
+                        : !allLampiranDone ? 'Kunjungi & pelajari semua lampiran dulu'
+                        : !allEssaysAnswered ? 'Jawab semua soal uraian dulu'
+                        : 'Tandai materi selesai'
+                    }>
+                    <Icon as={LuCircleCheck} /> {interactiveTotal === 0 ? 'Selesai membaca' : 'Selesai'}
                   </Button>
                 )}
               </Flex>

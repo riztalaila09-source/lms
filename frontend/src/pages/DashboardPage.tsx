@@ -8,7 +8,8 @@ import { Role } from '@/gen/user/v1/user_pb'
 import type { TeacherDashboard } from '@/gen/dashboard/v1/dashboard_pb'
 import type { Material, Category } from '@/gen/material/v1/material_pb'
 import type { StoryEntry } from '@/gen/user/v1/user_pb'
-import { dashboardClient, materialClient, userClient } from '@/lib/client'
+import type { School, Semester } from '@/gen/school/v1/school_pb'
+import { dashboardClient, materialClient, userClient, schoolClient } from '@/lib/client'
 import { useLang } from '@/i18n'
 import AppLayout from '@/components/AppLayout'
 import MaterialCard from '@/components/MaterialCard'
@@ -37,8 +38,11 @@ export default function DashboardPage() {
 
   const [d, setD] = useState<TeacherDashboard | null>(null)
   const [loading, setLoading] = useState(true)
+  const [school, setSchool] = useState<School | null>(null)
+  const [activeSem, setActiveSem] = useState<Semester | null>(null)
   // Student home data (Materi Umum slideshow + categories)
   const [generalMats, setGeneralMats] = useState<Material[]>([])
+  const [exploreMats, setExploreMats] = useState<Material[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [activeCat, setActiveCat] = useState<string>('')
   const [slide, setSlide] = useState(0)
@@ -73,10 +77,21 @@ export default function DashboardPage() {
   }, [user, isTeacher, loadDash])
 
   useEffect(() => {
+    if (!user || !isTeacher) return
+    schoolClient.getSchool({}).then(setSchool).catch(() => setSchool(null))
+    schoolClient.listSemesters({})
+      .then((r) => setActiveSem(r.semesters.find((s) => s.isActive) ?? null))
+      .catch(() => setActiveSem(null))
+  }, [user, isTeacher])
+
+  useEffect(() => {
     if (!user || isTeacher) return
     materialClient.listMaterials({ courseId: 'general', pagination: { page: 1, pageSize: 200 } })
       .then((r) => setGeneralMats(r.materials))
       .catch(() => setGeneralMats([]))
+    materialClient.exploreMaterials({})
+      .then((r) => setExploreMats(r.materials))
+      .catch(() => setExploreMats([]))
     materialClient.listCategories({})
       .then((r) => setCategories(r.categories))
       .catch(() => setCategories([]))
@@ -87,9 +102,9 @@ export default function DashboardPage() {
 
   // Popular = most-rated first (count, then average).
   const popular = useMemo(() => {
-    return [...generalMats].sort((a, b) =>
+    return [...exploreMats].sort((a, b) =>
       (b.ratingCount - a.ratingCount) || (b.avgRating - a.avgRating))
-  }, [generalMats])
+  }, [exploreMats])
 
   // Slideshow: top general materials, auto-advancing every 5s.
   const slides = useMemo(() => generalMats.slice(0, 6), [generalMats])
@@ -102,25 +117,25 @@ export default function DashboardPage() {
   // Categories that actually have materials, in the order they appear.
   const catTabs = useMemo(() => {
     const present = new Map<string, string>() // id -> name
-    for (const m of generalMats) {
+    for (const m of exploreMats) {
       if (m.categoryId && m.categoryName && !present.has(m.categoryId)) present.set(m.categoryId, m.categoryName)
     }
     const known = categories.filter((c) => present.has(c.id)).map((c) => ({ id: c.id, name: c.name }))
     // include any category present on materials but missing from the categories list
     for (const [id, name] of present) if (!known.some((k) => k.id === id)) known.push({ id, name })
     // materials without a category go under a virtual "Lainnya" tab
-    if (generalMats.some((m) => !m.categoryId)) known.push({ id: '__none__', name: 'Lainnya' })
+    if (exploreMats.some((m) => !m.categoryId)) known.push({ id: '__none__', name: 'Lainnya' })
     return known
-  }, [generalMats, categories])
+  }, [exploreMats, categories])
 
   useEffect(() => {
     if (catTabs.length > 0 && !catTabs.some((c) => c.id === activeCat)) setActiveCat(catTabs[0].id)
   }, [catTabs, activeCat])
 
   const catMaterials = useMemo(() => {
-    if (activeCat === '__none__') return generalMats.filter((m) => !m.categoryId)
-    return generalMats.filter((m) => m.categoryId === activeCat)
-  }, [generalMats, activeCat])
+    if (activeCat === '__none__') return exploreMats.filter((m) => !m.categoryId)
+    return exploreMats.filter((m) => m.categoryId === activeCat)
+  }, [exploreMats, activeCat])
   const activeCatName = catTabs.find((c) => c.id === activeCat)?.name || 'kategori'
 
   // Show one row by default; reveal the rest with a "show all" toggle.
@@ -325,123 +340,146 @@ export default function DashboardPage() {
   }
 
   // ── Teacher view (full dashboard) ──
+  const teacherClasses = (user?.kelas || '').split(',').map((s) => s.trim()).filter(Boolean)
+  const cap = (s: string) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : '')
+  const today = new Date().toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+  const semLabel = activeSem ? `Semester ${cap(activeSem.semester)} ${activeSem.tahunAjaran}` : ''
   return (
-    <AppLayout
-      title={`Selamat datang, ${user?.fullName || user?.username || ''}!`}
-      subtitle="Ringkasan aktivitas kelas Anda"
-    >
-      {loading ? (
-        <Text color={COLORS.muted}>Memuat statistik…</Text>
-      ) : !d ? (
-        <Text color={COLORS.danger}>Gagal memuat statistik.</Text>
-      ) : (
-        <Stack gap="16px">
-          {/* Primary stats */}
-          <SimpleGrid columns={{ base: 2, md: 4 }} gap="12px">
-            <Stat num={d.totalKelas} label="Total Kelas" accent={COLORS.primary} />
-            <Stat num={d.totalSiswa} label="Total Siswa" accent={COLORS.success} />
-            <Stat num={d.totalMateri} label="Total Materi" accent="#7C3AED" />
-            <Stat num={d.totalTugas} label="Total Tugas" accent={COLORS.warning} />
-          </SimpleGrid>
+    <AppLayout title="">
+      <Stack gap="16px">
+        {/* Greeting */}
+        <Box bg={COLORS.primary} color="white" borderRadius="12px" p={{ base: '20px', md: '26px' }}>
+          <Heading fontSize={{ base: '20px', md: '26px' }} fontWeight="800">
+            Selamat datang, {user?.fullName || user?.username}!
+          </Heading>
+          {school?.name && <Text fontSize="15px" fontWeight="600" mt="4px">{school.name}</Text>}
+          {(user?.mapel || teacherClasses.length > 0) && (
+            <Text fontSize="13px" color="whiteAlpha.900" mt="6px">
+              {user?.mapel ? `Guru ${user.mapel}` : 'Guru'}{teacherClasses.length > 0 ? ` • ${teacherClasses.join(', ')}` : ''}
+            </Text>
+          )}
+          <Flex gap="10px" mt="12px" fontSize="12px" color="whiteAlpha.800" wrap="wrap">
+            <Text>{today}</Text>
+            {semLabel && <Text>· {semLabel}</Text>}
+          </Flex>
+        </Box>
 
-          {/* Submission stats */}
-          <SimpleGrid columns={{ base: 2, md: 4 }} gap="12px">
-            <Stat num={d.totalPengumpulan} label="Tugas Terkumpul" accent={COLORS.success} />
-            <Stat num={d.belumKumpul} label="Belum Kumpul" accent={COLORS.danger} />
-            <Stat num={d.perluDinilai} label="Perlu Dinilai" accent={COLORS.warning} />
-            <Stat num={d.rataRataNilai ? d.rataRataNilai.toFixed(1) : '–'} label="Rata-rata Nilai" accent={COLORS.primary} />
-          </SimpleGrid>
+        {loading ? (
+          <Text color={COLORS.muted}>Memuat statistik…</Text>
+        ) : !d ? (
+          <Text color={COLORS.danger}>Gagal memuat statistik.</Text>
+        ) : (
+          <Stack gap="16px">
+            {/* Stats — single color */}
+            <SimpleGrid columns={{ base: 2, sm: 3, lg: 5 }} gap="12px">
+              <Stat num={d.totalSiswa} label="Total Siswa" />
+              <Stat num={d.totalGuru} label="Total Guru" />
+              <Stat num={d.totalKelas} label="Total Mata Pelajaran" />
+              <Stat num={d.totalMateri} label="Total Materi" />
+              <Stat num={d.totalTugas} label="Total Tugas" />
+              <Stat num={d.totalPengumpulan} label="Tugas Terkumpul" />
+              <Stat num={d.belumKumpul} label="Belum Terkumpul" />
+              <Stat num={d.perluDinilai} label="Perlu Dinilai" />
+              <Stat num={d.rataRataNilai ? d.rataRataNilai.toFixed(1) : '–'} label="Rata-rata Nilai" />
+            </SimpleGrid>
 
-          <SimpleGrid columns={{ base: 1, lg: 2 }} gap="16px">
-            {/* Students per major */}
-            <Card title={<><Icon as={LuGraduationCap} /> Siswa per Jurusan</>}>
-              {d.siswaPerJurusan.length === 0 ? (
-                <Text fontSize="13px" color={COLORS.muted}>Belum ada data.</Text>
-              ) : (
-                <Stack gap="8px">
-                  {d.siswaPerJurusan.map((j) => {
-                    const pct = d.totalSiswa ? (j.count / d.totalSiswa) * 100 : 0
-                    return (
-                      <Box key={j.jurusan}>
-                        <Flex justify="space-between" fontSize="12px" mb="2px">
-                          <Text fontWeight="medium">{j.jurusan}</Text>
-                          <Text color={COLORS.muted}>{j.count} siswa</Text>
+            <SimpleGrid columns={{ base: 1, lg: 2 }} gap="16px">
+              {/* Siswa per Kelas */}
+              <Card title={<><Icon as={LuGraduationCap} /> Siswa per Kelas</>}>
+                {d.siswaPerKelas.length === 0 ? (
+                  <Text fontSize="13px" color={COLORS.muted}>Belum ada data.</Text>
+                ) : (
+                  <Stack gap="8px">
+                    {d.siswaPerKelas.map((k) => {
+                      const pct = d.totalSiswa ? (k.count / d.totalSiswa) * 100 : 0
+                      return (
+                        <Box key={k.kelas}>
+                          <Flex justify="space-between" fontSize="12px" mb="2px">
+                            <Text fontWeight="medium">{k.kelas}</Text>
+                            <Text color={COLORS.muted}>{k.count} siswa</Text>
+                          </Flex>
+                          <Box h="8px" bg={COLORS.bg} borderRadius="99px" overflow="hidden">
+                            <Box h="100%" bg={COLORS.primary} w={`${pct}%`} />
+                          </Box>
+                        </Box>
+                      )
+                    })}
+                  </Stack>
+                )}
+              </Card>
+
+              {/* Siswa per Jurusan */}
+              <Card title={<><Icon as={LuGraduationCap} /> Siswa per Jurusan</>}>
+                {d.siswaPerJurusan.length === 0 ? (
+                  <Text fontSize="13px" color={COLORS.muted}>Belum ada data.</Text>
+                ) : (
+                  <Stack gap="8px">
+                    {d.siswaPerJurusan.map((j) => {
+                      const pct = d.totalSiswa ? (j.count / d.totalSiswa) * 100 : 0
+                      return (
+                        <Box key={j.jurusan}>
+                          <Flex justify="space-between" fontSize="12px" mb="2px">
+                            <Text fontWeight="medium">{j.jurusan}</Text>
+                            <Text color={COLORS.muted}>{j.count} siswa</Text>
+                          </Flex>
+                          <Box h="8px" bg={COLORS.bg} borderRadius="99px" overflow="hidden">
+                            <Box h="100%" bg={COLORS.primary} w={`${pct}%`} />
+                          </Box>
+                        </Box>
+                      )
+                    })}
+                  </Stack>
+                )}
+              </Card>
+            </SimpleGrid>
+
+            {/* Recent lists — single color */}
+            <SimpleGrid columns={{ base: 1, lg: 2 }} gap="16px">
+              <Card title={<><Icon as={LuClipboardList} /> Tugas Terbaru</>}>
+                {d.tugasTerbaru.length === 0 ? (
+                  <Text fontSize="13px" color={COLORS.muted}>Belum ada tugas.</Text>
+                ) : (
+                  <Stack gap="8px">
+                    {d.tugasTerbaru.map((tg) => {
+                      const dl = tg.deadline ? timestampDate(tg.deadline) : undefined
+                      return (
+                        <Flex key={tg.id} justify="space-between" align="center" borderBottom="1px solid" borderColor={COLORS.border} pb="8px">
+                          <Box>
+                            <Text fontSize="13px" fontWeight="medium">{tg.title}</Text>
+                            <Text fontSize="11px" color={COLORS.muted} display="flex" alignItems="center" gap="3px">{tg.courseName} · <Icon as={LuClock} /> {fmtDateTime(dl)}</Text>
+                          </Box>
+                          <Badge colorPalette="blue">{tg.submissionCount} <Icon as={LuInbox} /></Badge>
                         </Flex>
-                        <Box h="8px" bg={COLORS.bg} borderRadius="99px" overflow="hidden">
-                          <Box h="100%" bg={COLORS.primary} w={`${pct}%`} />
-                        </Box>
-                      </Box>
-                    )
-                  })}
-                </Stack>
-              )}
-            </Card>
+                      )
+                    })}
+                  </Stack>
+                )}
+              </Card>
 
-            {/* Materials status */}
-            <Card title={<><Icon as={LuBookOpen} /> Status Materi</>}>
-              <SimpleGrid columns={2} gap="12px">
-                <Box textAlign="center" bg={COLORS.bg} borderRadius="8px" p="14px">
-                  <Text fontSize="24px" fontWeight="bold" color={COLORS.success}>{d.materiPublikasi}</Text>
-                  <Text fontSize="11px" color={COLORS.muted}>Dipublikasi</Text>
-                </Box>
-                <Box textAlign="center" bg={COLORS.bg} borderRadius="8px" p="14px">
-                  <Text fontSize="24px" fontWeight="bold" color={COLORS.warning}>{d.materiDraft}</Text>
-                  <Text fontSize="11px" color={COLORS.muted}>Draft</Text>
-                </Box>
-              </SimpleGrid>
-            </Card>
-          </SimpleGrid>
-
-          {/* Recent lists */}
-          <SimpleGrid columns={{ base: 1, lg: 2 }} gap="16px">
-            <Card title={<><Icon as={LuClipboardList} /> Tugas Terbaru</>}>
-              {d.tugasTerbaru.length === 0 ? (
-                <Text fontSize="13px" color={COLORS.muted}>Belum ada tugas.</Text>
-              ) : (
-                <Stack gap="8px">
-                  {d.tugasTerbaru.map((t) => {
-                    const dl = t.deadline ? timestampDate(t.deadline) : undefined
-                    return (
-                      <Flex key={t.id} justify="space-between" align="center"
-                        borderBottom="1px solid" borderColor={COLORS.border} pb="8px">
-                        <Box>
-                          <Text fontSize="13px" fontWeight="medium">{t.title}</Text>
-                          <Text fontSize="11px" color={COLORS.muted} display="flex" alignItems="center" gap="3px">{t.courseName} · <Icon as={LuClock} /> {fmtDateTime(dl)}</Text>
-                        </Box>
-                        <Badge colorPalette="blue">{t.submissionCount} <Icon as={LuInbox} /></Badge>
-                      </Flex>
-                    )
-                  })}
-                </Stack>
-              )}
-            </Card>
-
-            <Card title={<><Icon as={LuInbox} /> Pengumpulan Terbaru</>}>
-              {d.pengumpulanTerbaru.length === 0 ? (
-                <Text fontSize="13px" color={COLORS.muted}>Belum ada pengumpulan.</Text>
-              ) : (
-                <Stack gap="8px">
-                  {d.pengumpulanTerbaru.map((p, i) => {
-                    const at = p.submittedAt ? timestampDate(p.submittedAt) : undefined
-                    return (
-                      <Flex key={i} justify="space-between" align="center"
-                        borderBottom="1px solid" borderColor={COLORS.border} pb="8px">
-                        <Box>
-                          <Text fontSize="13px" fontWeight="medium">
-                            {p.studentName} {p.kelas && <Badge colorPalette="gray">{p.kelas}</Badge>}
-                          </Text>
-                          <Text fontSize="11px" color={COLORS.muted}>{p.assignmentTitle} · {fmtDateTime(at)}</Text>
-                        </Box>
-                        <Badge colorPalette={p.graded ? 'green' : 'yellow'}>{p.graded ? 'Dinilai' : 'Belum'}</Badge>
-                      </Flex>
-                    )
-                  })}
-                </Stack>
-              )}
-            </Card>
-          </SimpleGrid>
-        </Stack>
-      )}
+              <Card title={<><Icon as={LuInbox} /> Pengumpulan Terbaru</>}>
+                {d.pengumpulanTerbaru.length === 0 ? (
+                  <Text fontSize="13px" color={COLORS.muted}>Belum ada pengumpulan.</Text>
+                ) : (
+                  <Stack gap="8px">
+                    {d.pengumpulanTerbaru.map((p, i) => {
+                      const at = p.submittedAt ? timestampDate(p.submittedAt) : undefined
+                      return (
+                        <Flex key={i} justify="space-between" align="center" borderBottom="1px solid" borderColor={COLORS.border} pb="8px">
+                          <Box>
+                            <Text fontSize="13px" fontWeight="medium">{p.studentName} {p.kelas && <Badge colorPalette="blue" variant="subtle">{p.kelas}</Badge>}</Text>
+                            <Text fontSize="11px" color={COLORS.muted}>{p.assignmentTitle} · {fmtDateTime(at)}</Text>
+                          </Box>
+                          <Badge colorPalette="blue" variant={p.graded ? 'solid' : 'subtle'}>{p.graded ? 'Dinilai' : 'Belum'}</Badge>
+                        </Flex>
+                      )
+                    })}
+                  </Stack>
+                )}
+              </Card>
+            </SimpleGrid>
+          </Stack>
+        )}
+      </Stack>
     </AppLayout>
   )
 }

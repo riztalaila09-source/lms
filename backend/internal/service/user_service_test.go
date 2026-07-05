@@ -201,7 +201,7 @@ func TestUserService_CreateUser(t *testing.T) {
 
 		repo.On("Create", ctx, mock.AnythingOfType("*repository.User")).Return(nil)
 
-		u, err := svc.CreateUser(ctx, "admin", "newuser", "new@test.com", "pass123", "New User", "student", "", "")
+		u, err := svc.CreateUser(ctx, "admin", "newuser", "new@test.com", "pass123", "New User", "student", "", "", "")
 		require.NoError(t, err)
 		assert.Equal(t, "student", u.Role)
 		assert.NotEmpty(t, u.ID)
@@ -211,7 +211,7 @@ func TestUserService_CreateUser(t *testing.T) {
 		repo := &mockUserRepository{}
 		svc := service.NewUserService(repo, newTestJWTService(), nil)
 
-		_, err := svc.CreateUser(ctx, "student", "newuser", "new@test.com", "pass123", "New User", "student", "", "")
+		_, err := svc.CreateUser(ctx, "student", "newuser", "new@test.com", "pass123", "New User", "student", "", "", "")
 		assert.ErrorIs(t, err, service.ErrPermissionDenied)
 	})
 }

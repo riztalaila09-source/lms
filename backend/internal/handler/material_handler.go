@@ -159,6 +159,22 @@ func (h *MaterialHandler) SearchMaterials(ctx context.Context, req *connect.Requ
 	return connect.NewResponse(&materialv1.SearchMaterialsResponse{Hits: hits}), nil
 }
 
+func (h *MaterialHandler) ExploreMaterials(ctx context.Context, _ *connect.Request[materialv1.ExploreMaterialsRequest]) (*connect.Response[materialv1.ExploreMaterialsResponse], error) {
+	claims, ok := middleware.ClaimsFromContext(ctx)
+	if !ok {
+		return nil, connect.NewError(connect.CodeUnauthenticated, nil)
+	}
+	mats, err := h.materialSvc.ExploreMaterials(ctx, claims.UserID, claims.Role)
+	if err != nil {
+		return nil, mapMaterialServiceError(err)
+	}
+	out := make([]*materialv1.Material, 0, len(mats))
+	for _, m := range mats {
+		out = append(out, materialToProto(m))
+	}
+	return connect.NewResponse(&materialv1.ExploreMaterialsResponse{Materials: out}), nil
+}
+
 func (h *MaterialHandler) RateMaterial(ctx context.Context, req *connect.Request[materialv1.RateMaterialRequest]) (*connect.Response[materialv1.RateMaterialResponse], error) {
 	claims, ok := middleware.ClaimsFromContext(ctx)
 	if !ok {

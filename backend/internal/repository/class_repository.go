@@ -90,9 +90,12 @@ func (r *sqliteClassRepository) Rename(ctx context.Context, id, newName string) 
 			}
 			return nil, fmt.Errorf("rename class: %w", err)
 		}
-		// Cascade to students who reference the class by name.
+		// Cascade to students who reference the class by name; also re-derive
+		// their jurusan from the new class name (X-TKJ-1 → TKJ).
+		jur := JurusanFromKelas(newName)
 		if _, err := tx.ExecContext(ctx,
-			`UPDATE users SET kelas = ? WHERE kelas = ? AND role = 'student'`, newName, oldName); err != nil {
+			`UPDATE users SET kelas = ?, jurusan = CASE WHEN ?<>'' THEN ? ELSE jurusan END
+			 WHERE kelas = ? AND role = 'student'`, newName, jur, jur, oldName); err != nil {
 			return nil, fmt.Errorf("cascade kelas: %w", err)
 		}
 	}

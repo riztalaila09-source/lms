@@ -487,7 +487,7 @@ export default function CourseDetailPage({ forcedCourseId }: { forcedCourseId?: 
                             <Icon as={done ? LuCircleCheck : LuPlay} boxSize="15px" />
                           </Flex>
                           <Box flex={1} minW={0}>
-                            <Text fontWeight="semibold" fontSize="14px" color={UDEMY.ink} lineClamp={1}>{idx + 1}. {m.title}</Text>
+                            <Text fontWeight="semibold" fontSize="14px" color={UDEMY.ink} lineClamp={1}>T{idx + 1}. {m.title}</Text>
                             <Flex gap="8px" align="center" mt="2px" wrap="wrap">
                               {m.categoryName && <Badge colorPalette="purple" variant="subtle">{m.categoryName}</Badge>}
                               {done ? <Text fontSize="11px" color={UDEMY.accent} fontWeight="medium">Selesai</Text>
@@ -510,9 +510,9 @@ export default function CourseDetailPage({ forcedCourseId }: { forcedCourseId?: 
                       <Flex justify="space-between" align="flex-start" gap={3}>
                         <HStack align="flex-start" gap={3} flex={1}>
                           <Stack gap={1} align="center" minW="44px">
-                            <Box w="28px" h="28px" borderRadius="full" bg={COLORS.primary} color="white"
-                              display="flex" alignItems="center" justifyContent="center" fontSize="13px" fontWeight="bold">
-                              {idx + 1}
+                            <Box minW="30px" h="24px" px="7px" borderRadius="999px" bg={COLORS.primary} color="white"
+                              display="flex" alignItems="center" justifyContent="center" fontSize="12px" fontWeight="bold">
+                              T{idx + 1}
                             </Box>
                             {canManage && (
                               <HStack gap="1">
