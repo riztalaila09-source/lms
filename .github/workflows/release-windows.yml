@@ -1,0 +1,85 @@
+name: Build Windows Release
+
+# Triggers when you publish a new Release (new version) on GitHub. The built
+# Windows package is attached to that Release automatically. You can also run it
+# manually (workflow_dispatch) to produce a downloadable artifact for testing.
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version label for a manual build"
+        required: false
+        default: "dev"
+
+permissions:
+  contents: write # required to upload assets to the Release
+
+jobs:
+  build-windows:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Determine version
+        id: ver
+        run: echo "version=${{ github.event.release.tag_name || github.event.inputs.version }}" >> "$GITHUB_OUTPUT"
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Setup buf
+        uses: bufbuild/buf-setup-action@v1
+        with:
+          github_token: ${{ github.token }}
+
+      # Generated stubs (backend/gen, frontend/src/gen) are gitignored, so
+      # regenerate them from the .proto contract before building.
+      - name: Generate protobuf stubs
+        run: buf generate
+
+      - name: Backend tests
+        run: cd backend && go test ./internal/... -race -count=1
+
+      # Vite writes the SPA into backend/cmd/server/frontend/, which is embedded
+      # into the Go binary — so the frontend must be built before the backend.
+      - name: Build frontend (embedded into the binary)
+        run: cd frontend && npm ci && npm run build
+
+      - name: Build Windows binary
+        env:
+          GOOS: windows
+          GOARCH: amd64
+          CGO_ENABLED: 0
+        run: |
+          mkdir -p dist
+          cd backend && go build -ldflags "-s -w -X main.version=${{ steps.ver.outputs.version }}" -o ../dist/lms.exe ./cmd/server
+
+      - name: Package archive
+        run: |
+          cp config.yaml dist/config.yaml
+          cd dist && zip -9 "lms-${{ steps.ver.outputs.version }}-windows.zip" lms.exe config.yaml
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: lms-${{ steps.ver.outputs.version }}-windows
+          path: dist/lms-${{ steps.ver.outputs.version }}-windows.zip
+
+      - name: Attach package to the Release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/lms-${{ steps.ver.outputs.version }}-windows.zip
