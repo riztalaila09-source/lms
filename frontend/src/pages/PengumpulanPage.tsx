@@ -1,8 +1,8 @@
 import { useEffect, useState, useCallback } from 'react'
 import {
-  Badge, Box, Button, Dialog, Field, Flex, Icon, Input, NativeSelect, SimpleGrid, Stack, Table, Text, Textarea,
+  Badge, Box, Button, Dialog, Field, Flex, Icon, IconButton, Input, NativeSelect, SimpleGrid, Stack, Table, Text, Textarea,
 } from '@chakra-ui/react'
-import { LuInbox, LuCircleCheck, LuCheck, LuCircleX, LuPartyPopper, LuLink, LuClock } from 'react-icons/lu'
+import { LuInbox, LuCircleCheck, LuCheck, LuCircleX, LuPartyPopper, LuLink, LuClock, LuPencil } from 'react-icons/lu'
 import { timestampDate } from '@bufbuild/protobuf/wkt'
 import { assignmentClient, courseClient } from '@/lib/client'
 import type { Assignment, Submission } from '@/gen/assignment/v1/assignment_pb'
@@ -138,7 +138,7 @@ export default function PengumpulanPage() {
                       <Table.ColumnHeader>Siswa</Table.ColumnHeader>
                       <Table.ColumnHeader>Waktu</Table.ColumnHeader>
                       <Table.ColumnHeader>Nilai</Table.ColumnHeader>
-                      <Table.ColumnHeader>Aksi</Table.ColumnHeader>
+                      <Table.ColumnHeader textAlign="right">Aksi</Table.ColumnHeader>
                     </Table.Row>
                   </Table.Header>
                   <Table.Body>
@@ -156,10 +156,12 @@ export default function PengumpulanPage() {
                         <Table.Cell>
                           {s.graded ? <Badge colorPalette="green">{s.score}</Badge> : <Badge colorPalette="yellow">Belum dinilai</Badge>}
                         </Table.Cell>
-                        <Table.Cell>
-                          <Button size="xs" bg={COLORS.primary} color="white" _hover={{ bg: COLORS.primaryDark }} onClick={() => openGrade(s)}>
-                            {s.graded ? 'Ubah' : <><Icon as={LuCheck} /> Nilai</>}
-                          </Button>
+                        <Table.Cell textAlign="right">
+                          <IconButton size="xs" bg={COLORS.primary} color="white" _hover={{ bg: COLORS.primaryDark }}
+                            aria-label={s.graded ? 'Ubah nilai' : 'Nilai'} title={s.graded ? 'Ubah nilai' : 'Nilai'}
+                            onClick={() => openGrade(s)}>
+                            <Icon as={s.graded ? LuPencil : LuCheck} />
+                          </IconButton>
                         </Table.Cell>
                       </Table.Row>
                     ))}

@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import {
-  Badge, Box, Button, Dialog, Field, Flex, Icon, Input, NativeSelect, Stack, Table, Text, Textarea,
+  Badge, Box, Button, Checkbox, Dialog, Field, Flex, Icon, IconButton, Input, NativeSelect, Stack, Table, Text, Textarea,
 } from '@chakra-ui/react'
 import {
   LuPlus, LuTrash2, LuPencil, LuSearch, LuUpload, LuDownload, LuFileText, LuCopy, LuArrowRightLeft,
@@ -17,6 +17,7 @@ import { Card } from '@/components/Card'
 import ConfirmDialog, { type ConfirmState } from '@/components/ConfirmDialog'
 import Pagination, { usePaged } from '@/components/Pagination'
 import { COLORS, labelColor } from '@/theme/tokens'
+import { toaster } from '@/components/ui/toaster'
 
 type Tab = 'sekolah' | 'semester' | 'kelas' | 'jurusan' | 'guru' | 'siswa'
 
@@ -26,6 +27,7 @@ interface EditForm {
   email: string
   kelas: string
   mapel: string
+  gender: string
   password: string
 }
 
@@ -65,6 +67,13 @@ function parseCSV(text: string): ImportRow[] {
   }).filter(r => r.fullName || r.username || r.email)
 }
 
+// Small badge for a user's gender ('L' | 'P' | '').
+function GenderBadge({ g }: { g: string }) {
+  if (g === 'L') return <Badge colorPalette="blue">L</Badge>
+  if (g === 'P') return <Badge colorPalette="pink">P</Badge>
+  return <Text as="span" color={COLORS.muted}>-</Text>
+}
+
 export default function UsersPage() {
   const [tab, setTab] = useState<Tab>('sekolah')
   const [confirm, setConfirm] = useState<ConfirmState | null>(null)
@@ -74,7 +83,7 @@ export default function UsersPage() {
 
   // edit dialog
   const [editTarget, setEditTarget] = useState<{ user: User; role: 'guru' | 'siswa' } | null>(null)
-  const [editForm, setEditForm] = useState<EditForm>({ fullName: '', username: '', email: '', kelas: '', mapel: '', password: '' })
+  const [editForm, setEditForm] = useState<EditForm>({ fullName: '', username: '', email: '', kelas: '', mapel: '', gender: '', password: '' })
   const [editGuruKelas, setEditGuruKelas] = useState<string[]>([])
   const [editSaving, setEditSaving] = useState(false)
   const [editError, setEditError] = useState('')
@@ -148,7 +157,7 @@ export default function UsersPage() {
   const delJurusan = (j: Jurusan) => setConfirm({
     title: 'Hapus Jurusan', message: `Hapus jurusan "${j.name}"? Siswa yang memakai jurusan ini tetap ada, tapi opsinya hilang.`,
     variant: 'danger', confirmLabel: 'Ya, Hapus',
-    onConfirm: async () => { try { await jurusanClient.deleteJurusan({ id: j.id }); await loadJurusans() } catch (e: unknown) { alert(e instanceof Error ? e.message : 'Gagal') } },
+    onConfirm: async () => { try { await jurusanClient.deleteJurusan({ id: j.id }); await loadJurusans() } catch (e: unknown) { toaster.create({ description: e instanceof Error ? e.message : 'Gagal', type: 'error' }) } },
   })
   const startEditJurusan = (j: Jurusan) => { setEditJurusan(j); setEditJurusanName(j.name); setEditJurusanErr('') }
   const saveEditJurusan = async () => {
@@ -167,7 +176,7 @@ export default function UsersPage() {
   const delKelas = (c: Class) => setConfirm({
     title: 'Hapus Kelas', message: `Hapus kelas "${c.name}"? Mapel yang memakai kelas ini akan kehilangan kaitannya.`,
     variant: 'danger', confirmLabel: 'Ya, Hapus',
-    onConfirm: async () => { try { await classClient.deleteClass({ id: c.id }); await loadClasses() } catch (e: unknown) { alert(e instanceof Error ? e.message : 'Gagal') } },
+    onConfirm: async () => { try { await classClient.deleteClass({ id: c.id }); await loadClasses() } catch (e: unknown) { toaster.create({ description: e instanceof Error ? e.message : 'Gagal', type: 'error' }) } },
   })
 
   // ── Guru ──
@@ -201,15 +210,15 @@ export default function UsersPage() {
     catch (e: unknown) { setSemErr(e instanceof Error ? e.message : 'Gagal menambah semester') }
   }
   const activateSemester = async (id: string) => {
-    try { await schoolClient.setActiveSemester({ id }); await loadSemesters() } catch (e: unknown) { alert(e instanceof Error ? e.message : 'Gagal') }
+    try { await schoolClient.setActiveSemester({ id }); await loadSemesters() } catch (e: unknown) { toaster.create({ description: e instanceof Error ? e.message : 'Gagal', type: 'error' }) }
   }
   const delSemester = (s: Semester) => setConfirm({
     title: 'Hapus Semester', message: `Hapus ${s.semester} ${s.tahunAjaran}?`,
     variant: 'danger', confirmLabel: 'Ya, Hapus',
-    onConfirm: async () => { try { await schoolClient.deleteSemester({ id: s.id }); await loadSemesters() } catch (e: unknown) { alert(e instanceof Error ? e.message : 'Gagal') } },
+    onConfirm: async () => { try { await schoolClient.deleteSemester({ id: s.id }); await loadSemesters() } catch (e: unknown) { toaster.create({ description: e instanceof Error ? e.message : 'Gagal', type: 'error' }) } },
   })
 
-  const emptyGuru = { fullName: '', username: '', email: '', password: '', mapel: '' }
+  const emptyGuru = { fullName: '', username: '', email: '', password: '', mapel: '', gender: '' }
   const [guruForm, setGuruForm] = useState(emptyGuru)
   const [guruKelas, setGuruKelas] = useState<string[]>([])
   const [guruErr, setGuruErr] = useState('')
@@ -228,11 +237,11 @@ export default function UsersPage() {
   const delGuru = (u: User) => setConfirm({
     title: 'Hapus Guru', message: `Hapus akun guru "${u.fullName || u.username}"?`,
     variant: 'danger', confirmLabel: 'Ya, Hapus',
-    onConfirm: async () => { try { await userClient.deleteUser({ id: u.id }); await loadTeachers() } catch (e: unknown) { alert(e instanceof Error ? e.message : 'Gagal') } },
+    onConfirm: async () => { try { await userClient.deleteUser({ id: u.id }); await loadTeachers() } catch (e: unknown) { toaster.create({ description: e instanceof Error ? e.message : 'Gagal', type: 'error' }) } },
   })
 
   // ── Siswa ──
-  const emptySiswa = { fullName: '', username: '', email: '', password: '', kelas: '' }
+  const emptySiswa = { fullName: '', username: '', email: '', password: '', kelas: '', gender: '' }
   const [siswaForm, setSiswaForm] = useState(emptySiswa)
   const [siswaErr, setSiswaErr] = useState('')
   const [siswaSaving, setSiswaSaving] = useState(false)
@@ -276,13 +285,13 @@ export default function UsersPage() {
   const delSiswa = (u: User) => setConfirm({
     title: 'Hapus Siswa', message: `Hapus akun siswa "${u.fullName || u.username}"?`,
     variant: 'danger', confirmLabel: 'Ya, Hapus',
-    onConfirm: async () => { try { await userClient.deleteUser({ id: u.id }); await loadStudents() } catch (e: unknown) { alert(e instanceof Error ? e.message : 'Gagal') } },
+    onConfirm: async () => { try { await userClient.deleteUser({ id: u.id }); await loadStudents() } catch (e: unknown) { toaster.create({ description: e instanceof Error ? e.message : 'Gagal', type: 'error' }) } },
   })
 
   // ── Edit ──
   const startEdit = (user: User, role: 'guru' | 'siswa') => {
     setEditTarget({ user, role })
-    setEditForm({ fullName: user.fullName, username: user.username, email: user.email, kelas: user.kelas, mapel: user.mapel, password: '' })
+    setEditForm({ fullName: user.fullName, username: user.username, email: user.email, kelas: user.kelas, mapel: user.mapel, gender: user.gender, password: '' })
     setEditGuruKelas(role === 'guru' && user.kelas ? user.kelas.split(',').map((k) => k.trim()).filter(Boolean) : [])
     setEditError('')
   }
@@ -298,6 +307,7 @@ export default function UsersPage() {
         username: editForm.username || undefined,
         kelas: editTarget.role === 'siswa' ? editForm.kelas : editGuruKelas.join(', '),
         mapel: editTarget.role === 'guru' ? editForm.mapel : undefined,
+        gender: editForm.gender || undefined,
         password: editForm.password || undefined,
       })
       if (editForm.password) setPasswords(p => ({ ...p, [editTarget.user.id]: editForm.password }))
@@ -342,8 +352,8 @@ export default function UsersPage() {
           const r = await userClient.mutateClass({ toKelas: bulkTo, studentIds: selectedIds })
           setSelected({}); setBulkTo('')
           await Promise.all([loadStudents(), loadClasses()])
-          alert(`${r.moved} siswa dipindah ke ${bulkTo}.`)
-        } catch (e: unknown) { alert(e instanceof Error ? e.message : 'Gagal mutasi') }
+          toaster.create({ description: `${r.moved} siswa dipindah ke ${bulkTo}.`, type: 'success' })
+        } catch (e: unknown) { toaster.create({ description: e instanceof Error ? e.message : 'Gagal mutasi', type: 'error' }) }
         finally { setMutSaving(false) }
       },
     })
@@ -484,7 +494,7 @@ export default function UsersPage() {
                     <Table.ColumnHeader>Semester</Table.ColumnHeader>
                     <Table.ColumnHeader>Tahun Ajaran</Table.ColumnHeader>
                     <Table.ColumnHeader>Status</Table.ColumnHeader>
-                    <Table.ColumnHeader>Aksi</Table.ColumnHeader>
+                    <Table.ColumnHeader textAlign="right">Aksi</Table.ColumnHeader>
                   </Table.Row>
                 </Table.Header>
                 <Table.Body>
@@ -499,10 +509,14 @@ export default function UsersPage() {
                           ? <Badge colorPalette="green"><Icon as={LuCircleCheck} /> Aktif</Badge>
                           : <Text fontSize="12px" color={COLORS.muted}>–</Text>}
                       </Table.Cell>
-                      <Table.Cell>
-                        <Flex gap="6px">
-                          {!s.isActive && <Button size="xs" colorPalette="blue" variant="outline" onClick={() => activateSemester(s.id)}>Jadikan Aktif</Button>}
-                          <Button size="xs" colorPalette="red" variant="outline" onClick={() => delSemester(s)}><Icon as={LuTrash2} /> Hapus</Button>
+                      <Table.Cell textAlign="right">
+                        <Flex gap="6px" justify="flex-end">
+                          {!s.isActive && (
+                            <IconButton size="xs" colorPalette="blue" variant="outline" aria-label="Jadikan aktif" title="Jadikan aktif"
+                              onClick={() => activateSemester(s.id)}><Icon as={LuCircleCheck} /></IconButton>
+                          )}
+                          <IconButton size="xs" colorPalette="red" variant="outline" aria-label="Hapus" title="Hapus"
+                            onClick={() => delSemester(s)}><Icon as={LuTrash2} /></IconButton>
                         </Flex>
                       </Table.Cell>
                     </Table.Row>
@@ -556,7 +570,7 @@ export default function UsersPage() {
                   <Table.Row>
                     <Table.ColumnHeader>Nama Kelas</Table.ColumnHeader>
                     <Table.ColumnHeader>Jumlah Siswa</Table.ColumnHeader>
-                    <Table.ColumnHeader>Aksi</Table.ColumnHeader>
+                    <Table.ColumnHeader textAlign="right">Aksi</Table.ColumnHeader>
                   </Table.Row>
                 </Table.Header>
                 <Table.Body>
@@ -566,10 +580,10 @@ export default function UsersPage() {
                     <Table.Row key={c.id}>
                       <Table.Cell><Badge {...labelColor(c.name)}>{c.name}</Badge></Table.Cell>
                       <Table.Cell>{c.studentCount} siswa</Table.Cell>
-                      <Table.Cell>
-                        <Flex gap="6px">
-                          <Button size="xs" colorPalette="blue" variant="outline" onClick={() => startEditKelas(c)}><Icon as={LuPencil} /> Edit</Button>
-                          <Button size="xs" colorPalette="red" variant="outline" onClick={() => delKelas(c)}><Icon as={LuTrash2} /> Hapus</Button>
+                      <Table.Cell textAlign="right">
+                        <Flex gap="6px" justify="flex-end">
+                          <IconButton size="xs" colorPalette="blue" variant="outline" aria-label="Edit" title="Edit" onClick={() => startEditKelas(c)}><Icon as={LuPencil} /></IconButton>
+                          <IconButton size="xs" colorPalette="red" variant="outline" aria-label="Hapus" title="Hapus" onClick={() => delKelas(c)}><Icon as={LuTrash2} /></IconButton>
                         </Flex>
                       </Table.Cell>
                     </Table.Row>
@@ -598,7 +612,7 @@ export default function UsersPage() {
                   <Table.Row>
                     <Table.ColumnHeader>Nama Jurusan</Table.ColumnHeader>
                     <Table.ColumnHeader>Jumlah Siswa</Table.ColumnHeader>
-                    <Table.ColumnHeader>Aksi</Table.ColumnHeader>
+                    <Table.ColumnHeader textAlign="right">Aksi</Table.ColumnHeader>
                   </Table.Row>
                 </Table.Header>
                 <Table.Body>
@@ -608,10 +622,10 @@ export default function UsersPage() {
                     <Table.Row key={j.id}>
                       <Table.Cell><Badge {...labelColor(j.name)}>{j.name}</Badge></Table.Cell>
                       <Table.Cell>{j.studentCount} siswa</Table.Cell>
-                      <Table.Cell>
-                        <Flex gap="6px">
-                          <Button size="xs" colorPalette="blue" variant="outline" onClick={() => startEditJurusan(j)}><Icon as={LuPencil} /> Edit</Button>
-                          <Button size="xs" colorPalette="red" variant="outline" onClick={() => delJurusan(j)}><Icon as={LuTrash2} /> Hapus</Button>
+                      <Table.Cell textAlign="right">
+                        <Flex gap="6px" justify="flex-end">
+                          <IconButton size="xs" colorPalette="blue" variant="outline" aria-label="Edit" title="Edit" onClick={() => startEditJurusan(j)}><Icon as={LuPencil} /></IconButton>
+                          <IconButton size="xs" colorPalette="red" variant="outline" aria-label="Hapus" title="Hapus" onClick={() => delJurusan(j)}><Icon as={LuTrash2} /></IconButton>
                         </Flex>
                       </Table.Cell>
                     </Table.Row>
@@ -638,6 +652,15 @@ export default function UsersPage() {
                     <Input type="text" value={guruForm.password} onChange={(e) => setGuruForm({ ...guruForm, password: e.target.value })} required minLength={6} /></Field.Root>
                   <Field.Root maxW="170px"><Field.Label>Mata Pelajaran</Field.Label>
                     <Input value={guruForm.mapel} onChange={(e) => setGuruForm({ ...guruForm, mapel: e.target.value })} placeholder="mis. Matematika" /></Field.Root>
+                  <Field.Root maxW="150px"><Field.Label>Jenis Kelamin</Field.Label>
+                    <NativeSelect.Root>
+                      <NativeSelect.Field value={guruForm.gender} onChange={(e) => setGuruForm({ ...guruForm, gender: e.target.value })}>
+                        <option value="">—</option>
+                        <option value="L">Laki-laki</option>
+                        <option value="P">Perempuan</option>
+                      </NativeSelect.Field>
+                      <NativeSelect.Indicator />
+                    </NativeSelect.Root></Field.Root>
                   <Button type="submit" bg={COLORS.primary} color="white" _hover={{ bg: COLORS.primaryDark }} loading={guruSaving}>Tambah Guru</Button>
                 </Flex>
                 <Box mt="10px">
@@ -649,12 +672,13 @@ export default function UsersPage() {
                       {classes.map((c) => {
                         const on = guruKelas.includes(c.name)
                         return (
-                          <Flex key={c.id} as="label" align="center" gap="6px" px="10px" py="6px" borderRadius="7px"
-                            border="1px solid" cursor="pointer" borderColor={on ? COLORS.primary : COLORS.border}
-                            bg={on ? COLORS.primaryTint : COLORS.surface}>
-                            <input type="checkbox" checked={on} onChange={() => toggleGuruKelas(c.name)} />
-                            <Text fontSize="13px">{c.name}</Text>
-                          </Flex>
+                          <Checkbox.Root key={c.id} checked={on} onCheckedChange={() => toggleGuruKelas(c.name)}
+                            px="10px" py="6px" borderRadius="7px" border="1px solid" cursor="pointer"
+                            borderColor={on ? COLORS.primary : COLORS.border} bg={on ? COLORS.primaryTint : COLORS.surface}>
+                            <Checkbox.HiddenInput />
+                            <Checkbox.Control />
+                            <Checkbox.Label fontSize="13px">{c.name}</Checkbox.Label>
+                          </Checkbox.Root>
                         )
                       })}
                     </Flex>
@@ -668,20 +692,22 @@ export default function UsersPage() {
                 <Table.Header>
                   <Table.Row>
                     <Table.ColumnHeader>Nama</Table.ColumnHeader>
+                    <Table.ColumnHeader>JK</Table.ColumnHeader>
                     <Table.ColumnHeader>Username</Table.ColumnHeader>
                     <Table.ColumnHeader>Email</Table.ColumnHeader>
                     <Table.ColumnHeader>Mapel</Table.ColumnHeader>
                     <Table.ColumnHeader>Kelas</Table.ColumnHeader>
                     <Table.ColumnHeader>Password</Table.ColumnHeader>
-                    <Table.ColumnHeader>Aksi</Table.ColumnHeader>
+                    <Table.ColumnHeader textAlign="right">Aksi</Table.ColumnHeader>
                   </Table.Row>
                 </Table.Header>
                 <Table.Body>
                   {teachers.length === 0 ? (
-                    <Table.Row><Table.Cell colSpan={7} textAlign="center" color={COLORS.muted}>Belum ada guru</Table.Cell></Table.Row>
+                    <Table.Row><Table.Cell colSpan={8} textAlign="center" color={COLORS.muted}>Belum ada guru</Table.Cell></Table.Row>
                   ) : teachersPaged.pageItems.map((u) => (
                     <Table.Row key={u.id}>
                       <Table.Cell fontWeight="medium">{u.fullName || '-'}</Table.Cell>
+                      <Table.Cell><GenderBadge g={u.gender} /></Table.Cell>
                       <Table.Cell>{u.username}</Table.Cell>
                       <Table.Cell>{u.email}</Table.Cell>
                       <Table.Cell>{u.mapel || '-'}</Table.Cell>
@@ -691,10 +717,10 @@ export default function UsersPage() {
                         </Flex>
                       </Table.Cell>
                       <Table.Cell><PwdCell user={u} /></Table.Cell>
-                      <Table.Cell>
-                        <Flex gap="6px">
-                          <Button size="xs" colorPalette="blue" variant="outline" onClick={() => startEdit(u, 'guru')}><Icon as={LuPencil} /> Edit</Button>
-                          <Button size="xs" colorPalette="red" variant="outline" onClick={() => delGuru(u)}><Icon as={LuTrash2} /> Hapus</Button>
+                      <Table.Cell textAlign="right">
+                        <Flex gap="6px" justify="flex-end">
+                          <IconButton size="xs" colorPalette="blue" variant="outline" aria-label="Edit" title="Edit" onClick={() => startEdit(u, 'guru')}><Icon as={LuPencil} /></IconButton>
+                          <IconButton size="xs" colorPalette="red" variant="outline" aria-label="Hapus" title="Hapus" onClick={() => delGuru(u)}><Icon as={LuTrash2} /></IconButton>
                         </Flex>
                       </Table.Cell>
                     </Table.Row>
@@ -725,6 +751,16 @@ export default function UsersPage() {
                       <NativeSelect.Field value={siswaForm.kelas} onChange={(e) => setSiswaForm({ ...siswaForm, kelas: e.target.value })}>
                         <option value="">— Pilih Kelas —</option>
                         {classes.map((c) => <option key={c.id} value={c.name}>{c.name}</option>)}
+                      </NativeSelect.Field>
+                      <NativeSelect.Indicator />
+                    </NativeSelect.Root>
+                  </Field.Root>
+                  <Field.Root maxW="140px"><Field.Label>Jenis Kelamin</Field.Label>
+                    <NativeSelect.Root>
+                      <NativeSelect.Field value={siswaForm.gender} onChange={(e) => setSiswaForm({ ...siswaForm, gender: e.target.value })}>
+                        <option value="">—</option>
+                        <option value="L">Laki-laki</option>
+                        <option value="P">Perempuan</option>
                       </NativeSelect.Field>
                       <NativeSelect.Indicator />
                     </NativeSelect.Root>
@@ -813,40 +849,48 @@ export default function UsersPage() {
                 <Table.Header>
                   <Table.Row>
                     <Table.ColumnHeader w="32px">
-                      <input type="checkbox" aria-label="pilih semua di halaman ini"
+                      <Checkbox.Root aria-label="pilih semua di halaman ini"
                         checked={studentsPaged.pageItems.length > 0 && studentsPaged.pageItems.every((u) => selected[u.id])}
-                        onChange={(e) => {
-                          const on = e.target.checked
+                        onCheckedChange={(e) => {
+                          const on = !!e.checked
                           setSelected((s) => { const n = { ...s }; studentsPaged.pageItems.forEach((u) => { n[u.id] = on }); return n })
-                        }} />
+                        }}>
+                        <Checkbox.HiddenInput />
+                        <Checkbox.Control />
+                      </Checkbox.Root>
                     </Table.ColumnHeader>
                     <Table.ColumnHeader>Nama</Table.ColumnHeader>
+                    <Table.ColumnHeader>JK</Table.ColumnHeader>
                     <Table.ColumnHeader>Username</Table.ColumnHeader>
                     <Table.ColumnHeader>Email</Table.ColumnHeader>
                     <Table.ColumnHeader>Kelas</Table.ColumnHeader>
                     <Table.ColumnHeader>Password</Table.ColumnHeader>
-                    <Table.ColumnHeader>Aksi</Table.ColumnHeader>
+                    <Table.ColumnHeader textAlign="right">Aksi</Table.ColumnHeader>
                   </Table.Row>
                 </Table.Header>
                 <Table.Body>
                   {students.length === 0 ? (
-                    <Table.Row><Table.Cell colSpan={7} textAlign="center" color={COLORS.muted}>Tidak ada siswa</Table.Cell></Table.Row>
+                    <Table.Row><Table.Cell colSpan={8} textAlign="center" color={COLORS.muted}>Tidak ada siswa</Table.Cell></Table.Row>
                   ) : studentsPaged.pageItems.map((u) => (
                     <Table.Row key={u.id} bg={selected[u.id] ? COLORS.primaryTint : undefined}>
                       <Table.Cell>
-                        <input type="checkbox" aria-label={`pilih ${u.fullName}`}
+                        <Checkbox.Root aria-label={`pilih ${u.fullName}`}
                           checked={!!selected[u.id]}
-                          onChange={() => setSelected((s) => ({ ...s, [u.id]: !s[u.id] }))} />
+                          onCheckedChange={() => setSelected((s) => ({ ...s, [u.id]: !s[u.id] }))}>
+                          <Checkbox.HiddenInput />
+                          <Checkbox.Control />
+                        </Checkbox.Root>
                       </Table.Cell>
                       <Table.Cell fontWeight="medium">{u.fullName || '-'}</Table.Cell>
+                      <Table.Cell><GenderBadge g={u.gender} /></Table.Cell>
                       <Table.Cell>{u.username}</Table.Cell>
                       <Table.Cell>{u.email}</Table.Cell>
                       <Table.Cell>{u.kelas ? <Badge {...labelColor(u.kelas)}>{u.kelas}</Badge> : '-'}</Table.Cell>
                       <Table.Cell><PwdCell user={u} /></Table.Cell>
-                      <Table.Cell>
-                        <Flex gap="6px">
-                          <Button size="xs" colorPalette="blue" variant="outline" onClick={() => startEdit(u, 'siswa')}><Icon as={LuPencil} /> Edit</Button>
-                          <Button size="xs" colorPalette="red" variant="outline" onClick={() => delSiswa(u)}><Icon as={LuTrash2} /> Hapus</Button>
+                      <Table.Cell textAlign="right">
+                        <Flex gap="6px" justify="flex-end">
+                          <IconButton size="xs" colorPalette="blue" variant="outline" aria-label="Edit" title="Edit" onClick={() => startEdit(u, 'siswa')}><Icon as={LuPencil} /></IconButton>
+                          <IconButton size="xs" colorPalette="red" variant="outline" aria-label="Hapus" title="Hapus" onClick={() => delSiswa(u)}><Icon as={LuTrash2} /></IconButton>
                         </Flex>
                       </Table.Cell>
                     </Table.Row>
@@ -881,6 +925,17 @@ export default function UsersPage() {
                   <Field.Label>Email</Field.Label>
                   <Input type="email" value={editForm.email} onChange={(e) => setEditForm({ ...editForm, email: e.target.value })} />
                 </Field.Root>
+                <Field.Root>
+                  <Field.Label>Jenis Kelamin</Field.Label>
+                  <NativeSelect.Root>
+                    <NativeSelect.Field value={editForm.gender} onChange={(e) => setEditForm({ ...editForm, gender: e.target.value })}>
+                      <option value="">—</option>
+                      <option value="L">Laki-laki</option>
+                      <option value="P">Perempuan</option>
+                    </NativeSelect.Field>
+                    <NativeSelect.Indicator />
+                  </NativeSelect.Root>
+                </Field.Root>
                 {editTarget?.role === 'siswa' && (
                   <Field.Root>
                     <Field.Label>Kelas</Field.Label>
@@ -905,13 +960,14 @@ export default function UsersPage() {
                         {classes.length === 0 ? <Text fontSize="12px" color={COLORS.muted}>Belum ada kelas.</Text> : classes.map((c) => {
                           const on = editGuruKelas.includes(c.name)
                           return (
-                            <Flex key={c.id} as="label" align="center" gap="6px" px="10px" py="6px" borderRadius="7px"
-                              border="1px solid" cursor="pointer" borderColor={on ? COLORS.primary : COLORS.border}
-                              bg={on ? COLORS.primaryTint : COLORS.surface}>
-                              <input type="checkbox" checked={on}
-                                onChange={() => setEditGuruKelas((arr) => arr.includes(c.name) ? arr.filter((x) => x !== c.name) : [...arr, c.name])} />
-                              <Text fontSize="13px">{c.name}</Text>
-                            </Flex>
+                            <Checkbox.Root key={c.id} checked={on}
+                              onCheckedChange={() => setEditGuruKelas((arr) => arr.includes(c.name) ? arr.filter((x) => x !== c.name) : [...arr, c.name])}
+                              px="10px" py="6px" borderRadius="7px" border="1px solid" cursor="pointer"
+                              borderColor={on ? COLORS.primary : COLORS.border} bg={on ? COLORS.primaryTint : COLORS.surface}>
+                              <Checkbox.HiddenInput />
+                              <Checkbox.Control />
+                              <Checkbox.Label fontSize="13px">{c.name}</Checkbox.Label>
+                            </Checkbox.Root>
                           )
                         })}
                       </Flex>

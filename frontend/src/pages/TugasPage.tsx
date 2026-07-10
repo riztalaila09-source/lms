@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import {
-  Badge, Box, Button, Dialog, Field, Flex, Icon, IconButton, Input, NativeSelect, Stack, Table, Text, Textarea,
+  Badge, Box, Button, Dialog, Field, Flex, Icon, IconButton, Image, Input, NativeSelect, RadioGroup, Stack, Table, Text, Textarea,
 } from '@chakra-ui/react'
 import {
   LuClipboardList, LuPlus, LuInbox, LuPencil, LuTrash2, LuSend, LuBan, LuMessageCircle, LuPower, LuX, LuSearch, LuImage,
@@ -14,10 +14,12 @@ import { useAuth } from '@/hooks/useAuth'
 import AppLayout from '@/components/AppLayout'
 import { Card } from '@/components/Card'
 import Pagination, { usePaged } from '@/components/Pagination'
+import RowActionsMenu from '@/components/RowActionsMenu'
 import { encodeLinks } from '@/components/MaterialFormDialog'
 import type { DraftQuestion } from '@/components/MaterialFormDialog'
 import { fileToDataUrl } from '@/lib/image'
 import { COLORS } from '@/theme/tokens'
+import { toaster } from '@/components/ui/toaster'
 
 interface LinkRow { label: string; url: string }
 
@@ -205,15 +207,15 @@ export default function TugasPage() {
   const setQImage = async (qi: number, file?: File) => {
     if (!file) return
     try { setQ(qi, { image: await fileToDataUrl(file, 600, 0.6) }) } // small thumbnail
-    catch (e: unknown) { alert(e instanceof Error ? e.message : 'Gagal memuat gambar') }
+    catch (e: unknown) { toaster.create({ description: e instanceof Error ? e.message : 'Gagal memuat gambar', type: 'error' }) }
   }
   const importQuestions = async (file?: File) => {
     if (!file) return
     try {
       const parsed = parseQuestionsCSV(await file.text())
       if (parsed.length) setForm((f) => ({ ...f, questions: [...f.questions, ...parsed] }))
-      else alert('CSV kosong atau format tidak sesuai template.')
-    } catch (e: unknown) { alert(e instanceof Error ? e.message : 'Gagal impor') }
+      else toaster.create({ description: 'CSV kosong atau format tidak sesuai template.', type: 'warning' })
+    } catch (e: unknown) { toaster.create({ description: e instanceof Error ? e.message : 'Gagal impor', type: 'error' }) }
     finally { if (fileRef.current) fileRef.current.value = '' }
   }
 
@@ -265,7 +267,7 @@ export default function TugasPage() {
       await assignmentClient.deleteAssignment({ id: a.id })
       await load()
     } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : 'Gagal menghapus')
+      toaster.create({ description: err instanceof Error ? err.message : 'Gagal menghapus', type: 'error' })
     }
   }
 
@@ -288,7 +290,7 @@ export default function TugasPage() {
       })
       setSubOpen(false)
       await load()
-      alert('Tugas berhasil dikumpulkan! Tugas hanya bisa dikumpulkan satu kali.')
+      toaster.create({ description: 'Tugas berhasil dikumpulkan! Tugas hanya bisa dikumpulkan satu kali.', type: 'success' })
     } catch (err: unknown) {
       setSubErr(err instanceof Error ? err.message : 'Gagal mengumpulkan tugas')
     } finally {
@@ -302,7 +304,7 @@ export default function TugasPage() {
       await assignmentClient.updateAssignment({ id: a.id, isActive: !a.isActive })
       await load()
     } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : 'Gagal mengubah status')
+      toaster.create({ description: err instanceof Error ? err.message : 'Gagal mengubah status', type: 'error' })
     }
   }
 
@@ -333,7 +335,7 @@ export default function TugasPage() {
         return next
       })
     } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : 'Gagal')
+      toaster.create({ description: err instanceof Error ? err.message : 'Gagal', type: 'error' })
     }
   }
 
@@ -383,7 +385,7 @@ export default function TugasPage() {
       if (res.accepted) {
         setQuizOpen(false)
         await load()
-        alert(`Selesai! Benar ${res.correct}/${res.total}. Nilai: ${res.score}. (waktu ${fmtDuration(timeTakenSeconds)})`)
+        toaster.create({ description: `Selesai! Benar ${res.correct}/${res.total}. Nilai: ${res.score}. (waktu ${fmtDuration(timeTakenSeconds)})`, type: 'success' })
       } else {
         setQuizMsg(`Benar ${res.correct} dari ${res.total} — salah melebihi 5%. Soal & jawaban diacak ulang, coba lagi!`)
         // reshuffle questions + options (keep their original indices for grading)
@@ -450,7 +452,7 @@ export default function TugasPage() {
                 <Table.ColumnHeader>Deadline</Table.ColumnHeader>
                 <Table.ColumnHeader>Nilai Maks</Table.ColumnHeader>
                 {canManage && <Table.ColumnHeader>Terkumpul</Table.ColumnHeader>}
-                <Table.ColumnHeader>Aksi</Table.ColumnHeader>
+                <Table.ColumnHeader textAlign="right">Aksi</Table.ColumnHeader>
               </Table.Row>
             </Table.Header>
             <Table.Body>
@@ -481,29 +483,16 @@ export default function TugasPage() {
                       </Table.Cell>
                       <Table.Cell>{a.maxScore}</Table.Cell>
                       {canManage && <Table.Cell>{a.submissionCount} <Icon as={LuInbox} /></Table.Cell>}
-                      <Table.Cell>
-                        <Flex gap="6px" wrap="wrap">
+                      <Table.Cell textAlign="right">
+                        <Flex gap="6px" wrap="wrap" justify="flex-end">
                           {canManage ? (
-                            <>
-                              <IconButton size="xs" variant="outline" colorPalette={a.isActive ? 'green' : 'gray'}
-                                aria-label="aktif" title={a.isActive ? 'Nonaktifkan tugas' : 'Aktifkan tugas'} onClick={() => toggleActive(a)}>
-                                <Icon as={LuPower} />
-                              </IconButton>
-                              <IconButton size="xs" variant="outline" colorPalette="orange"
-                                aria-label="blokir" title="Blokir siswa" onClick={() => openBlock(a)}>
-                                <Icon as={LuBan} />
-                              </IconButton>
-                              <IconButton size="xs" variant="outline" colorPalette="green"
-                                aria-label="wa" title="Kirim ke WhatsApp" onClick={() => kirimWA(a)}>
-                                <Icon as={LuMessageCircle} />
-                              </IconButton>
-                              <IconButton size="xs" variant="outline" colorPalette="blue" aria-label="edit" title="Edit" onClick={() => openEdit(a)}>
-                                <Icon as={LuPencil} />
-                              </IconButton>
-                              <IconButton size="xs" colorPalette="red" variant="outline" aria-label="hapus" title="Hapus" onClick={() => remove(a)}>
-                                <Icon as={LuTrash2} />
-                              </IconButton>
-                            </>
+                            <RowActionsMenu actions={[
+                              { label: a.isActive ? 'Nonaktifkan tugas' : 'Aktifkan tugas', icon: LuPower, onClick: () => toggleActive(a) },
+                              { label: 'Blokir siswa', icon: LuBan, onClick: () => openBlock(a) },
+                              { label: 'Kirim ke WhatsApp', icon: LuMessageCircle, onClick: () => kirimWA(a) },
+                              { label: 'Edit', icon: LuPencil, onClick: () => openEdit(a) },
+                              { label: 'Hapus', icon: LuTrash2, onClick: () => remove(a), danger: true },
+                            ]} />
                           ) : a.blocked ? (
                             <Badge colorPalette="red"><Icon as={LuBan} /> Diblokir</Badge>
                           ) : a.submitted ? (
@@ -621,27 +610,32 @@ export default function TugasPage() {
                                 onClick={() => setForm((f) => ({ ...f, questions: f.questions.filter((_, idx) => idx !== qi) }))}><Icon as={LuTrash2} /></IconButton>
                             </Flex>
                             <Flex gap="8px" align="center" mb="6px" wrap="wrap">
-                              {q.image && <img src={q.image} alt="" style={{ maxHeight: 80, borderRadius: 6, border: `1px solid ${COLORS.border}` }} />}
-                              <label style={{ fontSize: 11, cursor: 'pointer', color: COLORS.primary }}>
+                              {q.image && <Image src={q.image} alt="" maxH="80px" borderRadius="6px" border={`1px solid ${COLORS.border}`} />}
+                              <Box as="label" fontSize="11px" cursor="pointer" color={COLORS.primary} display="inline-flex" alignItems="center" gap="4px">
                                 <Icon as={LuImage} /> {q.image ? 'Ganti gambar' : 'Tambah gambar (opsional)'}
                                 <input type="file" accept="image/*" style={{ display: 'none' }} onChange={(e) => setQImage(qi, e.target.files?.[0])} />
-                              </label>
+                              </Box>
                               {q.image && <Button size="2xs" variant="ghost" colorPalette="red" onClick={() => setQ(qi, { image: '' })}><Icon as={LuX} /> Hapus gambar</Button>}
                             </Flex>
                             <Text fontSize="11px" color={COLORS.muted} mb="4px">Pilih jawaban benar (radio):</Text>
-                            <Stack gap="4px">
-                              {q.options.map((o, oi) => (
-                                <Flex key={oi} gap="6px" align="center">
-                                  <input type="radio" name={`q-${qi}`} checked={q.correctIndex === oi} onChange={() => setQ(qi, { correctIndex: oi })} />
-                                  <Input size="sm" placeholder={`Opsi ${String.fromCharCode(65 + oi)}`} value={o}
-                                    onChange={(e) => setOpt(qi, oi, e.target.value)} />
-                                  {q.options.length > 2 && (
-                                    <IconButton aria-label="hapus opsi" size="xs" variant="ghost"
-                                      onClick={() => setQ(qi, { options: q.options.filter((_, j) => j !== oi), correctIndex: 0 })}><Icon as={LuX} /></IconButton>
-                                  )}
-                                </Flex>
-                              ))}
-                            </Stack>
+                            <RadioGroup.Root size="sm" value={String(q.correctIndex)} onValueChange={(e) => e.value !== null && setQ(qi, { correctIndex: Number(e.value) })}>
+                              <Stack gap="4px">
+                                {q.options.map((o, oi) => (
+                                  <Flex key={oi} gap="6px" align="center">
+                                    <RadioGroup.Item value={String(oi)}>
+                                      <RadioGroup.ItemHiddenInput />
+                                      <RadioGroup.ItemIndicator />
+                                    </RadioGroup.Item>
+                                    <Input size="sm" placeholder={`Opsi ${String.fromCharCode(65 + oi)}`} value={o}
+                                      onChange={(e) => setOpt(qi, oi, e.target.value)} />
+                                    {q.options.length > 2 && (
+                                      <IconButton aria-label="hapus opsi" size="xs" variant="ghost"
+                                        onClick={() => setQ(qi, { options: q.options.filter((_, j) => j !== oi), correctIndex: 0 })}><Icon as={LuX} /></IconButton>
+                                    )}
+                                  </Flex>
+                                ))}
+                              </Stack>
+                            </RadioGroup.Root>
                             {q.options.length < 5 && (
                               <Button size="2xs" variant="ghost" mt="4px" onClick={() => setQ(qi, { options: [...q.options, ''] })}><Icon as={LuPlus} /> opsi</Button>
                             )}
@@ -810,21 +804,27 @@ export default function TugasPage() {
                 ) : quizQs.map((q, qi) => (
                   <Box key={q.id} borderBottom="1px solid" borderColor={COLORS.border} pb="10px">
                     <Text fontSize="14px" fontWeight="600" mb="8px">{qi + 1}. {q.question}</Text>
-                    {q.image && <img src={q.image} alt="" style={{ maxHeight: 220, marginBottom: 8, borderRadius: 8, border: `1px solid ${COLORS.border}` }} />}
-                    <Stack gap="6px">
-                      {q.opts.map((o, oi) => {
-                        const picked = quizAns[q.id] === o.orig
-                        return (
-                          <Flex key={oi} gap="8px" align="center" cursor="pointer"
-                            bg={picked ? '#DBEAFE' : COLORS.bg} px="10px" py="8px" borderRadius="6px"
-                            border="1px solid" borderColor={picked ? COLORS.primary : COLORS.border}
-                            onClick={() => setQuizAns((a) => ({ ...a, [q.id]: o.orig }))}>
-                            <input type="radio" name={`quiz-${q.id}`} checked={picked} readOnly />
-                            <Text fontSize="13px">{String.fromCharCode(65 + oi)}. {o.text}</Text>
-                          </Flex>
-                        )
-                      })}
-                    </Stack>
+                    {q.image && <Image src={q.image} alt="" maxH="220px" mb="8px" borderRadius="8px" border={`1px solid ${COLORS.border}`} />}
+                    <RadioGroup.Root value={quizAns[q.id] === undefined ? null : String(quizAns[q.id])}
+                      onValueChange={(e) => e.value !== null && setQuizAns((a) => ({ ...a, [q.id]: Number(e.value) }))}>
+                      <Stack gap="6px">
+                        {q.opts.map((o, oi) => {
+                          const picked = quizAns[q.id] === o.orig
+                          return (
+                            <Flex key={oi} gap="8px" align="center" cursor="pointer"
+                              bg={picked ? '#DBEAFE' : COLORS.bg} px="10px" py="8px" borderRadius="6px"
+                              border="1px solid" borderColor={picked ? COLORS.primary : COLORS.border}
+                              onClick={() => setQuizAns((a) => ({ ...a, [q.id]: o.orig }))}>
+                              <RadioGroup.Item value={String(o.orig)}>
+                                <RadioGroup.ItemHiddenInput />
+                                <RadioGroup.ItemIndicator />
+                              </RadioGroup.Item>
+                              <Text fontSize="13px">{String.fromCharCode(65 + oi)}. {o.text}</Text>
+                            </Flex>
+                          )
+                        })}
+                      </Stack>
+                    </RadioGroup.Root>
                   </Box>
                 ))}
                 {quizQs.length > 0 && (

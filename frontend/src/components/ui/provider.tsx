@@ -3,6 +3,7 @@
 import { ChakraProvider } from '@chakra-ui/react'
 import { ThemeProvider } from 'next-themes'
 import { system } from '@/theme/system'
+import { Toaster } from './toaster'
 
 interface ProviderProps {
   children: React.ReactNode
@@ -13,6 +14,7 @@ export function Provider({ children }: ProviderProps) {
     <ChakraProvider value={system}>
       <ThemeProvider attribute="class" disableTransitionOnChange>
         {children}
+        <Toaster />
       </ThemeProvider>
     </ChakraProvider>
   )

@@ -48,10 +48,51 @@ message TeacherDashboard {
   repeated RecentSubmission pengumpulan_terbaru = 13;
   int32 total_guru = 14;
   repeated KelasCount siswa_per_kelas = 15;
+  int32 siswa_laki = 16;       // number of male students
+  int32 siswa_perempuan = 17;  // number of female students
 }
 
 message GetTeacherDashboardRequest {}
 
+// One entry in a class/major leaderboard.
+message RankEntry {
+  int32 peringkat = 1;      // 1..5
+  string name = 2;          // student full name
+  string kelas = 3;         // student's class (useful in the major leaderboard)
+  double rata_rata = 4;     // average graded score
+}
+
+// Student home summary: kelas/jurusan, average grade, and rank within the
+// student's own class and major, plus top-5 leaderboards for both.
+message StudentDashboard {
+  string kelas = 1;
+  string jurusan = 2;
+  double rata_rata_nilai = 3;    // average of this student's graded scores
+  int32 graded_count = 4;        // number of graded submissions
+  int32 peringkat_kelas = 5;     // rank within same class (1 = best)
+  int32 total_kelas = 6;         // number of students in the same class
+  int32 peringkat_jurusan = 7;   // rank within same major
+  int32 total_jurusan = 8;       // number of students in the same major
+  repeated RankEntry juara_kelas = 9;    // top 5 in the same class
+  repeated RankEntry juara_jurusan = 10; // top 5 in the same major
+  repeated string all_kelas = 11;        // all class names (dropdown options)
+  repeated string all_jurusan = 12;      // all major names (dropdown options)
+}
+
+message GetStudentDashboardRequest {}
+
+// Leaderboard for an arbitrary class or major (exactly one of kelas/jurusan set).
+message GetLeaderboardRequest {
+  string kelas = 1;
+  string jurusan = 2;
+}
+
+message Leaderboard {
+  repeated RankEntry entries = 1;
+}
+
 service DashboardService {
   rpc GetTeacherDashboard(GetTeacherDashboardRequest) returns (TeacherDashboard);
+  rpc GetStudentDashboard(GetStudentDashboardRequest) returns (StudentDashboard);
+  rpc GetLeaderboard(GetLeaderboardRequest) returns (Leaderboard);
 }

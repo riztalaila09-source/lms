@@ -25,6 +25,8 @@ type UpdateCourseInput struct {
 	TeacherID       *string
 	IsActive        *bool
 	BackgroundImage *string
+	CapaianPembelajaran *string
+	TujuanPembelajaran  *string
 }
 
 type CourseService struct {
@@ -213,6 +215,12 @@ func (s *CourseService) UpdateCourse(ctx context.Context, callerRole, courseID s
 	}
 	if input.BackgroundImage != nil {
 		c.BackgroundImage = *input.BackgroundImage
+	}
+	if input.CapaianPembelajaran != nil {
+		c.CapaianPembelajaran = *input.CapaianPembelajaran
+	}
+	if input.TujuanPembelajaran != nil {
+		c.TujuanPembelajaran = *input.TujuanPembelajaran
 	}
 
 	if err := s.courseRepo.Update(ctx, c); err != nil {

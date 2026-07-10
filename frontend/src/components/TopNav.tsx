@@ -1,16 +1,17 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { Badge, Box, Button, Flex, Icon, Input, Text } from '@chakra-ui/react'
+import { Badge, Box, Button, Flex, Icon, Image, Input, Text } from '@chakra-ui/react'
 import {
   LuGraduationCap, LuSearch, LuMenu, LuX, LuBookOpen, LuHouse, LuLibrary,
-  LuClipboardList, LuTrophy, LuSettings, LuLogOut,
+  LuClipboardList, LuTrophy, LuSettings, LuLogOut, LuQrCode, LuBriefcase,
 } from 'react-icons/lu'
 import type { IconType } from 'react-icons'
 import { useAuth } from '@/hooks/useAuth'
 import { useLang } from '@/i18n'
-import { materialClient } from '@/lib/client'
+import { materialClient, assignmentClient } from '@/lib/client'
 import type { MaterialSearchHit } from '@/gen/material/v1/material_pb'
 import type { Material } from '@/gen/material/v1/material_pb'
+import { timestampDate } from '@bufbuild/protobuf/wkt'
 import MaterialViewer from '@/components/MaterialViewer'
 import { UDEMY } from '@/theme/tokens'
 
@@ -35,9 +36,24 @@ export default function TopNav() {
   const [menuOpen, setMenuOpen] = useState(false)
   const [avatarOpen, setAvatarOpen] = useState(false)
   const [viewing, setViewing] = useState<Material | null>(null)
+  const [pendingTugas, setPendingTugas] = useState(0)
   const searchRef = useRef<HTMLDivElement>(null)
 
   const isActive = (path: string) => location.pathname === path || location.pathname.startsWith(path + '/')
+
+  // Badge on "Tugas": assignments still actionable (active, not submitted, not
+  // blocked, deadline not passed). Submitted & late assignments are excluded.
+  useEffect(() => {
+    if (!user) return
+    assignmentClient.listAssignments({ pagination: { page: 1, pageSize: 200 } })
+      .then((r) => {
+        const now = Date.now()
+        setPendingTugas(r.assignments.filter((a) =>
+          a.isActive && !a.submitted && !a.blocked &&
+          !(a.deadline && timestampDate(a.deadline).getTime() < now)).length)
+      })
+      .catch(() => setPendingTugas(0))
+  }, [user, location.pathname])
 
   // Debounced global material search.
   useEffect(() => {
@@ -127,6 +143,9 @@ export default function TopNav() {
                 fontWeight={isActive(l.path) ? 'bold' : 'medium'}
                 _hover={{ bg: UDEMY.accentTint }} onClick={() => go(l.path)}>
                 {t(l.key)}
+                {l.path === '/tugas' && pendingTugas > 0 && (
+                  <Badge ml="1" colorPalette="red" borderRadius="full" px="6px">{pendingTugas}</Badge>
+                )}
               </Button>
             ))}
           </Flex>
@@ -146,6 +165,8 @@ export default function TopNav() {
                     {user?.kelas && <Text fontSize="11px" color={UDEMY.inkMuted}>Kelas {user.kelas}</Text>}
                   </Box>
                   <MenuItem icon={LuSettings} label={t('nav.settings')} onClick={() => go('/pengaturan')} />
+                  <MenuItem icon={LuBriefcase} label={t('nav.pkl')} onClick={() => go('/mitra-pkl')} />
+                  <MenuItem icon={LuQrCode} label={t('nav.attendance')} onClick={() => go('/absensi')} />
                   <MenuItem icon={LuLogOut} label={t('nav.logout')} danger onClick={() => { if (confirm('Yakin ingin keluar?')) { logout(); navigate('/login', { replace: true }) } }} />
                 </Box>
               </>
@@ -174,6 +195,9 @@ export default function TopNav() {
                 color={isActive(l.path) ? UDEMY.accent : UDEMY.ink} fontWeight={isActive(l.path) ? 'bold' : 'medium'}
                 _hover={{ bg: UDEMY.accentTint }} onClick={() => go(l.path)}>
                 <Icon as={l.icon} /> <Text fontSize="14px">{t(l.key)}</Text>
+                {l.path === '/tugas' && pendingTugas > 0 && (
+                  <Badge ml="auto" colorPalette="red" borderRadius="full" px="6px">{pendingTugas}</Badge>
+                )}
               </Flex>
             ))}
             <MenuItem icon={LuSettings} label={t('nav.settings')} onClick={() => go('/pengaturan')} />
@@ -189,7 +213,7 @@ export default function TopNav() {
 
 function Avatar({ user, initials }: { user: { photoUrl?: string } | null; initials: string }) {
   if (user?.photoUrl) {
-    return <img src={user.photoUrl} alt="foto" style={{ width: 36, height: 36, borderRadius: '9999px', objectFit: 'cover' }} />
+    return <Image src={user.photoUrl} alt="foto" w="36px" h="36px" borderRadius="full" objectFit="cover" />
   }
   return (
     <Flex w="36px" h="36px" borderRadius="full" bg={UDEMY.ink} color="white" align="center" justify="center" fontSize="13px" fontWeight="bold">

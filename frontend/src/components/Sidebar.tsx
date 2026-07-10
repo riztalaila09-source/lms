@@ -1,11 +1,11 @@
 import { useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { Box, Button, Flex, HStack, Icon, Stack, Text } from '@chakra-ui/react'
+import { Box, Button, Flex, HStack, Icon, Image, Stack, Text } from '@chakra-ui/react'
 import type { IconType } from 'react-icons'
 import {
   LuHouse, LuLibrary, LuBookOpen, LuClipboardList, LuInbox,
   LuTrophy, LuActivity, LuSettings, LuWrench, LuSchool, LuLogOut,
-  LuLayoutGrid, LuChevronDown, LuChevronRight,
+  LuLayoutGrid, LuChevronDown, LuChevronRight, LuQrCode, LuBriefcase,
 } from 'react-icons/lu'
 import { useAuth } from '@/hooks/useAuth'
 import { Role } from '@/gen/user/v1/user_pb'
@@ -34,6 +34,7 @@ const MANAGER = [Role.ADMIN, Role.TEACHER]
 
 const NAV: NavEntry[] = [
   { label: 'Beranda', path: '/dashboard', icon: LuHouse },
+  { label: 'Absensi', path: '/absensi', icon: LuQrCode },
   {
     label: 'Mata Pelajaran',
     icon: LuLibrary,
@@ -47,6 +48,7 @@ const NAV: NavEntry[] = [
     ],
   },
   { label: 'Master Data', path: '/users', icon: LuSettings, roles: MANAGER },
+  { label: 'Mitra PKL', path: '/mitra-pkl', icon: LuBriefcase },
   { label: 'Pengaturan', path: '/pengaturan', icon: LuWrench },
 ]
 
@@ -196,8 +198,7 @@ export default function Sidebar({ mobileOpen = false, onNavigate }: { mobileOpen
       <Box px="14px" py="14px" borderTop="1px solid" borderColor={COLORS.border}>
         <Flex direction="column" align="center" textAlign="center" gap="6px" mb="10px">
           {user?.photoUrl ? (
-            <img src={user.photoUrl} alt="foto"
-              style={{ width: 52, height: 52, borderRadius: '9999px', objectFit: 'cover', border: `2px solid ${COLORS.border}` }} />
+            <Image src={user.photoUrl} alt="foto" w="52px" h="52px" borderRadius="full" objectFit="cover" border={`2px solid ${COLORS.border}`} />
           ) : (
             <Flex w="52px" h="52px" borderRadius="full" bg={COLORS.primary} color="white"
               align="center" justify="center" fontSize="18px" fontWeight="bold">

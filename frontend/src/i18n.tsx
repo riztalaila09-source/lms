@@ -9,6 +9,8 @@ const DICT: Record<string, { id: string; en: string }> = {
   'nav.courses': { id: 'Mata Pelajaran', en: 'Subjects' },
   'nav.materials': { id: 'Materi Umum', en: 'General Materials' },
   'nav.tasks': { id: 'Tugas', en: 'Assignments' },
+  'nav.attendance': { id: 'Absensi', en: 'Attendance' },
+  'nav.pkl': { id: 'Mitra PKL', en: 'Internship Partners' },
   'nav.grades': { id: 'Nilai', en: 'Grades' },
   'nav.settings': { id: 'Pengaturan', en: 'Settings' },
   'nav.logout': { id: 'Keluar', en: 'Log out' },

@@ -1,0 +1,174 @@
+syntax = "proto3";
+
+package attendance.v1;
+
+option go_package = "lms/backend/gen/attendance/v1;attendancev1";
+
+import "google/protobuf/timestamp.proto";
+
+message Session {
+  string id = 1;
+  string course_id = 2;
+  string mapel = 3;
+  string kelas = 4;
+  string ruang = 13;        // room / lab used (e.g. "Lab 1")
+  string tanggal = 5;       // 'YYYY-MM-DD'
+  int32 jam_ke = 6;         // starting lesson hour 1..10, 0 = manual
+  string start_time = 7;    // 'HH:MM'
+  string end_time = 8;
+  string created_by_name = 9;
+  int32 hadir_count = 10;
+  google.protobuf.Timestamp created_at = 11;
+  int32 jam_ke_akhir = 12;  // ending lesson hour (0 = single / manual)
+}
+
+// The ephemeral 60-second barcode: token goes in the QR, code is for manual entry.
+message TokenInfo {
+  string token = 1;
+  string code = 2;
+  int32 expires_in_seconds = 3;
+}
+
+message Record {
+  string student_id = 1;
+  string student_name = 2;
+  string student_kelas = 3;
+  string status = 4;   // 'hadir' | 'sakit' | 'izin' | 'alpa'
+  string note = 5;
+  google.protobuf.Timestamp marked_at = 6;
+}
+
+// ── Teacher ──
+message CreateSessionRequest {
+  string course_id = 1;
+  string mapel = 2;
+  string kelas = 3;
+  string tanggal = 4;
+  int32 jam_ke = 5;
+  string start_time = 6;
+  string end_time = 7;
+  int32 jam_ke_akhir = 8;
+  string ruang = 9;
+}
+message CreateSessionResponse {
+  Session session = 1;
+  TokenInfo token = 2;
+}
+
+message RegenerateTokenRequest { string session_id = 1; }
+message RegenerateTokenResponse { TokenInfo token = 1; }
+
+message ListSessionsRequest { string tanggal = 1; } // '' = recent sessions of the caller
+message ListSessionsResponse { repeated Session sessions = 1; }
+
+message GetSessionRecordsRequest { string session_id = 1; }
+message GetSessionRecordsResponse {
+  Session session = 1;
+  repeated Record records = 2;
+}
+
+message SetRecordStatusRequest {
+  string session_id = 1;
+  string student_id = 2;
+  string status = 3;
+  string note = 4;
+}
+message SetRecordStatusResponse { Record record = 1; }
+
+message DeleteSessionRequest { string session_id = 1; }
+message DeleteSessionResponse {}
+
+// Attendance recap for export (per student), filtered by date range and scope.
+message ExportRow {
+  string student_name = 1;
+  string kelas = 2;
+  string jurusan = 3;
+  int32 hadir = 4;
+  int32 sakit = 5;
+  int32 izin = 6;
+  int32 alpa = 7;
+  int32 total = 8;
+  int32 telat = 9;
+}
+message ExportAttendanceRequest {
+  string start = 1;    // 'YYYY-MM-DD'
+  string end = 2;      // 'YYYY-MM-DD'
+  string kelas = 3;    // fill exactly one of kelas / jurusan
+  string jurusan = 4;
+}
+message ExportAttendanceResponse { repeated ExportRow rows = 1; }
+
+// ── Student ──
+message ScanRequest {
+  string token = 1; // from QR
+  string code = 2;  // or the short manual code (one of the two)
+}
+message ScanResponse {
+  Session session = 1;
+  string status = 2;   // 'hadir'
+  bool already = 3;    // true if the student was already recorded
+}
+
+message MyTodayRequest { string tanggal = 1; } // '' = today
+message TodayEntry {
+  string session_id = 1;
+  string mapel = 2;
+  string kelas = 3;
+  int32 jam_ke = 4;
+  string start_time = 5;
+  string end_time = 6;
+  string status = 7;
+  int32 jam_ke_akhir = 8;
+  string ruang = 9;
+}
+message MyTodayResponse {
+  string tanggal = 1;
+  int32 hadir = 2;
+  int32 sakit = 3;
+  int32 izin = 4;
+  int32 alpa = 5;
+  repeated TodayEntry entries = 6;
+  int32 telat = 7;
+}
+
+// ── Per-day recap grid (teacher) ──
+message DayGridRequest {
+  string tanggal = 1;
+  string kelas = 2;
+}
+message DaySession {
+  string id = 1;
+  string mapel = 2;
+  int32 jam_ke = 3;
+  int32 jam_ke_akhir = 4;
+  string start_time = 5;
+  string end_time = 6;
+  string ruang = 7;
+}
+message DayStudent {
+  string id = 1;
+  string name = 2;
+}
+message DayCell {
+  string session_id = 1;
+  string student_id = 2;
+  string status = 3;
+}
+message DayGridResponse {
+  repeated DaySession sessions = 1;
+  repeated DayStudent students = 2;
+  repeated DayCell cells = 3;
+}
+
+service AttendanceService {
+  rpc CreateSession(CreateSessionRequest) returns (CreateSessionResponse);
+  rpc RegenerateToken(RegenerateTokenRequest) returns (RegenerateTokenResponse);
+  rpc ListSessions(ListSessionsRequest) returns (ListSessionsResponse);
+  rpc GetSessionRecords(GetSessionRecordsRequest) returns (GetSessionRecordsResponse);
+  rpc SetRecordStatus(SetRecordStatusRequest) returns (SetRecordStatusResponse);
+  rpc DeleteSession(DeleteSessionRequest) returns (DeleteSessionResponse);
+  rpc ExportAttendance(ExportAttendanceRequest) returns (ExportAttendanceResponse);
+  rpc DayGrid(DayGridRequest) returns (DayGridResponse);
+  rpc Scan(ScanRequest) returns (ScanResponse);
+  rpc MyToday(MyTodayRequest) returns (MyTodayResponse);
+}

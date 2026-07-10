@@ -3,7 +3,8 @@ LMS (Learning Management System) adalah aplikasi berbasis web yang dirancang unt
 
 1. Untuk Referensi guideline development frontend, [Baca Ini](./frontend-devel-guideline.md).
 2. Untuk Referensi Implementasi frontend, [Baca Ini](./frontend-implementation.md).
-3. Untuk Brief Umum dari project, [Baca Ini](./general-brief.md)
+3. Untuk Brief Umum dari project, [Baca Ini](./general-brief.md).
+4. Untuk Referensi guideline terkait testing. [baca Ini](./testing.md).
 
 
 ## General Guideline Untuk Agent AI

@@ -44,6 +44,8 @@ type Course struct {
 	StudentCount    int
 	Kelas           []string
 	BackgroundImage string
+	CapaianPembelajaran string
+	TujuanPembelajaran  string
 	CreatedAt       time.Time
 	UpdatedAt       time.Time
 }
@@ -102,9 +104,9 @@ func NewEnrollmentRepository(db *sql.DB) EnrollmentRepository {
 
 func (r *sqliteCourseRepository) Create(ctx context.Context, c *Course) error {
 	_, err := r.db.ExecContext(ctx, `
-		INSERT INTO courses (id, code, name, description, teacher_id, is_active, background_image, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		c.ID, c.Code, c.Name, c.Description, c.TeacherID, c.IsActive, c.BackgroundImage, c.CreatedAt, c.UpdatedAt,
+		INSERT INTO courses (id, code, name, description, teacher_id, is_active, background_image, capaian_pembelajaran, tujuan_pembelajaran, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		c.ID, c.Code, c.Name, c.Description, c.TeacherID, c.IsActive, c.BackgroundImage, c.CapaianPembelajaran, c.TujuanPembelajaran, c.CreatedAt, c.UpdatedAt,
 	)
 	if err != nil {
 		if isSQLiteConstraintError(err) {
@@ -122,12 +124,12 @@ func (r *sqliteCourseRepository) GetByID(ctx context.Context, id string) (*Cours
 		SELECT c.id, c.code, c.name, c.description, c.teacher_id,
 		       u.full_name, u.email, c.is_active, c.created_at, c.updated_at,
 		       (SELECT COUNT(*) FROM course_enrollments WHERE course_id = c.id) AS student_count,
-		       `+kelasColumn+`, c.background_image
+		       `+kelasColumn+`, c.background_image, c.capaian_pembelajaran, c.tujuan_pembelajaran
 		FROM courses c
 		JOIN users u ON u.id = c.teacher_id
 		WHERE c.id = ?`, id,
 	).Scan(&c.ID, &c.Code, &c.Name, &c.Description, &c.TeacherID,
-		&c.TeacherName, &c.TeacherEmail, &c.IsActive, &c.CreatedAt, &c.UpdatedAt, &c.StudentCount, &kelas, &c.BackgroundImage)
+		&c.TeacherName, &c.TeacherEmail, &c.IsActive, &c.CreatedAt, &c.UpdatedAt, &c.StudentCount, &kelas, &c.BackgroundImage, &c.CapaianPembelajaran, &c.TujuanPembelajaran)
 	c.Kelas = splitKelas(kelas)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrCourseNotFound
@@ -141,9 +143,9 @@ func (r *sqliteCourseRepository) GetByID(ctx context.Context, id string) (*Cours
 func (r *sqliteCourseRepository) Update(ctx context.Context, c *Course) error {
 	c.UpdatedAt = time.Now()
 	res, err := r.db.ExecContext(ctx, `
-		UPDATE courses SET code=?, name=?, description=?, teacher_id=?, is_active=?, background_image=?, updated_at=?
+		UPDATE courses SET code=?, name=?, description=?, teacher_id=?, is_active=?, background_image=?, capaian_pembelajaran=?, tujuan_pembelajaran=?, updated_at=?
 		WHERE id=?`,
-		c.Code, c.Name, c.Description, c.TeacherID, c.IsActive, c.BackgroundImage, c.UpdatedAt, c.ID,
+		c.Code, c.Name, c.Description, c.TeacherID, c.IsActive, c.BackgroundImage, c.CapaianPembelajaran, c.TujuanPembelajaran, c.UpdatedAt, c.ID,
 	)
 	if err != nil {
 		if isSQLiteConstraintError(err) {
@@ -206,7 +208,7 @@ func (r *sqliteCourseRepository) List(ctx context.Context, f CourseListFilter) (
 		SELECT c.id, c.code, c.name, c.description, c.teacher_id,
 		       u.full_name, u.email, c.is_active, c.created_at, c.updated_at,
 		       (SELECT COUNT(*) FROM course_enrollments WHERE course_id = c.id) AS student_count,
-		       `+kelasColumn+`
+		       `+kelasColumn+`, c.capaian_pembelajaran, c.tujuan_pembelajaran
 		FROM courses c
 		JOIN users u ON u.id = c.teacher_id
 		`+where+` ORDER BY c.created_at DESC LIMIT ? OFFSET ?`, listArgs...)
@@ -220,7 +222,7 @@ func (r *sqliteCourseRepository) List(ctx context.Context, f CourseListFilter) (
 		c := &Course{}
 		var kelas sql.NullString
 		if err := rows.Scan(&c.ID, &c.Code, &c.Name, &c.Description, &c.TeacherID,
-			&c.TeacherName, &c.TeacherEmail, &c.IsActive, &c.CreatedAt, &c.UpdatedAt, &c.StudentCount, &kelas); err != nil {
+			&c.TeacherName, &c.TeacherEmail, &c.IsActive, &c.CreatedAt, &c.UpdatedAt, &c.StudentCount, &kelas, &c.CapaianPembelajaran, &c.TujuanPembelajaran); err != nil {
 			return nil, 0, fmt.Errorf("scan course: %w", err)
 		}
 		c.Kelas = splitKelas(kelas)

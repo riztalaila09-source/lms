@@ -1,9 +1,9 @@
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  Badge, Box, Button, Dialog, Field, Flex, Icon, Input, NativeSelect, SimpleGrid, Stack, Table, Text, Wrap,
+  Badge, Box, Button, Checkbox, Dialog, Field, Flex, Icon, Input, NativeSelect, SimpleGrid, Stack, Table, Text, Wrap,
 } from '@chakra-ui/react'
-import { LuEye, LuPencil, LuTrash2, LuX, LuPlus, LuSearch } from 'react-icons/lu'
+import { LuEye, LuPencil, LuTrash2, LuX, LuPlus, LuSearch, LuPower } from 'react-icons/lu'
 import { courseClient, userClient, classClient } from '@/lib/client'
 import type { Course } from '@/gen/course/v1/course_pb'
 import type { User } from '@/gen/user/v1/user_pb'
@@ -14,8 +14,10 @@ import AppLayout from '@/components/AppLayout'
 import CourseCard from '@/components/CourseCard'
 import ConfirmDialog, { type ConfirmState } from '@/components/ConfirmDialog'
 import Pagination, { usePaged } from '@/components/Pagination'
+import RowActionsMenu from '@/components/RowActionsMenu'
 import { COLORS, UDEMY } from '@/theme/tokens'
 import { fileToDataUrl } from '@/lib/image'
+import { toaster } from '@/components/ui/toaster'
 
 interface CourseForm {
   id: string
@@ -119,7 +121,7 @@ export default function CoursesPage() {
       await courseClient.updateCourse({ id: c.id, isActive: !c.isActive })
       await loadCourses()
     } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : 'Gagal mengubah status kelas')
+      toaster.create({ description: err instanceof Error ? err.message : 'Gagal mengubah status kelas', type: 'error' })
     }
   }
 
@@ -131,7 +133,7 @@ export default function CoursesPage() {
       confirmLabel: 'Ya, Hapus',
       onConfirm: async () => {
         try { await courseClient.deleteCourse({ id: c.id }); await loadCourses() }
-        catch (err: unknown) { alert(err instanceof Error ? err.message : 'Gagal menghapus kelas') }
+        catch (err: unknown) { toaster.create({ description: err instanceof Error ? err.message : 'Gagal menghapus kelas', type: 'error' }) }
       },
     })
   }
@@ -151,7 +153,7 @@ export default function CoursesPage() {
       await loadClasses()
       setSelectedClassIds((arr) => [...arr, c.id]) // auto-check the new class
     } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : 'Gagal membuat kelas')
+      toaster.create({ description: err instanceof Error ? err.message : 'Gagal membuat kelas', type: 'error' })
     } finally {
       setCreatingClass(false)
     }
@@ -164,7 +166,7 @@ export default function CoursesPage() {
       const dataUrl = await fileToDataUrl(file, 1280, 0.8)
       setForm((f) => ({ ...f, backgroundImage: dataUrl }))
     } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : 'Gagal memuat gambar')
+      toaster.create({ description: err instanceof Error ? err.message : 'Gagal memuat gambar', type: 'error' })
     } finally {
       setUploadingBg(false)
     }
@@ -179,7 +181,7 @@ export default function CoursesPage() {
         await courseClient.updateCourse({
           id: form.id, code: form.code, name: form.name,
           description: form.description, teacherId: form.teacherId, classIds: selectedClassIds,
-          backgroundImage: form.backgroundImage,
+          backgroundImage: form.backgroundImage, syncClasses: true,
         })
       } else {
         await courseClient.createCourse({
@@ -258,7 +260,7 @@ export default function CoursesPage() {
               <Table.ColumnHeader>Kelas</Table.ColumnHeader>
               <Table.ColumnHeader>Guru</Table.ColumnHeader>
               <Table.ColumnHeader>Murid</Table.ColumnHeader>
-              <Table.ColumnHeader>Aksi</Table.ColumnHeader>
+              <Table.ColumnHeader textAlign="right">Aksi</Table.ColumnHeader>
             </Table.Row>
           </Table.Header>
           <Table.Body>
@@ -281,20 +283,13 @@ export default function CoursesPage() {
                   </Table.Cell>
                   <Table.Cell>{course.teacher?.fullName || '-'}</Table.Cell>
                   <Table.Cell>{course.studentCount} murid</Table.Cell>
-                  <Table.Cell onClick={(e) => e.stopPropagation()}>
-                    <Flex gap="6px">
-                      <Button size="xs" variant="outline" onClick={() => navigate(`/courses/${course.id}`)}><Icon as={LuEye} /> Buka</Button>
-                      {canManage && (
-                        <>
-                          <Button size="xs" colorPalette={course.isActive ? 'orange' : 'green'} variant="outline"
-                            onClick={() => handleToggleActive(course)}>
-                            {course.isActive ? 'Nonaktifkan' : 'Aktifkan'}
-                          </Button>
-                          <Button size="xs" colorPalette="blue" variant="outline" onClick={() => openEdit(course)}><Icon as={LuPencil} /> Edit</Button>
-                          <Button size="xs" colorPalette="red" variant="outline" onClick={() => askDelete(course)}><Icon as={LuTrash2} /> Hapus</Button>
-                        </>
-                      )}
-                    </Flex>
+                  <Table.Cell onClick={(e) => e.stopPropagation()} textAlign="right">
+                    <RowActionsMenu actions={[
+                      { label: 'Buka', icon: LuEye, onClick: () => navigate(`/courses/${course.id}`) },
+                      { label: course.isActive ? 'Nonaktifkan' : 'Aktifkan', icon: LuPower, onClick: () => handleToggleActive(course), hidden: !canManage },
+                      { label: 'Edit', icon: LuPencil, onClick: () => openEdit(course), hidden: !canManage },
+                      { label: 'Hapus', icon: LuTrash2, onClick: () => askDelete(course), danger: true, hidden: !canManage },
+                    ]} />
                   </Table.Cell>
                 </Table.Row>
               ))
@@ -370,13 +365,14 @@ export default function CoursesPage() {
                         {classes.map((c) => {
                           const checked = selectedClassIds.includes(c.id)
                           return (
-                            <Flex key={c.id} as="label" align="center" gap="6px" px="10px" py="6px"
-                              borderRadius="7px" border="1px solid" cursor="pointer"
+                            <Checkbox.Root key={c.id} checked={checked} onCheckedChange={() => toggleClass(c.id)}
+                              px="10px" py="6px" borderRadius="7px" border="1px solid" cursor="pointer"
                               borderColor={checked ? COLORS.primary : COLORS.border}
                               bg={checked ? '#DBEAFE' : COLORS.surface}>
-                              <input type="checkbox" checked={checked} onChange={() => toggleClass(c.id)} />
-                              <Text fontSize="13px">{c.name}</Text>
-                            </Flex>
+                              <Checkbox.HiddenInput />
+                              <Checkbox.Control />
+                              <Checkbox.Label fontSize="13px">{c.name}</Checkbox.Label>
+                            </Checkbox.Root>
                           )
                         })}
                       </Wrap>

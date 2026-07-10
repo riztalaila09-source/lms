@@ -5,7 +5,7 @@ import {
 } from '@chakra-ui/react'
 import {
   LuPlus, LuBookOpen, LuPencil, LuTrash2, LuSearch, LuRefreshCw, LuChevronUp, LuChevronDown, LuCircleCheck, LuEye, LuEyeOff,
-  LuPlay, LuChevronRight, LuGraduationCap,
+  LuPlay, LuChevronRight, LuGraduationCap, LuPower, LuTarget, LuX, LuSave, LuListChecks,
 } from 'react-icons/lu'
 import { timestampDate } from '@bufbuild/protobuf/wkt'
 import { courseClient, materialClient, userClient } from '@/lib/client'
@@ -20,8 +20,13 @@ import ConfirmDialog, { type ConfirmState } from '@/components/ConfirmDialog'
 import Pagination, { usePaged } from '@/components/Pagination'
 import { StarsDisplay } from '@/components/StarRating'
 import { COLORS, UDEMY, courseGradient } from '@/theme/tokens'
+import { toaster } from '@/components/ui/toaster'
 
-type ActiveTab = 'materials' | 'students' | 'completions' | 'categories'
+type ActiveTab = 'materials' | 'students' | 'completions' | 'categories' | 'about'
+
+// Bullet points stored newline-separated (mirrors encodeLinks/decodeLinks).
+const decodePoints = (s: string): string[] => (s || '').split('\n').map((p) => p.trim()).filter(Boolean)
+const encodePoints = (arr: string[]): string => arr.map((p) => p.trim()).filter(Boolean).join('\n')
 
 export default function CourseDetailPage({ forcedCourseId }: { forcedCourseId?: string }) {
   const params = useParams<{ id: string }>()
@@ -60,6 +65,34 @@ export default function CourseDetailPage({ forcedCourseId }: { forcedCourseId?: 
     try { setCourse(await courseClient.getCourse({ id })) }
     catch (err: unknown) { setError(err instanceof Error ? err.message : 'Gagal memuat data kelas') }
   }, [id])
+
+  // ── Capaian & Tujuan Pembelajaran (editable list of points) ──
+  const [capaian, setCapaian] = useState<string[]>([])
+  const [tujuan, setTujuan] = useState<string[]>([])
+  const [savingAbout, setSavingAbout] = useState(false)
+  // Seed editors when the course's stored points change (also after a save reload).
+  useEffect(() => {
+    setCapaian(decodePoints(course?.capaianPembelajaran || ''))
+    setTujuan(decodePoints(course?.tujuanPembelajaran || ''))
+  }, [course?.capaianPembelajaran, course?.tujuanPembelajaran])
+
+  const saveAbout = async () => {
+    if (!id) return
+    setSavingAbout(true)
+    try {
+      await courseClient.updateCourse({
+        id,
+        capaianPembelajaran: encodePoints(capaian),
+        tujuanPembelajaran: encodePoints(tujuan),
+      })
+      await loadCourse()
+      toaster.create({ description: 'Capaian & Tujuan Pembelajaran tersimpan', type: 'success' })
+    } catch (err: unknown) {
+      toaster.create({ description: err instanceof Error ? err.message : 'Gagal menyimpan', type: 'error' })
+    } finally {
+      setSavingAbout(false)
+    }
+  }
 
   // Per-material progress read from localStorage (written by MaterialViewer).
   // Local-only so the list doesn't fire one getMyCompletion request per material
@@ -117,7 +150,7 @@ export default function CourseDetailPage({ forcedCourseId }: { forcedCourseId?: 
   const delCategory = (c: Category) => setConfirm({
     title: 'Hapus Kategori', message: `Hapus kategori "${c.code} — ${c.name}"? Materi yang memakainya akan kehilangan kategori.`,
     variant: 'danger', confirmLabel: 'Ya, Hapus',
-    onConfirm: async () => { try { await materialClient.deleteCategory({ id: c.id }); await loadCategories() } catch (e: unknown) { alert(e instanceof Error ? e.message : 'Gagal') } },
+    onConfirm: async () => { try { await materialClient.deleteCategory({ id: c.id }); await loadCategories() } catch (e: unknown) { toaster.create({ description: e instanceof Error ? e.message : 'Gagal', type: 'error' }) } },
   })
 
   useEffect(() => {
@@ -147,13 +180,13 @@ export default function CourseDetailPage({ forcedCourseId }: { forcedCourseId?: 
       confirmLabel: 'Ya, Hapus',
       onConfirm: async () => {
         try { await materialClient.deleteMaterial({ id: m.id }); await loadMaterials() }
-        catch (err: unknown) { alert(err instanceof Error ? err.message : 'Gagal menghapus materi') }
+        catch (err: unknown) { toaster.create({ description: err instanceof Error ? err.message : 'Gagal menghapus materi', type: 'error' }) }
       },
     })
   }
   const togglePublish = async (m: Material) => {
     try { await materialClient.updateMaterial({ id: m.id, isPublished: !m.isPublished }); await loadMaterials() }
-    catch (err: unknown) { alert(err instanceof Error ? err.message : 'Gagal mengubah status') }
+    catch (err: unknown) { toaster.create({ description: err instanceof Error ? err.message : 'Gagal mengubah status', type: 'error' }) }
   }
 
   const moveTo = async (from: number, to: number) => {
@@ -169,7 +202,7 @@ export default function CourseDetailPage({ forcedCourseId }: { forcedCourseId?: 
         : materialClient.updateMaterial({ id: m.id, orderIndex: i }))))
       await loadMaterials()
     } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : 'Gagal mengubah urutan')
+      toaster.create({ description: err instanceof Error ? err.message : 'Gagal mengubah urutan', type: 'error' })
       await loadMaterials()
     } finally {
       setReordering(false)
@@ -186,7 +219,7 @@ export default function CourseDetailPage({ forcedCourseId }: { forcedCourseId?: 
       await userClient.updateUser({ id: student.id, isActive: nextActive })
       await loadStudents()
     } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : 'Gagal mengubah status siswa')
+      toaster.create({ description: err instanceof Error ? err.message : 'Gagal mengubah status siswa', type: 'error' })
     }
   }
 
@@ -196,7 +229,7 @@ export default function CourseDetailPage({ forcedCourseId }: { forcedCourseId?: 
     variant: 'danger', confirmLabel: 'Ya, Reset',
     onConfirm: async () => {
       try { await materialClient.resetStudentProgress({ courseId: id ?? '', studentId: s.studentId }); await loadCompletions() }
-      catch (e: unknown) { alert(e instanceof Error ? e.message : 'Gagal reset progress') }
+      catch (e: unknown) { toaster.create({ description: e instanceof Error ? e.message : 'Gagal reset progress', type: 'error' }) }
     },
   })
 
@@ -364,6 +397,14 @@ export default function CourseDetailPage({ forcedCourseId }: { forcedCourseId?: 
               onClick={() => setActiveTab('materials')}>
               Materi Belajar ({visibleMaterials.length})
             </Button>
+            {!isGeneral && (canManage || capaian.length > 0 || tujuan.length > 0) && (
+              <Button variant="ghost" borderRadius={0} borderBottom="2px solid"
+                borderColor={activeTab === 'about' ? COLORS.primary : 'transparent'}
+                color={activeTab === 'about' ? COLORS.primary : 'gray.600'}
+                onClick={() => setActiveTab('about')}>
+                Capaian &amp; Tujuan
+              </Button>
+            )}
             {canManage && !isGeneral && (
               <Button variant="ghost" borderRadius={0} borderBottom="2px solid"
                 borderColor={activeTab === 'students' ? COLORS.primary : 'transparent'}
@@ -389,6 +430,100 @@ export default function CourseDetailPage({ forcedCourseId }: { forcedCourseId?: 
               </Button>
             )}
           </HStack>
+
+          {/* Capaian & Tujuan Pembelajaran */}
+          {activeTab === 'about' && !isGeneral && (
+            <Stack gap="16px">
+              {canManage ? (
+                <>
+                  <Text fontSize="12px" color={COLORS.muted}>
+                    Tambahkan poin Capaian & Tujuan Pembelajaran. Siswa akan melihatnya di tab ini.
+                  </Text>
+                  <SimpleGrid columns={{ base: 1, lg: 2 }} gap="16px">
+                    <Card.Root><Card.Body>
+                      <Flex align="center" gap="8px" mb="10px">
+                        <Icon as={LuCircleCheck} color={COLORS.success} boxSize="18px" />
+                        <Heading size="sm">Capaian Pembelajaran</Heading>
+                      </Flex>
+                      <Stack gap="8px">
+                        {capaian.map((p, i) => (
+                          <Flex key={i} gap="6px" align="center">
+                            <Input size="sm" value={p} placeholder={`Capaian ${i + 1}`}
+                              onChange={(e) => setCapaian((arr) => arr.map((x, j) => (j === i ? e.target.value : x)))} />
+                            <IconButton aria-label="Hapus poin" size="xs" variant="ghost" colorPalette="red"
+                              onClick={() => setCapaian((arr) => arr.filter((_, j) => j !== i))}><Icon as={LuX} /></IconButton>
+                          </Flex>
+                        ))}
+                        <Button size="xs" variant="outline" alignSelf="flex-start"
+                          onClick={() => setCapaian((arr) => [...arr, ''])}><Icon as={LuPlus} /> Tambah poin</Button>
+                      </Stack>
+                    </Card.Body></Card.Root>
+
+                    <Card.Root><Card.Body>
+                      <Flex align="center" gap="8px" mb="10px">
+                        <Icon as={LuTarget} color={COLORS.primary} boxSize="18px" />
+                        <Heading size="sm">Tujuan Pembelajaran</Heading>
+                      </Flex>
+                      <Stack gap="8px">
+                        {tujuan.map((p, i) => (
+                          <Flex key={i} gap="6px" align="center">
+                            <Input size="sm" value={p} placeholder={`Tujuan ${i + 1}`}
+                              onChange={(e) => setTujuan((arr) => arr.map((x, j) => (j === i ? e.target.value : x)))} />
+                            <IconButton aria-label="Hapus poin" size="xs" variant="ghost" colorPalette="red"
+                              onClick={() => setTujuan((arr) => arr.filter((_, j) => j !== i))}><Icon as={LuX} /></IconButton>
+                          </Flex>
+                        ))}
+                        <Button size="xs" variant="outline" alignSelf="flex-start"
+                          onClick={() => setTujuan((arr) => [...arr, ''])}><Icon as={LuPlus} /> Tambah poin</Button>
+                      </Stack>
+                    </Card.Body></Card.Root>
+                  </SimpleGrid>
+                  <Button alignSelf="flex-start" bg={COLORS.primary} color="white" _hover={{ bg: COLORS.primaryDark }}
+                    loading={savingAbout} onClick={saveAbout}><Icon as={LuSave} /> Simpan</Button>
+                </>
+              ) : (capaian.length === 0 && tujuan.length === 0) ? (
+                <Flex direction="column" align="center" py="40px" color={COLORS.muted} gap="8px">
+                  <Icon as={LuListChecks} boxSize="30px" />
+                  <Text fontSize="14px">Belum ada Capaian & Tujuan Pembelajaran.</Text>
+                </Flex>
+              ) : (
+                <SimpleGrid columns={{ base: 1, lg: 2 }} gap="16px">
+                  <Card.Root><Card.Body>
+                    <Flex align="center" gap="8px" mb="12px">
+                      <Icon as={LuCircleCheck} color={COLORS.success} boxSize="20px" />
+                      <Heading size="sm">Capaian Pembelajaran</Heading>
+                    </Flex>
+                    {capaian.length === 0 ? <Text fontSize="13px" color={COLORS.muted}>—</Text> : (
+                      <Stack gap="10px">
+                        {capaian.map((p, i) => (
+                          <Flex key={i} gap="8px" align="flex-start">
+                            <Icon as={LuCircleCheck} color={COLORS.success} mt="3px" flexShrink={0} />
+                            <Text fontSize="14px" color={COLORS.text}>{p}</Text>
+                          </Flex>
+                        ))}
+                      </Stack>
+                    )}
+                  </Card.Body></Card.Root>
+                  <Card.Root><Card.Body>
+                    <Flex align="center" gap="8px" mb="12px">
+                      <Icon as={LuTarget} color={COLORS.primary} boxSize="20px" />
+                      <Heading size="sm">Tujuan Pembelajaran</Heading>
+                    </Flex>
+                    {tujuan.length === 0 ? <Text fontSize="13px" color={COLORS.muted}>—</Text> : (
+                      <Stack gap="10px">
+                        {tujuan.map((p, i) => (
+                          <Flex key={i} gap="8px" align="flex-start">
+                            <Icon as={LuTarget} color={COLORS.primary} mt="3px" flexShrink={0} />
+                            <Text fontSize="14px" color={COLORS.text}>{p}</Text>
+                          </Flex>
+                        ))}
+                      </Stack>
+                    )}
+                  </Card.Body></Card.Root>
+                </SimpleGrid>
+              )}
+            </Stack>
+          )}
 
           {/* Materials */}
           {activeTab === 'materials' && (
@@ -516,10 +651,10 @@ export default function CourseDetailPage({ forcedCourseId }: { forcedCourseId?: 
                             </Box>
                             {canManage && (
                               <HStack gap="1">
-                                <button disabled={idx === 0} onClick={() => moveTo(idx, idx - 1)} title="Naik"
-                                  style={{ display: 'inline-flex', background: 'none', border: 'none', cursor: idx === 0 ? 'default' : 'pointer', opacity: idx === 0 ? 0.3 : 1 }}><Icon as={LuChevronUp} /></button>
-                                <button disabled={idx === visibleMaterials.length - 1} onClick={() => moveTo(idx, idx + 1)} title="Turun"
-                                  style={{ display: 'inline-flex', background: 'none', border: 'none', cursor: idx === visibleMaterials.length - 1 ? 'default' : 'pointer', opacity: idx === visibleMaterials.length - 1 ? 0.3 : 1 }}><Icon as={LuChevronDown} /></button>
+                                <IconButton aria-label="Naik" title="Naik" size="2xs" variant="ghost"
+                                  disabled={idx === 0} onClick={() => moveTo(idx, idx - 1)}><Icon as={LuChevronUp} /></IconButton>
+                                <IconButton aria-label="Turun" title="Turun" size="2xs" variant="ghost"
+                                  disabled={idx === visibleMaterials.length - 1} onClick={() => moveTo(idx, idx + 1)}><Icon as={LuChevronDown} /></IconButton>
                               </HStack>
                             )}
                           </Stack>
@@ -609,7 +744,7 @@ export default function CourseDetailPage({ forcedCourseId }: { forcedCourseId?: 
                         <Table.ColumnHeader>Kelas</Table.ColumnHeader>
                         <Table.ColumnHeader>Email</Table.ColumnHeader>
                         <Table.ColumnHeader>Terdaftar</Table.ColumnHeader>
-                        <Table.ColumnHeader>Aksi</Table.ColumnHeader>
+                        <Table.ColumnHeader textAlign="right">Aksi</Table.ColumnHeader>
                       </Table.Row>
                     </Table.Header>
                     <Table.Body>
@@ -621,14 +756,16 @@ export default function CourseDetailPage({ forcedCourseId }: { forcedCourseId?: 
                           <Table.Cell>{e.student?.kelas ? <Badge colorPalette="blue">{e.student.kelas}</Badge> : '-'}</Table.Cell>
                           <Table.Cell>{e.student?.email || '-'}</Table.Cell>
                           <Table.Cell>{e.enrolledAt ? timestampDate(e.enrolledAt).toLocaleDateString('id-ID') : '-'}</Table.Cell>
-                          <Table.Cell>
-                            <Button
+                          <Table.Cell textAlign="right">
+                            <IconButton
                               size="xs"
                               colorPalette={e.student?.isActive ? 'orange' : 'green'}
                               variant="outline"
+                              aria-label={e.student?.isActive ? 'Nonaktifkan siswa' : 'Aktifkan siswa'}
+                              title={e.student?.isActive ? 'Nonaktifkan siswa' : 'Aktifkan siswa'}
                               onClick={() => handleToggleStudentActive(e)}>
-                              {e.student?.isActive ? 'Nonaktifkan' : 'Aktifkan'}
-                            </Button>
+                              <Icon as={LuPower} />
+                            </IconButton>
                           </Table.Cell>
                         </Table.Row>
                       ))}
@@ -664,7 +801,7 @@ export default function CourseDetailPage({ forcedCourseId }: { forcedCourseId?: 
                         <Table.ColumnHeader>Selesai</Table.ColumnHeader>
                         <Table.ColumnHeader>Total Materi</Table.ColumnHeader>
                         <Table.ColumnHeader minW="160px">Progress</Table.ColumnHeader>
-                        <Table.ColumnHeader>Aksi</Table.ColumnHeader>
+                        <Table.ColumnHeader textAlign="right">Aksi</Table.ColumnHeader>
                       </Table.Row>
                     </Table.Header>
                     <Table.Body>
@@ -689,10 +826,11 @@ export default function CourseDetailPage({ forcedCourseId }: { forcedCourseId?: 
                               <Text fontSize="12px" color={COLORS.muted} minW="36px">{s.percent}%</Text>
                             </Flex>
                           </Table.Cell>
-                          <Table.Cell>
-                            <Button size="xs" colorPalette="red" variant="outline" onClick={() => handleResetProgress(s)}>
-                              <Icon as={LuRefreshCw} /> Reset
-                            </Button>
+                          <Table.Cell textAlign="right">
+                            <IconButton size="xs" colorPalette="red" variant="outline" aria-label="Reset progress" title="Reset progress"
+                              onClick={() => handleResetProgress(s)}>
+                              <Icon as={LuRefreshCw} />
+                            </IconButton>
                           </Table.Cell>
                         </Table.Row>
                       ))}
@@ -733,7 +871,7 @@ export default function CourseDetailPage({ forcedCourseId }: { forcedCourseId?: 
                       <Table.Row>
                         <Table.ColumnHeader>Kode</Table.ColumnHeader>
                         <Table.ColumnHeader>Nama Kategori</Table.ColumnHeader>
-                        <Table.ColumnHeader>Aksi</Table.ColumnHeader>
+                        <Table.ColumnHeader textAlign="right">Aksi</Table.ColumnHeader>
                       </Table.Row>
                     </Table.Header>
                     <Table.Body>
@@ -743,10 +881,11 @@ export default function CourseDetailPage({ forcedCourseId }: { forcedCourseId?: 
                         <Table.Row key={c.id}>
                           <Table.Cell><Badge colorPalette="purple">{c.code}</Badge></Table.Cell>
                           <Table.Cell fontWeight="medium">{c.name}</Table.Cell>
-                          <Table.Cell>
-                            <Button size="xs" colorPalette="red" variant="outline" onClick={() => delCategory(c)}>
-                              <Icon as={LuTrash2} /> Hapus
-                            </Button>
+                          <Table.Cell textAlign="right">
+                            <IconButton size="xs" colorPalette="red" variant="outline" aria-label="Hapus" title="Hapus"
+                              onClick={() => delCategory(c)}>
+                              <Icon as={LuTrash2} />
+                            </IconButton>
                           </Table.Cell>
                         </Table.Row>
                       ))}

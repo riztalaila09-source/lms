@@ -20,6 +20,8 @@ message Course {
   google.protobuf.Timestamp updated_at = 9;
   repeated string kelas = 10;
   string background_image = 11;
+  string capaian_pembelajaran = 12; // learning outcomes, newline-separated points
+  string tujuan_pembelajaran = 13;  // learning objectives, newline-separated points
 }
 
 message Enrollment {
@@ -51,6 +53,11 @@ message UpdateCourseRequest {
   optional bool is_active = 6;
   repeated string class_ids = 7;
   optional string background_image = 8;
+  optional string capaian_pembelajaran = 9;
+  optional string tujuan_pembelajaran = 10;
+  // When true, class_ids replaces the course's class assignments. When false/unset,
+  // class assignments are left untouched (so partial updates don't clear them).
+  optional bool sync_classes = 11;
 }
 
 message DeleteCourseRequest {

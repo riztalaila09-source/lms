@@ -1,8 +1,8 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
-import { Badge, Box, Button, Dialog, Flex, Heading, Icon, Input, Spinner, Stack, Text, useBreakpointValue } from '@chakra-ui/react'
+import { Badge, Box, Button, Dialog, Flex, Heading, Icon, Image, Input, Spinner, Stack, Text, useBreakpointValue } from '@chakra-ui/react'
 import {
   LuCircleCheck, LuPaperclip, LuPencil, LuCheck, LuClock, LuExternalLink,
-  LuGraduationCap, LuCalendar, LuList, LuChevronDown,
+  LuGraduationCap, LuCalendar, LuList, LuChevronDown, LuPlay,
 } from 'react-icons/lu'
 import { timestampDate } from '@bufbuild/protobuf/wkt'
 import { useEditor, EditorContent } from '@tiptap/react'
@@ -13,8 +13,11 @@ import { decodeLinks } from './MaterialFormDialog'
 import { StarsDisplay, StarsInput } from '@/components/StarRating'
 import { buildExtensions, READER_CSS } from './tiptap'
 import { MCQContext } from './MCQNode'
+import { VideoContext } from './YouTubeNode'
+import YouTubePlayer, { parseYouTubeId } from './YouTubePlayer'
 import { COLORS, courseGradient, labelColor } from '@/theme/tokens'
 import { useAuth } from '@/hooks/useAuth'
+import { toaster } from '@/components/ui/toaster'
 
 interface Props {
   open: boolean
@@ -144,6 +147,10 @@ export default function MaterialViewer({ open, onClose, material }: Props) {
   const [linkDone, setLinkDone] = useState<boolean[]>([])
   const [now, setNow] = useState(Date.now())
 
+  // Inline (content) YouTube videos that must be watched to complete the material.
+  const [registeredVideos, setRegisteredVideos] = useState<Set<string>>(new Set())
+  const [watchedVideos, setWatchedVideos] = useState<Set<string>>(new Set())
+
   const [completion, setCompletion] = useState<MaterialCompletion | null>(null)
   const [completing, setCompleting] = useState(false)
   const [readNoInteractive, setReadNoInteractive] = useState(false)
@@ -165,12 +172,34 @@ export default function MaterialViewer({ open, onClose, material }: Props) {
   const lampiranDoneCount = linkDone.filter(Boolean).length
   const allLampiranDone = links.length === 0 || linkDone.every(Boolean)
 
-  const interactiveTotal = links.length + essayQuestions.length + (hasMCQ ? 1 : 0)
-  const interactiveDone = lampiranDoneCount + essaysAnswered + (hasMCQ && mcqPassed ? 1 : 0)
+  // Inline videos (registered by content YouTube nodes). LAMPIRAN YouTube videos
+  // are tracked via linkDone, so they are NOT counted again here.
+  const registerVideo = useCallback((key: string) => {
+    setRegisteredVideos((s) => (s.has(key) ? s : new Set(s).add(key)))
+    try {
+      if (material && localStorage.getItem(`lms_video_${material.id}_${key}`) === '1') {
+        setWatchedVideos((w) => (w.has(key) ? w : new Set(w).add(key)))
+      }
+    } catch { /* ignore */ }
+  }, [material])
+  const watchVideo = useCallback((key: string) => {
+    setWatchedVideos((w) => (w.has(key) ? w : new Set(w).add(key)))
+    try { if (material) localStorage.setItem(`lms_video_${material.id}_${key}`, '1') } catch { /* ignore */ }
+  }, [material])
+  const videoCtx = useMemo(() => ({
+    interactive: true, onRegister: registerVideo, onWatched: watchVideo, watchedKeys: watchedVideos,
+  }), [registerVideo, watchVideo, watchedVideos])
+
+  const videosTotal = registeredVideos.size
+  const videosDone = [...registeredVideos].filter((k) => watchedVideos.has(k)).length
+  const allVideosWatched = videosDone === videosTotal
+
+  const interactiveTotal = links.length + essayQuestions.length + (hasMCQ ? 1 : 0) + videosTotal
+  const interactiveDone = lampiranDoneCount + essaysAnswered + (hasMCQ && mcqPassed ? 1 : 0) + videosDone
   const readPercent = interactiveTotal === 0
     ? (isComplete || readNoInteractive ? 100 : 0)
     : Math.round((interactiveDone / interactiveTotal) * 100)
-  const canComplete = !isComplete && mcqPassed && allEssaysAnswered && allLampiranDone
+  const canComplete = !isComplete && mcqPassed && allEssaysAnswered && allLampiranDone && allVideosWatched
 
   useEffect(() => {
     if (!material) return
@@ -193,7 +222,7 @@ export default function MaterialViewer({ open, onClose, material }: Props) {
       const r = await materialClient.rateMaterial({ materialId: material.id, stars: n })
       setRatingAvg(r.avgRating); setRatingCount(r.ratingCount); setMyRating(r.myRating || n)
       try { localStorage.setItem(`lms_rating_${material.id}`, String(r.myRating || n)) } catch { /* ignore */ }
-    } catch (e: unknown) { alert(e instanceof Error ? e.message : 'Gagal memberi rating') }
+    } catch (e: unknown) { toaster.create({ description: e instanceof Error ? e.message : 'Gagal memberi rating', type: 'error' }) }
     finally { setRatingSaving(false) }
   }
 
@@ -267,16 +296,23 @@ export default function MaterialViewer({ open, onClose, material }: Props) {
     try { localStorage.setItem(`lms_link_${material.id}_${i}`, String(st)) } catch { /* ignore */ }
   }
 
+  // A LAMPIRAN YouTube video is marked done once watched (no 120s timer needed).
+  const markLinkWatched = (i: number) => {
+    if (!material || linkDone[i]) return
+    setLinkDone((d) => { const n = [...d]; n[i] = true; return n })
+    try { localStorage.setItem(`lms_linkdone_${material.id}_${i}`, '1') } catch { /* ignore */ }
+  }
+
   const checkAnswers = () => {
     const inline = [...mcqKeys].map((k) => mcqReports.get(k) ?? { picked: null, correct: false })
     const inlineUnanswered = inline.some((r) => r.picked === null)
     const bottomUnanswered = quiz.some((_, qi) => quizPick[qi] === undefined)
-    if (inlineUnanswered || bottomUnanswered) { alert('Jawab semua soal dulu ya.'); return }
+    if (inlineUnanswered || bottomUnanswered) { toaster.create({ description: 'Jawab semua soal dulu ya.', type: 'warning' }); return }
     const total = inline.length + quiz.length
     let wrong = inline.filter((r) => !r.correct).length
     quiz.forEach((q, qi) => { if (!q.options[quizPick[qi]]?.correct) wrong++ })
     if (total > 0 && wrong * 100 > total * 10) {
-      alert(`Ada ${wrong} jawaban salah (lebih dari 10%). Semua soal & jawaban diacak ulang — silakan coba lagi!`)
+      toaster.create({ description: `Ada ${wrong} jawaban salah (lebih dari 10%). Semua soal & jawaban diacak ulang — silakan coba lagi!`, type: 'warning' })
       setResetNonce((n) => n + 1)
       setMcqReports(new Map())
       setQuiz(buildQuiz(rawQuestions))
@@ -293,7 +329,7 @@ export default function MaterialViewer({ open, onClose, material }: Props) {
     try {
       const c = await materialClient.markComplete({ materialId: material.id, readPercent: 100, quizPassed: mcqPassed })
       setCompletion(c)
-    } catch (err) { alert(err instanceof Error ? err.message : 'Gagal menyimpan penyelesaian') }
+    } catch (err) { toaster.create({ description: err instanceof Error ? err.message : 'Gagal menyimpan penyelesaian', type: 'error' }) }
     finally { setCompleting(false) }
   }
 
@@ -306,7 +342,7 @@ export default function MaterialViewer({ open, onClose, material }: Props) {
       const res = await materialClient.listEssayComments({ essayQuestionId })
       setEssayComments((prev) => ({ ...prev, [essayQuestionId]: res.comments }))
       setCommentDraft((prev) => ({ ...prev, [essayQuestionId]: '' }))
-    } catch (err) { alert(err instanceof Error ? err.message : 'Gagal mengirim komentar') }
+    } catch (err) { toaster.create({ description: err instanceof Error ? err.message : 'Gagal mengirim komentar', type: 'error' }) }
     finally { setSubmittingComment(null) }
   }
 
@@ -334,7 +370,7 @@ export default function MaterialViewer({ open, onClose, material }: Props) {
           </Dialog.Header>
 
           <Dialog.Body ref={bodyRef} onScroll={onBodyScroll}>
-            <Box maxW="1140px" mx="auto" w="full">
+            <Box w="full" px={{ base: '12px', md: '32px' }}>
               {/* HERO */}
               {material && (
                 <Box position="relative" borderRadius="14px" overflow="hidden"
@@ -367,18 +403,20 @@ export default function MaterialViewer({ open, onClose, material }: Props) {
               {/* BODY: main + rail */}
               <Flex direction={{ base: 'column', lg: 'row' }} gap={{ base: '18px', lg: '28px' }} align="flex-start" mt="18px">
                 {/* MAIN */}
-                <Box flex="1" minW={0} maxW={{ lg: '760px' }} w="full">
-                  <Stack gap="16px">
+                <Box flex="1" minW={0} w="full">
+                  <Stack gap="16px" maxW={{ lg: '1000px' }}>
                     {material?.description && (
                       <Text fontSize={`${17 * fontScale}px`} color={COLORS.text} fontWeight="500" lineHeight="1.7"
                         borderLeft="3px solid" borderColor={COLORS.primary} pl="14px">{material.description}</Text>
                     )}
 
                     <MCQContext.Provider value={mcqCtx}>
-                      <Box ref={contentRef} fontSize={`${16 * fontScale}px`} lineHeight="1.9" color={COLORS.text}
-                        css={{ '& .ProseMirror': { outline: 'none' }, ...READER_CSS }}>
-                        <EditorContent editor={contentEditor} />
-                      </Box>
+                      <VideoContext.Provider value={videoCtx}>
+                        <Box ref={contentRef} fontSize={`${16 * fontScale}px`} lineHeight="1.9" color={COLORS.text}
+                          css={{ '& .ProseMirror': { outline: 'none' }, ...READER_CSS }}>
+                          <EditorContent editor={contentEditor} />
+                        </Box>
+                      </VideoContext.Provider>
                     </MCQContext.Provider>
 
                     {/* LAMPIRAN / VIDEO */}
@@ -390,11 +428,27 @@ export default function MaterialViewer({ open, onClose, material }: Props) {
                           <Text fontSize="15px" fontWeight="800" color={COLORS.text}>LAMPIRAN / VIDEO — wajib dikunjungi</Text>
                         </Flex>
                         <Text fontSize="12px" color={COLORS.muted} mb="10px">
-                          Klik tiap tautan lalu <b>pelajari minimal 2 menit</b>. Centang hijau muncul otomatis setelah 120 detik.
+                          Tonton video sampai selesai; untuk tautan lain, klik lalu <b>pelajari minimal 2 menit</b> (centang otomatis setelah 120 detik).
                         </Text>
-                        <Stack gap="8px">
+                        <Stack gap="10px">
                           {links.map((l, i) => {
                             const done = linkDone[i]
+                            const ytId = parseYouTubeId(l.url)
+                            // YouTube attachment → embedded player, marked done when watched.
+                            if (ytId) {
+                              return (
+                                <Box key={i} bg="white" border="1px solid" borderColor={done ? COLORS.success : COLORS.border} borderRadius="8px" p="10px">
+                                  <Flex align="center" gap="8px" mb="8px">
+                                    {done
+                                      ? <Icon as={LuCircleCheck} boxSize="18px" color={COLORS.success} flexShrink={0} />
+                                      : <Icon as={LuPlay} boxSize="18px" color={COLORS.warning} flexShrink={0} />}
+                                    <Text fontSize="14px" fontWeight="700" flex="1" lineClamp={1}>{l.label || 'Video'}</Text>
+                                    {!done && <Text fontSize="11px" color={COLORS.warning}>Tonton sampai selesai</Text>}
+                                  </Flex>
+                                  <YouTubePlayer videoId={ytId} interactive watched={done} onWatched={() => markLinkWatched(i)} />
+                                </Box>
+                              )
+                            }
                             const st = linkStart[i]
                             const remain = st && !done ? Math.max(0, LINK_WAIT - Math.floor((now - st) / 1000)) : null
                             return (
@@ -441,7 +495,7 @@ export default function MaterialViewer({ open, onClose, material }: Props) {
                                   <Icon as={LuCircleCheck} boxSize="18px" color={pass && !answeredWrong ? COLORS.success : COLORS.border} mt="1px" />
                                   <Text fontSize="14px" fontWeight="600" flex="1">{qi + 1}. {q.question}</Text>
                                 </Flex>
-                                {q.image && <img src={q.image} alt="" style={{ maxHeight: 200, marginBottom: 8, borderRadius: 8, border: `1px solid ${COLORS.border}` }} />}
+                                {q.image && <Image src={q.image} alt="" maxH="200px" mb="8px" borderRadius="8px" border={`1px solid ${COLORS.border}`} />}
                                 <Stack gap="5px" pl="26px">
                                   {q.options.map((o, oi) => {
                                     const isPicked = picked === oi
@@ -581,6 +635,7 @@ export default function MaterialViewer({ open, onClose, material }: Props) {
                     title={
                       interactiveTotal === 0 ? 'Tandai sudah dibaca'
                         : !mcqPassed ? 'Klik "Periksa Jawaban" dan lulus dulu'
+                        : !allVideosWatched ? 'Tonton semua video dulu'
                         : !allLampiranDone ? 'Kunjungi & pelajari semua lampiran dulu'
                         : !allEssaysAnswered ? 'Jawab semua soal uraian dulu'
                         : 'Tandai materi selesai'

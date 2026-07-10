@@ -17,6 +17,7 @@ var (
 	ErrPermissionDenied   = errors.New("permission denied")
 	ErrNotFound           = errors.New("user not found")
 	ErrDuplicate          = errors.New("user already exists")
+	ErrInvalidArgument    = errors.New("invalid argument")
 )
 
 type LoginResult struct {
@@ -34,6 +35,7 @@ type UpdateUserInput struct {
 	Jurusan  *string
 	Password *string
 	Mapel    *string
+	Gender   *string
 }
 
 type UpdateProfileInput struct {
@@ -84,7 +86,7 @@ func (s *UserService) Login(ctx context.Context, email, password string) (*Login
 	return &LoginResult{Token: token, User: user}, nil
 }
 
-func (s *UserService) CreateUser(ctx context.Context, callerRole, username, email, password, fullName, role, kelas, jurusan, mapel string) (*repository.User, error) {
+func (s *UserService) CreateUser(ctx context.Context, callerRole, username, email, password, fullName, role, kelas, jurusan, mapel, gender string) (*repository.User, error) {
 	// Managers (teacher / legacy admin) may add students or other teachers, not admins.
 	switch callerRole {
 	case "admin":
@@ -125,6 +127,7 @@ func (s *UserService) CreateUser(ctx context.Context, callerRole, username, emai
 		Kelas:         kelas,
 		Jurusan:       jurusan,
 		Mapel:         mapel,
+		Gender:        gender,
 		CreatedAt:     now,
 		UpdatedAt:     now,
 	}
@@ -192,6 +195,9 @@ func (s *UserService) UpdateUser(ctx context.Context, callerRole, targetID strin
 	}
 	if input.Mapel != nil {
 		u.Mapel = *input.Mapel
+	}
+	if input.Gender != nil {
+		u.Gender = *input.Gender
 	}
 	// Keep jurusan in sync with the combined class name for students.
 	if u.Role == "student" {

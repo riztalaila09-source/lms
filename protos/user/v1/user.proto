@@ -25,6 +25,7 @@ message User {
   string jurusan = 10;
   string photo_url = 11;
   string mapel = 14; // teacher's subject taught
+  string gender = 15; // '' | 'L' (laki-laki) | 'P' (perempuan)
   google.protobuf.Timestamp created_at = 7;
   google.protobuf.Timestamp updated_at = 8;
   // Plaintext password, populated ONLY in manager-only ListUsers responses so
@@ -55,6 +56,7 @@ message CreateUserRequest {
   string kelas = 6;
   string jurusan = 7;
   string mapel = 8;
+  string gender = 9;
 }
 
 message GetUserRequest {
@@ -72,6 +74,7 @@ message UpdateUserRequest {
   optional string jurusan = 8;
   optional string password = 9;
   optional string mapel = 10;
+  optional string gender = 11;
 }
 
 // Self-service profile update (any logged-in user updates their own account).

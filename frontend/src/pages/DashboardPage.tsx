@@ -1,11 +1,11 @@
-import { useEffect, useState, useCallback, useMemo } from 'react'
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Badge, Box, Button, Flex, Heading, Icon, SimpleGrid, Stack, Text } from '@chakra-ui/react'
+import { Badge, Box, Button, Flex, Heading, Icon, Image, NativeSelect, SimpleGrid, Spinner, Stack, Text } from '@chakra-ui/react'
 import { LuBookOpen, LuGraduationCap, LuClipboardList, LuTrophy, LuInbox, LuClock, LuChevronLeft, LuChevronRight, LuQuote, LuFlame } from 'react-icons/lu'
 import { timestampDate } from '@bufbuild/protobuf/wkt'
 import { useAuth } from '@/hooks/useAuth'
 import { Role } from '@/gen/user/v1/user_pb'
-import type { TeacherDashboard } from '@/gen/dashboard/v1/dashboard_pb'
+import type { TeacherDashboard, StudentDashboard, RankEntry } from '@/gen/dashboard/v1/dashboard_pb'
 import type { Material, Category } from '@/gen/material/v1/material_pb'
 import type { StoryEntry } from '@/gen/user/v1/user_pb'
 import type { School, Semester } from '@/gen/school/v1/school_pb'
@@ -16,6 +16,7 @@ import MaterialCard from '@/components/MaterialCard'
 import MaterialViewer from '@/components/MaterialViewer'
 import { Card } from '@/components/Card'
 import { COLORS, UDEMY, courseGradient } from '@/theme/tokens'
+import { toaster } from '@/components/ui/toaster'
 
 function Stat({ num, label, accent }: { num: string | number; label: string; accent?: string }) {
   return (
@@ -31,6 +32,103 @@ function fmtDateTime(d?: Date) {
   return d ? d.toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' }) : '-'
 }
 
+// Translucent stat chip used inside the student greeting hero (on primary bg).
+function HeroStat({ label, value, sub }: { label: string; value: string; sub?: string }) {
+  return (
+    <Box bg="whiteAlpha.200" borderRadius="10px" px="12px" py="10px">
+      <Text fontSize="11px" color="whiteAlpha.800">{label}</Text>
+      <Text fontSize="20px" fontWeight="800" lineHeight="1.15" mt="1px">{value}</Text>
+      {sub && <Text fontSize="10px" color="whiteAlpha.700" mt="1px">{sub}</Text>}
+    </Box>
+  )
+}
+
+// Gold / silver / bronze for ranks 1–3, muted for the rest.
+const MEDAL = ['#F59E0B', '#94A3B8', '#B45309']
+function rankColor(r: number) { return MEDAL[r - 1] ?? COLORS.muted }
+
+// A class/major top-5 leaderboard card with a dropdown to pick which class or
+// major to view. Fetches entries via GetLeaderboard when the selection changes.
+// If `initialEntries` is provided (the viewer's own group), it is shown without
+// an extra fetch on mount.
+function LeaderboardCard({ scope, label, options, initialValue, initialEntries, showKelas, myName }: {
+  scope: 'kelas' | 'jurusan'
+  label: string
+  options: string[]
+  initialValue: string
+  initialEntries?: RankEntry[]
+  showKelas: boolean
+  myName?: string
+}) {
+  const [selected, setSelected] = useState(initialValue)
+  const [entries, setEntries] = useState<RankEntry[]>(initialEntries ?? [])
+  const [loading, setLoading] = useState(false)
+  const didMount = useRef(false)
+
+  const load = useCallback(async (value: string) => {
+    if (!value) { setEntries([]); return }
+    setLoading(true)
+    try {
+      const res = await dashboardClient.getLeaderboard(scope === 'kelas' ? { kelas: value } : { jurusan: value })
+      setEntries(res.entries)
+    } catch {
+      toaster.create({ description: 'Gagal memuat papan peringkat', type: 'error' })
+    } finally {
+      setLoading(false)
+    }
+  }, [scope])
+
+  // Fetch on mount only when no initial entries were supplied (e.g. teacher view).
+  useEffect(() => {
+    if (didMount.current) return
+    didMount.current = true
+    if (initialEntries === undefined) load(selected)
+  }, [initialEntries, selected, load])
+
+  // Ensure the current selection is a valid option (falls back to first).
+  const opts = options.length > 0 ? options : (selected ? [selected] : [])
+
+  return (
+    <Box border="1px solid" borderColor={COLORS.border} borderRadius="12px" bg={COLORS.surface} overflow="hidden">
+      <Flex align="center" gap="10px" px="14px" py="10px" borderBottom="1px solid" borderColor={COLORS.border} bg={COLORS.bg}>
+        <Text fontSize="13px" fontWeight="800" color={COLORS.text} flex="1">{label}</Text>
+        <NativeSelect.Root size="xs" width="auto" maxW="160px">
+          <NativeSelect.Field value={selected} onChange={(e) => { setSelected(e.target.value); load(e.target.value) }}>
+            {opts.map((o) => <option key={o} value={o}>{o}</option>)}
+          </NativeSelect.Field>
+          <NativeSelect.Indicator />
+        </NativeSelect.Root>
+      </Flex>
+      {loading ? (
+        <Flex align="center" gap="8px" p="14px" color={COLORS.muted} fontSize="12px"><Spinner size="sm" /> Memuat…</Flex>
+      ) : entries.length === 0 ? (
+        <Text fontSize="12px" color={COLORS.muted} p="14px">Belum ada data nilai.</Text>
+      ) : (
+        <Stack gap="0">
+          {entries.map((e, i) => {
+            const mine = !!myName && e.name === myName
+            return (
+              <Flex key={i} align="center" gap="10px" px="14px" py="10px"
+                borderTop={i === 0 ? undefined : '1px solid'} borderColor={COLORS.border}
+                bg={mine ? COLORS.primaryTint : undefined}>
+                <Flex w="26px" h="26px" flexShrink={0} borderRadius="full" align="center" justify="center"
+                  bg={rankColor(e.peringkat)} color="white" fontWeight="800" fontSize="13px">{e.peringkat}</Flex>
+                <Box flex="1" minW={0}>
+                  <Text fontSize="13px" fontWeight={mine ? '800' : '600'} color={COLORS.text} lineClamp={1}>
+                    {e.name}{mine ? ' (kamu)' : ''}
+                  </Text>
+                  {showKelas && e.kelas && <Text fontSize="11px" color={COLORS.muted} lineClamp={1}>{e.kelas}</Text>}
+                </Box>
+                <Text fontSize="14px" fontWeight="800" color={COLORS.primary}>{e.rataRata.toFixed(1)}</Text>
+              </Flex>
+            )
+          })}
+        </Stack>
+      )}
+    </Box>
+  )
+}
+
 export default function DashboardPage() {
   const { user, isAuthenticated, logout, loadProfile } = useAuth()
   const navigate = useNavigate()
@@ -40,6 +138,7 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true)
   const [school, setSchool] = useState<School | null>(null)
   const [activeSem, setActiveSem] = useState<Semester | null>(null)
+  const [stud, setStud] = useState<StudentDashboard | null>(null)
   // Student home data (Materi Umum slideshow + categories)
   const [generalMats, setGeneralMats] = useState<Material[]>([])
   const [exploreMats, setExploreMats] = useState<Material[]>([])
@@ -77,15 +176,16 @@ export default function DashboardPage() {
   }, [user, isTeacher, loadDash])
 
   useEffect(() => {
-    if (!user || !isTeacher) return
+    if (!user) return
     schoolClient.getSchool({}).then(setSchool).catch(() => setSchool(null))
     schoolClient.listSemesters({})
       .then((r) => setActiveSem(r.semesters.find((s) => s.isActive) ?? null))
       .catch(() => setActiveSem(null))
-  }, [user, isTeacher])
+  }, [user])
 
   useEffect(() => {
     if (!user || isTeacher) return
+    dashboardClient.getStudentDashboard({}).then(setStud).catch(() => setStud(null))
     materialClient.listMaterials({ courseId: 'general', pagination: { page: 1, pageSize: 200 } })
       .then((r) => setGeneralMats(r.materials))
       .catch(() => setGeneralMats([]))
@@ -144,9 +244,30 @@ export default function DashboardPage() {
   // ── Student view (Udemy-style) ──
   if (user && !isTeacher) {
     const current = slides[slide]
+    const cap = (s: string) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : '')
+    const today = new Date().toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })
+    const semLabel = activeSem ? `Semester ${cap(activeSem.semester)} ${activeSem.tahunAjaran}` : ''
     return (
       <AppLayout title="">
         <Stack gap="22px">
+          {/* Greeting hero — beranda siswa */}
+          <Box bg={COLORS.primary} color="white" borderRadius="12px" p={{ base: '20px', md: '26px' }}>
+            <Heading fontSize={{ base: '20px', md: '26px' }} fontWeight="800">
+              Selamat datang, {user.fullName || user.username}!
+            </Heading>
+            {school?.name && <Text fontSize="15px" fontWeight="600" mt="4px">DI {school.name}</Text>}
+            <SimpleGrid columns={{ base: 2, md: 4 }} gap="10px" mt="16px">
+              <HeroStat label="Kelas" value={stud?.kelas || user.kelas || '–'} />
+              <HeroStat label="Nilai rata-rata" value={stud && stud.gradedCount > 0 ? stud.rataRataNilai.toFixed(1) : '–'} />
+              <HeroStat label="Peringkat kelas" value={stud && stud.totalKelas > 0 ? `${stud.peringkatKelas}` : '–'} sub={stud && stud.totalKelas > 0 ? `dari ${stud.totalKelas} siswa` : undefined} />
+              <HeroStat label="Peringkat jurusan" value={stud && stud.totalJurusan > 0 ? `${stud.peringkatJurusan}` : '–'} sub={stud && stud.totalJurusan > 0 ? `${stud.jurusan || 'jurusan'} · ${stud.totalJurusan} siswa` : undefined} />
+            </SimpleGrid>
+            <Flex gap="10px" mt="14px" fontSize="12px" color="whiteAlpha.800" wrap="wrap">
+              <Text>{today}</Text>
+              {semLabel && <Text>· {semLabel}</Text>}
+            </Flex>
+          </Box>
+
           {/* Slideshow — Materi Umum */}
           {current && (
             <Box position="relative" borderRadius="14px" overflow="hidden" h={{ base: '260px', md: '380px' }}
@@ -277,7 +398,7 @@ export default function DashboardPage() {
                     <Text fontSize="13px" color={UDEMY.ink} flex={1} lineHeight="1.5">{s.story}</Text>
                     <Flex align="center" gap="10px" mt="14px">
                       {s.photoUrl ? (
-                        <img src={s.photoUrl} alt="" style={{ width: 40, height: 40, borderRadius: '9999px', objectFit: 'cover' }} />
+                        <Image src={s.photoUrl} alt="" w="40px" h="40px" borderRadius="full" objectFit="cover" />
                       ) : (
                         <Flex w="40px" h="40px" borderRadius="full" bg={UDEMY.accentTint} color={UDEMY.accent} align="center" justify="center" fontWeight="bold" fontSize="14px">
                           {(s.fullName || '?').trim().charAt(0).toUpperCase()}
@@ -299,6 +420,28 @@ export default function DashboardPage() {
                   {storiesExpanded ? t('home.hide') : `${t('home.seeAllStories')} (${stories.length})`}
                 </Button>
               )}
+            </Box>
+          )}
+
+          {/* Papan peringkat — juara 1–5 per kelas & jurusan */}
+          {stud && (stud.juaraKelas.length > 0 || stud.juaraJurusan.length > 0) && (
+            <Box>
+              <Heading fontSize="20px" fontWeight="800" color={UDEMY.ink} mb="4px">
+                <Icon as={LuTrophy} color={UDEMY.star} mr="8px" />Papan Peringkat
+              </Heading>
+              <Text fontSize="13px" color={UDEMY.inkMuted} mb="14px">
+                Juara 1–5 berdasarkan rata-rata nilai tugas.
+              </Text>
+              <SimpleGrid columns={{ base: 1, md: 2 }} gap="16px">
+                <LeaderboardCard scope="kelas" label="Juara Kelas"
+                  options={stud.allKelas.length ? stud.allKelas : (stud.kelas ? [stud.kelas] : [])}
+                  initialValue={stud.kelas} initialEntries={stud.juaraKelas}
+                  myName={user.fullName} showKelas={false} />
+                <LeaderboardCard scope="jurusan" label="Juara Jurusan"
+                  options={stud.allJurusan.length ? stud.allJurusan : (stud.jurusan ? [stud.jurusan] : [])}
+                  initialValue={stud.jurusan} initialEntries={stud.juaraJurusan}
+                  myName={user.fullName} showKelas />
+              </SimpleGrid>
             </Box>
           )}
 
@@ -373,6 +516,8 @@ export default function DashboardPage() {
             {/* Stats — single color */}
             <SimpleGrid columns={{ base: 2, sm: 3, lg: 5 }} gap="12px">
               <Stat num={d.totalSiswa} label="Total Siswa" />
+              <Stat num={d.siswaLaki} label="Siswa Laki-laki" />
+              <Stat num={d.siswaPerempuan} label="Siswa Perempuan" />
               <Stat num={d.totalGuru} label="Total Guru" />
               <Stat num={d.totalKelas} label="Total Mata Pelajaran" />
               <Stat num={d.totalMateri} label="Total Materi" />
@@ -477,6 +622,29 @@ export default function DashboardPage() {
                 )}
               </Card>
             </SimpleGrid>
+
+            {/* Papan Peringkat — juara per kelas & per jurusan (pilih di dropdown) */}
+            {(() => {
+              const kelasOpts = d.siswaPerKelas.map((k) => k.kelas).filter((k) => k && !k.startsWith('('))
+              const jurusanOpts = d.siswaPerJurusan.map((j) => j.jurusan).filter((j) => j && !j.startsWith('('))
+              if (kelasOpts.length === 0 && jurusanOpts.length === 0) return null
+              return (
+                <Box>
+                  <Heading fontSize="16px" fontWeight="800" color={COLORS.text} mb="4px" display="flex" alignItems="center" gap="8px">
+                    <Icon as={LuTrophy} color={COLORS.warning} /> Papan Peringkat
+                  </Heading>
+                  <Text fontSize="12px" color={COLORS.muted} mb="12px">Juara 1–5 berdasarkan rata-rata nilai tugas.</Text>
+                  <SimpleGrid columns={{ base: 1, lg: 2 }} gap="16px">
+                    {kelasOpts.length > 0 && (
+                      <LeaderboardCard scope="kelas" label="Juara Kelas" options={kelasOpts} initialValue={kelasOpts[0]} showKelas={false} />
+                    )}
+                    {jurusanOpts.length > 0 && (
+                      <LeaderboardCard scope="jurusan" label="Juara Jurusan" options={jurusanOpts} initialValue={jurusanOpts[0]} showKelas />
+                    )}
+                  </SimpleGrid>
+                </Box>
+              )
+            })()}
           </Stack>
         )}
       </Stack>

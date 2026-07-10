@@ -6,7 +6,8 @@ DIST_DIR     = dist
 EMBED_DIR    = $(BACKEND_DIR)/cmd/server/frontend
 
 .PHONY: proto migrate-up migrate-down dev-backend dev-frontend dev \
-        build build-frontend build-backend test test-cover dist clean install-tools
+        build build-frontend build-backend build-backend-windows \
+        test test-cover dist dist-windows clean install-tools
 
 # ── Code generation ──────────────────────────────────────────────────────────
 proto:
@@ -57,6 +58,21 @@ dist: build
 	cp config.yaml $(DIST_DIR)/config.yaml
 	cd $(DIST_DIR) && zip -9 $(BINARY_NAME)-$(VERSION).zip $(BINARY_NAME) config.yaml
 	@echo "Distribution archive: $(DIST_DIR)/$(BINARY_NAME)-$(VERSION).zip"
+
+# ── Windows distribution ─────────────────────────────────────────────────────
+# Produces a Windows .exe (single self-contained binary with the embedded
+# frontend) and zips it with config.yaml via PowerShell (no `zip` needed).
+build-backend-windows: build-frontend
+	cd $(BACKEND_DIR) && GOOS=windows GOARCH=amd64 go build \
+		-ldflags="-s -w -X main.version=$(VERSION)" \
+		-o ../$(DIST_DIR)/$(BINARY_NAME).exe \
+		./cmd/server
+
+dist-windows: build-backend-windows
+	@mkdir -p $(DIST_DIR)
+	cp config.yaml $(DIST_DIR)/config.yaml
+	powershell -NoProfile -Command "Compress-Archive -Path '$(DIST_DIR)/$(BINARY_NAME).exe','$(DIST_DIR)/config.yaml' -DestinationPath '$(DIST_DIR)/$(BINARY_NAME)-$(VERSION)-windows.zip' -Force"
+	@echo "Windows distribution archive: $(DIST_DIR)/$(BINARY_NAME)-$(VERSION)-windows.zip"
 
 # ── Cleanup ──────────────────────────────────────────────────────────────────
 clean:

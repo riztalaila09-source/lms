@@ -1,14 +1,16 @@
 import { useRef } from 'react'
-import { Box, Flex, Icon } from '@chakra-ui/react'
+import { Box, Button, Flex, Icon, NativeSelect } from '@chakra-ui/react'
 import { useEditor, EditorContent } from '@tiptap/react'
 import {
   LuBold, LuItalic, LuUnderline, LuBaseline, LuAlignLeft, LuAlignCenter,
-  LuAlignRight, LuListOrdered, LuList, LuTable, LuImage, LuLink, LuUndo2, LuRedo2,
-  LuListChecks,
+  LuAlignRight, LuAlignJustify, LuListOrdered, LuList, LuTable, LuImage, LuLink, LuUndo2, LuRedo2,
+  LuListChecks, LuYoutube, LuCode,
 } from 'react-icons/lu'
 import { COLORS } from '@/theme/tokens'
 import { fileToDataUrl } from '@/lib/image'
 import { buildExtensions, CONTENT_CSS } from './tiptap'
+import { parseYouTubeId } from './YouTubePlayer'
+import { toaster } from '@/components/ui/toaster'
 
 interface RichTextEditorProps {
   value: string
@@ -40,13 +42,13 @@ export default function RichTextEditor({ value, onChange }: RichTextEditorProps)
     borderRadius: 4, background: COLORS.surface, cursor: 'pointer', lineHeight: 1.4,
   }
   const Tool = ({ label, title, onClick, active }: { label: React.ReactNode; title: string; onClick: () => void; active?: boolean }) => (
-    <button type="button" title={title}
-      style={{ ...toolStyle, background: active ? COLORS.primaryTint : COLORS.surface, borderColor: active ? COLORS.primary : COLORS.border }}
-      onMouseDown={(e) => e.preventDefault()} onClick={onClick}>{label}</button>
+    <Button type="button" title={title} variant="outline" gap="4px" px="8px" py="4px" h="auto" minH="0"
+      fontSize="12px" lineHeight="1.4" color={COLORS.text}
+      bg={active ? COLORS.primaryTint : COLORS.surface}
+      borderColor={active ? COLORS.primary : COLORS.border}
+      _hover={{ bg: active ? COLORS.primaryTint : COLORS.bg }}
+      onMouseDown={(e) => e.preventDefault()} onClick={onClick}>{label}</Button>
   )
-  const selStyle: React.CSSProperties = {
-    fontSize: 11, border: `1px solid ${COLORS.border}`, borderRadius: 4, background: COLORS.surface, padding: '2px 4px',
-  }
 
   if (!editor) return null
 
@@ -56,7 +58,7 @@ export default function RichTextEditor({ value, onChange }: RichTextEditorProps)
       const dataUrl = await fileToDataUrl(file, 900, 0.82)
       editor.chain().focus().setImage({ src: dataUrl }).run()
     } catch (e) {
-      alert(e instanceof Error ? e.message : 'Gagal menyisipkan gambar')
+      toaster.create({ description: e instanceof Error ? e.message : 'Gagal menyisipkan gambar', type: 'error' })
     }
   }
   const insertLink = () => {
@@ -71,6 +73,12 @@ export default function RichTextEditor({ value, onChange }: RichTextEditorProps)
   const insertMCQ = () => {
     editor.chain().focus().insertContent({ type: 'mcq', attrs: { question: '', options: ['', '', '', ''], correct: 0 } }).run()
   }
+  const insertYoutube = () => {
+    const url = prompt('Tempel URL video YouTube:', 'https://')
+    if (!url) return
+    if (!parseYouTubeId(url)) { toaster.create({ description: 'URL YouTube tidak valid.', type: 'error' }); return }
+    editor.chain().focus().insertContent({ type: 'youtube', attrs: { src: url } }).run()
+  }
 
   return (
     <Box border="1px solid" borderColor={COLORS.border} borderRadius="8px" overflow="hidden">
@@ -78,50 +86,58 @@ export default function RichTextEditor({ value, onChange }: RichTextEditorProps)
         borderBottom="1px solid" borderColor={COLORS.border}
         position="sticky" top="0" zIndex={2}>
         {/* heading / paragraph */}
-        <select style={selStyle} value={
-          editor.isActive('heading', { level: 1 }) ? 'h1'
-            : editor.isActive('heading', { level: 2 }) ? 'h2'
-            : editor.isActive('heading', { level: 3 }) ? 'h3' : 'p'
-        }
-          onChange={(e) => {
-            const v = e.target.value
-            if (v === 'p') editor.chain().focus().setParagraph().run()
-            else editor.chain().focus().toggleHeading({ level: Number(v[1]) as 1 | 2 | 3 }).run()
-          }}>
-          <option value="p">Paragraf</option>
-          <option value="h1">Judul 1</option>
-          <option value="h2">Judul 2</option>
-          <option value="h3">Judul 3</option>
-        </select>
+        <NativeSelect.Root size="xs" width="auto">
+          <NativeSelect.Field fontSize="11px" value={
+            editor.isActive('heading', { level: 1 }) ? 'h1'
+              : editor.isActive('heading', { level: 2 }) ? 'h2'
+              : editor.isActive('heading', { level: 3 }) ? 'h3' : 'p'
+          }
+            onChange={(e) => {
+              const v = e.target.value
+              if (v === 'p') editor.chain().focus().setParagraph().run()
+              else editor.chain().focus().toggleHeading({ level: Number(v[1]) as 1 | 2 | 3 }).run()
+            }}>
+            <option value="p">Paragraf</option>
+            <option value="h1">Judul 1</option>
+            <option value="h2">Judul 2</option>
+            <option value="h3">Judul 3</option>
+          </NativeSelect.Field>
+          <NativeSelect.Indicator />
+        </NativeSelect.Root>
         {/* font size */}
-        <select style={selStyle} defaultValue=""
-          title="Ukuran huruf"
-          onChange={(e) => {
-            const v = e.target.value
-            if (v === 'reset') editor.chain().focus().unsetFontSize().run()
-            else if (v) editor.chain().focus().setFontSize(v).run()
-            e.target.value = ''
-          }}>
-          <option value="" disabled>Ukuran</option>
-          {FONT_SIZES.map((s) => <option key={s} value={s}>{parseInt(s, 10)}</option>)}
-          <option value="reset">Normal</option>
-        </select>
+        <NativeSelect.Root size="xs" width="auto" title="Ukuran huruf">
+          <NativeSelect.Field fontSize="11px" defaultValue=""
+            onChange={(e) => {
+              const v = e.target.value
+              if (v === 'reset') editor.chain().focus().unsetFontSize().run()
+              else if (v) editor.chain().focus().setFontSize(v).run()
+              e.target.value = ''
+            }}>
+            <option value="" disabled>Ukuran</option>
+            {FONT_SIZES.map((s) => <option key={s} value={s}>{parseInt(s, 10)}</option>)}
+            <option value="reset">Normal</option>
+          </NativeSelect.Field>
+          <NativeSelect.Indicator />
+        </NativeSelect.Root>
         <Tool label={<Icon as={LuBold} />} title="Tebal" active={editor.isActive('bold')} onClick={() => editor.chain().focus().toggleBold().run()} />
         <Tool label={<Icon as={LuItalic} />} title="Miring" active={editor.isActive('italic')} onClick={() => editor.chain().focus().toggleItalic().run()} />
         <Tool label={<Icon as={LuUnderline} />} title="Garis bawah" active={editor.isActive('underline')} onClick={() => editor.chain().focus().toggleUnderline().run()} />
-        {/* color */}
-        <label title="Warna teks" style={toolStyle} onMouseDown={(e) => e.preventDefault()}>
+        {/* color (native color input — no Chakra equivalent) */}
+        <Box as="label" title="Warna teks" style={toolStyle} onMouseDown={(e: React.MouseEvent) => e.preventDefault()}>
           <Icon as={LuBaseline} />
           <input type="color" defaultValue="#1E293B" style={{ width: 18, height: 18, border: 'none', padding: 0, background: 'none' }}
             onChange={(e) => editor.chain().focus().setColor(e.target.value).run()} />
-        </label>
-        <Tool label={<Icon as={LuAlignLeft} />} title="Rata kiri" onClick={() => editor.chain().focus().setTextAlign('left').run()} />
-        <Tool label={<Icon as={LuAlignCenter} />} title="Rata tengah" onClick={() => editor.chain().focus().setTextAlign('center').run()} />
-        <Tool label={<Icon as={LuAlignRight} />} title="Rata kanan" onClick={() => editor.chain().focus().setTextAlign('right').run()} />
+        </Box>
+        <Tool label={<Icon as={LuAlignLeft} />} title="Rata kiri" active={editor.isActive({ textAlign: 'left' })} onClick={() => editor.chain().focus().setTextAlign('left').run()} />
+        <Tool label={<Icon as={LuAlignCenter} />} title="Rata tengah" active={editor.isActive({ textAlign: 'center' })} onClick={() => editor.chain().focus().setTextAlign('center').run()} />
+        <Tool label={<Icon as={LuAlignRight} />} title="Rata kanan" active={editor.isActive({ textAlign: 'right' })} onClick={() => editor.chain().focus().setTextAlign('right').run()} />
+        <Tool label={<Icon as={LuAlignJustify} />} title="Rata kanan-kiri (justify)" active={editor.isActive({ textAlign: 'justify' })} onClick={() => editor.chain().focus().setTextAlign('justify').run()} />
         <Tool label={<Icon as={LuListOrdered} />} title="List bernomor" active={editor.isActive('orderedList')} onClick={() => editor.chain().focus().toggleOrderedList().run()} />
         <Tool label={<Icon as={LuList} />} title="List poin" active={editor.isActive('bulletList')} onClick={() => editor.chain().focus().toggleBulletList().run()} />
+        <Tool label={<><Icon as={LuCode} /> Kode</>} title="Blok kode (untuk contoh koding)" active={editor.isActive('codeBlock')} onClick={() => editor.chain().focus().toggleCodeBlock().run()} />
         <Tool label={<><Icon as={LuTable} /> Tabel</>} title="Sisip tabel" onClick={insertTable} />
         <Tool label={<><Icon as={LuImage} /> Gambar</>} title="Sisip gambar" onClick={() => imgInput.current?.click()} />
+        <Tool label={<><Icon as={LuYoutube} /> Video</>} title="Sisip video YouTube (tertanam)" onClick={insertYoutube} />
         <Tool label={<><Icon as={LuLink} /> Link</>} title="Sisip link" onClick={insertLink} />
         <Tool
           label={<><Icon as={LuListChecks} /> Soal PG</>}

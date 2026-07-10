@@ -15,11 +15,13 @@ import (
 	"golang.org/x/net/http2/h2c"
 
 	"lms/backend/gen/assignment/v1/assignmentv1connect"
+	"lms/backend/gen/attendance/v1/attendancev1connect"
 	"lms/backend/gen/class/v1/classv1connect"
 	"lms/backend/gen/jurusan/v1/jurusanv1connect"
 	"lms/backend/gen/school/v1/schoolv1connect"
 	"lms/backend/gen/course/v1/coursev1connect"
 	"lms/backend/gen/dashboard/v1/dashboardv1connect"
+	"lms/backend/gen/pkl/v1/pklv1connect"
 	"lms/backend/gen/material/v1/materialv1connect"
 	"lms/backend/gen/user/v1/userv1connect"
 	"lms/backend/internal/config"
@@ -71,6 +73,8 @@ func main() {
 	completionRepo := repository.NewCompletionRepository(db)
 	essayRepo := repository.NewEssayRepository(db)
 	categoryRepo := repository.NewCategoryRepository(db)
+	attendanceRepo := repository.NewAttendanceRepository(db)
+	pklRepo := repository.NewPklRepository(db)
 
 	// Business logic
 	userSvc := service.NewUserService(userRepo, jwtSvc, activityRepo)
@@ -83,6 +87,8 @@ func main() {
 	classSvc := service.NewClassService(classRepo)
 	jurusanSvc := service.NewJurusanService(jurusanRepo)
 	schoolSvc := service.NewSchoolService(schoolRepo)
+	attendanceSvc := service.NewAttendanceService(attendanceRepo, courseRepo)
+	pklSvc := service.NewPklService(pklRepo)
 
 	// Handlers
 	userHandler := handler.NewUserHandler(userSvc, courseSvc)
@@ -93,6 +99,8 @@ func main() {
 	classHandler := handler.NewClassHandler(classSvc)
 	jurusanHandler := handler.NewJurusanHandler(jurusanSvc)
 	schoolHandler := handler.NewSchoolHandler(schoolSvc)
+	attendanceHandler := handler.NewAttendanceHandler(attendanceSvc)
+	pklHandler := handler.NewPklHandler(pklSvc)
 
 	// Auth interceptor applied to all handlers
 	authInterceptor := middleware.NewAuthInterceptor(jwtSvc)
@@ -108,6 +116,8 @@ func main() {
 	classPath, classAPI := classv1connect.NewClassServiceHandler(classHandler, interceptors)
 	jurusanPath, jurusanAPI := jurusanv1connect.NewJurusanServiceHandler(jurusanHandler, interceptors)
 	schoolPath, schoolAPI := schoolv1connect.NewSchoolServiceHandler(schoolHandler, interceptors)
+	attendancePath, attendanceAPI := attendancev1connect.NewAttendanceServiceHandler(attendanceHandler, interceptors)
+	pklPath, pklAPI := pklv1connect.NewPklServiceHandler(pklHandler, interceptors)
 
 	mux.Handle(userPath, userAPI)
 	mux.Handle(coursePath, courseAPI)
@@ -117,6 +127,8 @@ func main() {
 	mux.Handle(classPath, classAPI)
 	mux.Handle(jurusanPath, jurusanAPI)
 	mux.Handle(schoolPath, schoolAPI)
+	mux.Handle(attendancePath, attendanceAPI)
+	mux.Handle(pklPath, pklAPI)
 
 	// Serve material cover images as cacheable binary (NOT base64 in JSON), so
 	// the materials list payload stays tiny and images load lazily/cached.

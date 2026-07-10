@@ -67,9 +67,11 @@ func (h *CourseHandler) UpdateCourse(ctx context.Context, req *connect.Request[c
 		TeacherID:       req.Msg.TeacherId,
 		IsActive:        req.Msg.IsActive,
 		BackgroundImage: req.Msg.BackgroundImage,
+		CapaianPembelajaran: req.Msg.CapaianPembelajaran,
+		TujuanPembelajaran:  req.Msg.TujuanPembelajaran,
 	}
 
-	c, err := h.courseSvc.UpdateCourse(ctx, claims.Role, req.Msg.Id, input, req.Msg.ClassIds, true)
+	c, err := h.courseSvc.UpdateCourse(ctx, claims.Role, req.Msg.Id, input, req.Msg.ClassIds, req.Msg.GetSyncClasses())
 	if err != nil {
 		return nil, mapCourseServiceError(err)
 	}
@@ -199,6 +201,8 @@ func courseToProto(c *repository.Course) *coursev1.Course {
 		StudentCount:    int32(c.StudentCount),
 		Kelas:           c.Kelas,
 		BackgroundImage: c.BackgroundImage,
+		CapaianPembelajaran: c.CapaianPembelajaran,
+		TujuanPembelajaran:  c.TujuanPembelajaran,
 		CreatedAt:       timestamppb.New(c.CreatedAt),
 		UpdatedAt:       timestamppb.New(c.UpdatedAt),
 		Teacher: &userv1.User{

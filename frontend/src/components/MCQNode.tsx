@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { Node, mergeAttributes } from '@tiptap/core'
 import { ReactNodeViewRenderer, NodeViewWrapper, type NodeViewProps } from '@tiptap/react'
-import { Box, Button, Flex, Icon, IconButton, Input, Text } from '@chakra-ui/react'
+import { Box, Button, Flex, Icon, IconButton, Input, RadioGroup, Text } from '@chakra-ui/react'
 import { LuPlus, LuTrash2, LuX, LuCircleCheck, LuGripVertical } from 'react-icons/lu'
 import { COLORS } from '@/theme/tokens'
 
@@ -51,21 +51,26 @@ function MCQEdit({ node, updateAttributes, deleteNode }: NodeViewProps) {
         <Input size="sm" bg="white" placeholder="Tulis pertanyaan…" value={question}
           onChange={(e) => updateAttributes({ question: e.target.value })} mb="6px" />
         <Text fontSize="11px" color={COLORS.muted} mb="4px">Pilih jawaban benar (radio):</Text>
-        <Box>
-          {options.map((o, i) => (
-            <Flex key={i} gap="6px" align="center" mb="4px">
-              <input type="radio" checked={correct === i} onChange={() => updateAttributes({ correct: i })} />
-              <Input size="sm" bg="white" placeholder={`Opsi ${String.fromCharCode(65 + i)}`} value={o}
-                onChange={(e) => setOpt(i, e.target.value)} />
-              {options.length > 2 && (
-                <IconButton aria-label="hapus opsi" size="xs" variant="ghost"
-                  onClick={() => updateAttributes({ options: options.filter((_, j) => j !== i), correct: 0 })}>
-                  <Icon as={LuX} />
-                </IconButton>
-              )}
-            </Flex>
-          ))}
-        </Box>
+        <RadioGroup.Root size="sm" value={String(correct)} onValueChange={(e) => e.value !== null && updateAttributes({ correct: Number(e.value) })}>
+          <Box>
+            {options.map((o, i) => (
+              <Flex key={i} gap="6px" align="center" mb="4px">
+                <RadioGroup.Item value={String(i)}>
+                  <RadioGroup.ItemHiddenInput />
+                  <RadioGroup.ItemIndicator />
+                </RadioGroup.Item>
+                <Input size="sm" bg="white" placeholder={`Opsi ${String.fromCharCode(65 + i)}`} value={o}
+                  onChange={(e) => setOpt(i, e.target.value)} />
+                {options.length > 2 && (
+                  <IconButton aria-label="hapus opsi" size="xs" variant="ghost"
+                    onClick={() => updateAttributes({ options: options.filter((_, j) => j !== i), correct: 0 })}>
+                    <Icon as={LuX} />
+                  </IconButton>
+                )}
+              </Flex>
+            ))}
+          </Box>
+        </RadioGroup.Root>
         {options.length < 6 && (
           <Button size="2xs" variant="ghost" onClick={() => updateAttributes({ options: [...options, ''] })}>
             <Icon as={LuPlus} /> opsi

@@ -1,0 +1,92 @@
+syntax = "proto3";
+
+package pkl.v1;
+
+option go_package = "lms/backend/gen/pkl/v1;pklv1";
+
+import "google/protobuf/timestamp.proto";
+
+message Partner {
+  string id = 1;
+  string name = 2;
+  string alamat = 3;
+  string deskripsi = 4;
+  string maps_url = 5;
+  double lat = 6;
+  double lng = 7;
+  string kontak_wa = 8;
+  string bidang_usaha = 9;     // newline-separated points
+  string job_requirement = 10; // newline-separated points
+  int32 kuota = 11;
+  int32 terisi = 12;           // current number of applicants
+  bool is_full = 13;
+  bool applied_by_me = 14;     // true if the calling student applied here
+  string created_by_name = 15;
+  google.protobuf.Timestamp created_at = 16;
+  string logo = 17; // small compressed data URL
+}
+
+message Applicant {
+  string student_id = 1;
+  string name = 2;
+  string kelas = 3;
+  google.protobuf.Timestamp applied_at = 4;
+}
+
+message CreatePartnerRequest {
+  string name = 1;
+  string alamat = 2;
+  string deskripsi = 3;
+  string maps_url = 4;
+  double lat = 5;
+  double lng = 6;
+  string kontak_wa = 7;
+  string bidang_usaha = 8;
+  string job_requirement = 9;
+  int32 kuota = 10;
+  string logo = 11;
+}
+message UpdatePartnerRequest {
+  string id = 1;
+  string name = 2;
+  string alamat = 3;
+  string deskripsi = 4;
+  string maps_url = 5;
+  double lat = 6;
+  double lng = 7;
+  string kontak_wa = 8;
+  string bidang_usaha = 9;
+  string job_requirement = 10;
+  int32 kuota = 11;
+  string logo = 12;
+}
+message DeletePartnerRequest { string id = 1; }
+message DeletePartnerResponse {}
+
+message ListPartnersRequest {}
+message ListPartnersResponse { repeated Partner partners = 1; }
+
+message GetApplicantsRequest { string partner_id = 1; }
+message GetApplicantsResponse { repeated Applicant applicants = 1; }
+
+message ApplyRequest { string partner_id = 1; }
+message ApplyResponse {}
+message CancelApplyRequest {}
+message CancelApplyResponse {}
+
+message MyApplicationRequest {}
+message MyApplicationResponse {
+  bool has = 1;
+  Partner partner = 2;
+}
+
+service PklService {
+  rpc CreatePartner(CreatePartnerRequest) returns (Partner);
+  rpc UpdatePartner(UpdatePartnerRequest) returns (Partner);
+  rpc DeletePartner(DeletePartnerRequest) returns (DeletePartnerResponse);
+  rpc ListPartners(ListPartnersRequest) returns (ListPartnersResponse);
+  rpc GetApplicants(GetApplicantsRequest) returns (GetApplicantsResponse);
+  rpc Apply(ApplyRequest) returns (ApplyResponse);
+  rpc CancelApply(CancelApplyRequest) returns (CancelApplyResponse);
+  rpc MyApplication(MyApplicationRequest) returns (MyApplicationResponse);
+}

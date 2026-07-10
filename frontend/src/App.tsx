@@ -6,6 +6,8 @@ import UsersPage from '@/pages/UsersPage'
 import CoursesPage from '@/pages/CoursesPage'
 import CourseDetailPage from '@/pages/CourseDetailPage'
 import TugasPage from '@/pages/TugasPage'
+import AbsensiPage from '@/pages/AbsensiPage'
+import MitraPklPage from '@/pages/MitraPklPage'
 import PengumpulanPage from '@/pages/PengumpulanPage'
 import NilaiPage from '@/pages/NilaiPage'
 import LogAktivitasPage from '@/pages/LogAktivitasPage'
@@ -42,6 +44,8 @@ export default function App() {
         <Route path="/courses/:id" element={<AuthGuard><CourseDetailPage /></AuthGuard>} />
         <Route path="/materi" element={<AuthGuard><CourseDetailPage forcedCourseId="general" /></AuthGuard>} />
         <Route path="/tugas" element={<AuthGuard><TugasPage /></AuthGuard>} />
+        <Route path="/absensi" element={<AuthGuard><AbsensiPage /></AuthGuard>} />
+        <Route path="/mitra-pkl" element={<AuthGuard><MitraPklPage /></AuthGuard>} />
         <Route path="/pengumpulan" element={<StaffGuard><PengumpulanPage /></StaffGuard>} />
         <Route path="/nilai" element={<AuthGuard><NilaiPage /></AuthGuard>} />
         <Route path="/log" element={<StaffGuard><LogAktivitasPage /></StaffGuard>} />

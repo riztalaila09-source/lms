@@ -28,7 +28,9 @@
     "@tiptap/pm": "^3.27.1",
     "@tiptap/react": "^3.27.1",
     "@tiptap/starter-kit": "^3.27.1",
+    "html5-qrcode": "^2.3.8",
     "next-themes": "^0.3.0",
+    "qrcode": "^1.5.4",
     "react": "^18.3.0",
     "react-dom": "^18.3.0",
     "react-icons": "^5.6.0",
@@ -36,6 +38,7 @@
   },
   "devDependencies": {
     "@chakra-ui/cli": "^3.5.0",
+    "@types/qrcode": "^1.5.6",
     "@types/react": "^18.3.0",
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.3.0",

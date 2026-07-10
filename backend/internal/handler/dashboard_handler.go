@@ -10,6 +10,7 @@ import (
 	dashboardv1 "lms/backend/gen/dashboard/v1"
 	"lms/backend/gen/dashboard/v1/dashboardv1connect"
 	"lms/backend/internal/middleware"
+	"lms/backend/internal/repository"
 	"lms/backend/internal/service"
 )
 
@@ -49,6 +50,8 @@ func (h *DashboardHandler) GetTeacherDashboard(ctx context.Context, _ *connect.R
 		MateriDraft:      int32(d.MateriDraft),
 		RataRataNilai:    d.RataRataNilai,
 		TotalGuru:        int32(d.TotalGuru),
+		SiswaLaki:        int32(d.SiswaLaki),
+		SiswaPerempuan:   int32(d.SiswaPerempuan),
 	}
 	for _, jc := range d.SiswaPerJurusan {
 		out.SiswaPerJurusan = append(out.SiswaPerJurusan, &dashboardv1.JurusanCount{
@@ -77,6 +80,69 @@ func (h *DashboardHandler) GetTeacherDashboard(ctx context.Context, _ *connect.R
 			item.SubmittedAt = timestamppb.New(rs.SubmittedAt)
 		}
 		out.PengumpulanTerbaru = append(out.PengumpulanTerbaru, item)
+	}
+	return connect.NewResponse(out), nil
+}
+
+func (h *DashboardHandler) GetStudentDashboard(ctx context.Context, _ *connect.Request[dashboardv1.GetStudentDashboardRequest]) (*connect.Response[dashboardv1.StudentDashboard], error) {
+	claims, ok := middleware.ClaimsFromContext(ctx)
+	if !ok {
+		return nil, connect.NewError(connect.CodeUnauthenticated, nil)
+	}
+	d, err := h.svc.GetStudentDashboard(ctx, claims.UserID, claims.Role)
+	if err != nil {
+		if errors.Is(err, service.ErrPermissionDenied) {
+			return nil, connect.NewError(connect.CodePermissionDenied, err)
+		}
+		return nil, connect.NewError(connect.CodeInternal, err)
+	}
+	out := &dashboardv1.StudentDashboard{
+		Kelas:            d.Kelas,
+		Jurusan:          d.Jurusan,
+		RataRataNilai:    d.RataRataNilai,
+		GradedCount:      int32(d.GradedCount),
+		PeringkatKelas:   int32(d.PeringkatKelas),
+		TotalKelas:       int32(d.TotalKelas),
+		PeringkatJurusan: int32(d.PeringkatJurusan),
+		TotalJurusan:     int32(d.TotalJurusan),
+	}
+	toRank := func(src []repository.RankEntry) []*dashboardv1.RankEntry {
+		out := make([]*dashboardv1.RankEntry, 0, len(src))
+		for _, e := range src {
+			out = append(out, &dashboardv1.RankEntry{
+				Peringkat: int32(e.Peringkat), Name: e.Name, Kelas: e.Kelas, RataRata: e.RataRata,
+			})
+		}
+		return out
+	}
+	out.JuaraKelas = toRank(d.JuaraKelas)
+	out.JuaraJurusan = toRank(d.JuaraJurusan)
+	out.AllKelas = d.AllKelas
+	out.AllJurusan = d.AllJurusan
+	return connect.NewResponse(out), nil
+}
+
+func (h *DashboardHandler) GetLeaderboard(ctx context.Context, req *connect.Request[dashboardv1.GetLeaderboardRequest]) (*connect.Response[dashboardv1.Leaderboard], error) {
+	claims, ok := middleware.ClaimsFromContext(ctx)
+	if !ok {
+		return nil, connect.NewError(connect.CodeUnauthenticated, nil)
+	}
+	entries, err := h.svc.GetLeaderboard(ctx, claims.Role, req.Msg.Kelas, req.Msg.Jurusan)
+	if err != nil {
+		switch {
+		case errors.Is(err, service.ErrPermissionDenied):
+			return nil, connect.NewError(connect.CodePermissionDenied, err)
+		case errors.Is(err, service.ErrInvalidArgument):
+			return nil, connect.NewError(connect.CodeInvalidArgument, err)
+		default:
+			return nil, connect.NewError(connect.CodeInternal, err)
+		}
+	}
+	out := &dashboardv1.Leaderboard{Entries: make([]*dashboardv1.RankEntry, 0, len(entries))}
+	for _, e := range entries {
+		out.Entries = append(out.Entries, &dashboardv1.RankEntry{
+			Peringkat: int32(e.Peringkat), Name: e.Name, Kelas: e.Kelas, RataRata: e.RataRata,
+		})
 	}
 	return connect.NewResponse(out), nil
 }

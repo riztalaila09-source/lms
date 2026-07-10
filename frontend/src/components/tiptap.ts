@@ -4,6 +4,7 @@ import TextAlign from '@tiptap/extension-text-align'
 import Image from '@tiptap/extension-image'
 import { TableKit } from '@tiptap/extension-table'
 import { MCQNode } from './MCQNode'
+import { YouTubeNode } from './YouTubeNode'
 
 /** Shared TipTap extension set used by both the editor and the read-only viewer. */
 export function buildExtensions() {
@@ -16,6 +17,7 @@ export function buildExtensions() {
     Image.configure({ inline: false, allowBase64: true }),
     TableKit,
     MCQNode,
+    YouTubeNode,
   ]
 }
 
@@ -33,6 +35,9 @@ export const CONTENT_CSS = {
   '& table td, & table th': { border: '1px solid #cbd5e1', padding: '6px 10px' },
   '& table th': { background: '#f1f5f9', fontWeight: 600 },
   '& blockquote': { borderLeft: '3px solid #cbd5e1', paddingLeft: '12px', color: '#475569', margin: '0.5em 0' },
+  '& code': { background: '#f1f5f9', padding: '2px 5px', borderRadius: '4px', fontSize: '0.88em', fontFamily: 'monospace' },
+  '& pre': { background: '#0f172a', color: '#e2e8f0', padding: '12px 14px', borderRadius: '8px', overflowX: 'auto', margin: '0.6em 0', fontFamily: 'monospace', fontSize: '0.9em', lineHeight: 1.6 },
+  '& pre code': { background: 'transparent', color: 'inherit', padding: 0, fontSize: 'inherit' },
 } as const
 
 /** Richer typography for the reading view (viewer only). Extends CONTENT_CSS. */
