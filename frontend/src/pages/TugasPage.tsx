@@ -4,6 +4,7 @@ import {
 } from '@chakra-ui/react'
 import {
   LuClipboardList, LuPlus, LuInbox, LuPencil, LuTrash2, LuSend, LuBan, LuMessageCircle, LuPower, LuX, LuSearch, LuImage,
+  LuUsers, LuClipboardCheck, LuCheck,
 } from 'react-icons/lu'
 import { timestampDate, timestampFromDate } from '@bufbuild/protobuf/wkt'
 import { assignmentClient, courseClient } from '@/lib/client'
@@ -20,8 +21,20 @@ import type { DraftQuestion } from '@/components/MaterialFormDialog'
 import { fileToDataUrl } from '@/lib/image'
 import { COLORS } from '@/theme/tokens'
 import { toaster } from '@/components/ui/toaster'
+import KuisRunner from '@/components/tugas/KuisRunner'
+import GroupSubmitDialog from '@/components/tugas/GroupSubmitDialog'
+import PraktikumManager from '@/components/tugas/PraktikumManager'
 
 interface LinkRow { label: string; url: string }
+
+type TabKey = 'tugas' | 'kuis' | 'praktikum'
+const BSM = ['Benar', 'Salah', 'Mungkin']
+// which assignment types belong to each tab
+function tabOfType(t: string): TabKey {
+  if (t === 'kuis') return 'kuis'
+  if (t === 'praktikum') return 'praktikum'
+  return 'tugas'
+}
 
 function fmtDateTime(d?: Date) {
   if (!d) return '-'
@@ -88,6 +101,7 @@ function parseQuestionsCSV(text: string): DraftQuestion[] {
   }).filter((q) => q.question)
 }
 
+interface KuisDraft { question: string; correct: number[] } // correct = indeks di BSM
 interface FormState {
   id: string
   courseId: string
@@ -95,10 +109,11 @@ interface FormState {
   description: string
   deadline: string // datetime-local value
   maxScore: number
-  type: string // 'uraian' | 'pilihan_ganda'
+  type: string // 'uraian' | 'pilihan_ganda' | 'kuis' | 'praktikum'
   questions: DraftQuestion[]
+  kuisQuestions: KuisDraft[]
 }
-const EMPTY: FormState = { id: '', courseId: '', title: '', description: '', deadline: '', maxScore: 100, type: 'uraian', questions: [] }
+const EMPTY: FormState = { id: '', courseId: '', title: '', description: '', deadline: '', maxScore: 100, type: 'uraian', questions: [], kuisQuestions: [] }
 
 export default function TugasPage() {
   const { user } = useAuth()
@@ -110,6 +125,15 @@ export default function TugasPage() {
   const [error, setError] = useState('')
   const [search, setSearch] = useState('')
   const [courseFilter, setCourseFilter] = useState('')
+  const [tab, setTab] = useState<TabKey>('tugas')
+
+  // kuis runner (siswa) + praktikum dialogs
+  const [kuisOpen, setKuisOpen] = useState(false)
+  const [kuisTarget, setKuisTarget] = useState<Assignment | null>(null)
+  const [groupOpen, setGroupOpen] = useState(false)
+  const [groupTarget, setGroupTarget] = useState<Assignment | null>(null)
+  const [mgrOpen, setMgrOpen] = useState(false)
+  const [mgrTarget, setMgrTarget] = useState<Assignment | null>(null)
 
   const [open, setOpen] = useState(false)
   const [form, setForm] = useState<FormState>(EMPTY)
@@ -171,17 +195,24 @@ export default function TugasPage() {
   }, [load, loadCourses, canManage])
 
   const openCreate = () => {
-    setForm({ ...EMPTY, courseId: courses[0]?.id ?? '' })
+    const type = tab === 'kuis' ? 'kuis' : tab === 'praktikum' ? 'praktikum' : 'uraian'
+    setForm({ ...EMPTY, courseId: courses[0]?.id ?? '', type })
     setFormErr('')
     setOpen(true)
   }
 
   const openEdit = async (a: Assignment) => {
     let questions: DraftQuestion[] = []
+    let kuisQuestions: KuisDraft[] = []
     if (a.type === 'pilihan_ganda') {
       try {
         const r = await assignmentClient.listAssignmentQuestions({ assignmentId: a.id })
         questions = r.questions.map((q) => ({ question: q.question, options: q.options.length ? q.options : ['', ''], correctIndex: Math.max(0, q.correctIndex), image: q.image }))
+      } catch { /* ignore */ }
+    } else if (a.type === 'kuis') {
+      try {
+        const r = await assignmentClient.listAssignmentQuestions({ assignmentId: a.id })
+        kuisQuestions = r.questions.map((q) => ({ question: q.question, correct: [...q.correctIndices] }))
       } catch { /* ignore */ }
     }
     setForm({
@@ -193,6 +224,7 @@ export default function TugasPage() {
       maxScore: a.maxScore,
       type: a.type || 'uraian',
       questions,
+      kuisQuestions,
     })
     setFormErr('')
     setOpen(true)
@@ -219,6 +251,14 @@ export default function TugasPage() {
     finally { if (fileRef.current) fileRef.current.value = '' }
   }
 
+  // ── Kuis editor helpers ──
+  const addKuis = () => setForm((f) => ({ ...f, kuisQuestions: [...f.kuisQuestions, { question: '', correct: [] }] }))
+  const setKuisQ = (i: number, patch: Partial<KuisDraft>) =>
+    setForm((f) => ({ ...f, kuisQuestions: f.kuisQuestions.map((q, idx) => (idx === i ? { ...q, ...patch } : q)) }))
+  const toggleKuisCorrect = (i: number, idx: number) =>
+    setForm((f) => ({ ...f, kuisQuestions: f.kuisQuestions.map((q, qi) => qi === i
+      ? { ...q, correct: q.correct.includes(idx) ? q.correct.filter((x) => x !== idx) : [...q.correct, idx] } : q) }))
+
   const save = async (e: React.FormEvent) => {
     e.preventDefault()
     setFormErr('')
@@ -227,10 +267,16 @@ export default function TugasPage() {
     if (form.type === 'pilihan_ganda' && form.questions.filter((q) => q.question.trim()).length === 0) {
       setFormErr('Tugas pilihan ganda butuh minimal 1 soal.'); return
     }
+    if (form.type === 'kuis') {
+      const valid = form.kuisQuestions.filter((q) => q.question.trim())
+      if (valid.length < 5) { setFormErr('Kuis minimal 5 soal.'); return }
+      if (valid.some((q) => q.correct.length === 0)) { setFormErr('Setiap soal kuis harus punya minimal 1 jawaban benar.'); return }
+    }
     setSaving(true)
     try {
       const deadline = form.deadline ? timestampFromDate(new Date(form.deadline)) : undefined
       let assignmentId = form.id
+      let createdAssignment: Assignment | null = null
       if (form.id) {
         await assignmentClient.updateAssignment({
           id: form.id, title: form.title, description: form.description,
@@ -242,6 +288,7 @@ export default function TugasPage() {
           deadline, maxScore: form.maxScore, type: form.type,
         })
         assignmentId = created.id
+        createdAssignment = created
       }
       if (form.type === 'pilihan_ganda') {
         const questions = form.questions
@@ -251,9 +298,18 @@ export default function TugasPage() {
             return { question: q.question, options, correctIndex: options.length ? Math.min(q.correctIndex, options.length - 1) : 0, image: q.image || '' }
           })
         await assignmentClient.setAssignmentQuestions({ assignmentId, questions })
+      } else if (form.type === 'kuis') {
+        const questions = form.kuisQuestions
+          .filter((q) => q.question.trim())
+          .map((q) => ({ question: q.question, options: BSM, correctIndex: -1, correctIndices: q.correct, image: '' }))
+        await assignmentClient.setAssignmentQuestions({ assignmentId, questions })
       }
       setOpen(false)
       await load()
+      // Praktikum baru → langsung buka pengatur kelompok.
+      if (form.type === 'praktikum' && createdAssignment) {
+        setMgrTarget(createdAssignment); setMgrOpen(true)
+      }
     } catch (err: unknown) {
       setFormErr(err instanceof Error ? err.message : 'Gagal menyimpan tugas')
     } finally {
@@ -405,15 +461,21 @@ export default function TugasPage() {
     assignments.forEach((a) => { if (a.courseId) m.set(a.courseId, a.courseName) })
     return Array.from(m, ([id, name]) => ({ id, name }))
   }, [assignments])
+  const tabCounts = useMemo(() => {
+    const c = { tugas: 0, kuis: 0, praktikum: 0 }
+    assignments.forEach((a) => { c[tabOfType(a.type)]++ })
+    return c
+  }, [assignments])
   const filteredAssignments = useMemo(() => {
     const q = search.trim().toLowerCase()
     return assignments.filter((a) => {
+      const okTab = tabOfType(a.type) === tab
       const okSearch = !q || a.title.toLowerCase().includes(q) ||
         a.courseName.toLowerCase().includes(q) || (a.createdByName || '').toLowerCase().includes(q)
       const okCourse = !courseFilter || a.courseId === courseFilter
-      return okSearch && okCourse
+      return okTab && okSearch && okCourse
     })
-  }, [assignments, search, courseFilter])
+  }, [assignments, search, courseFilter, tab])
 
   const assignmentsPaged = usePaged(filteredAssignments, 10)
 
@@ -421,9 +483,20 @@ export default function TugasPage() {
     <AppLayout
       title={<><Icon as={LuClipboardList} /> Tugas</>}
       subtitle={canManage ? 'Kelola tugas untuk siswa' : 'Daftar tugas Anda'}
-      actions={canManage ? <Button bg={COLORS.primary} color="white" _hover={{ bg: COLORS.primaryDark }} onClick={openCreate}><Icon as={LuPlus} /> Buat Tugas</Button> : undefined}
+      actions={canManage ? <Button bg={COLORS.primary} color="white" _hover={{ bg: COLORS.primaryDark }} onClick={openCreate}><Icon as={LuPlus} /> Buat {tab === 'kuis' ? 'Kuis' : tab === 'praktikum' ? 'Praktikum' : 'Tugas'}</Button> : undefined}
     >
       {error && <Text color={COLORS.danger} mb="10px">{error}</Text>}
+
+      {/* Tab: Tugas / Kuis / Praktikum */}
+      <Flex gap={0} borderBottom="2px solid" borderColor="gray.200" mb="12px">
+        {([['tugas', 'Tugas', LuClipboardList], ['kuis', 'Kuis', LuClipboardCheck], ['praktikum', 'Praktikum', LuUsers]] as const).map(([k, label, ic]) => (
+          <Button key={k} variant="ghost" borderRadius={0} borderBottom="2px solid"
+            borderColor={tab === k ? COLORS.primary : 'transparent'} color={tab === k ? COLORS.primary : 'gray.600'}
+            onClick={() => setTab(k)}>
+            <Icon as={ic} /> {label} ({tabCounts[k]})
+          </Button>
+        ))}
+      </Flex>
 
       <Card>
         <Flex gap="10px" mb="12px" flexWrap="wrap" align="flex-end">
@@ -469,8 +542,8 @@ export default function TugasPage() {
                       <Table.Cell fontWeight="medium">
                         <Flex align="center" gap="6px" wrap="wrap">
                           {a.title}
-                          <Badge colorPalette={a.type === 'pilihan_ganda' ? 'purple' : 'teal'} variant="subtle">
-                            {a.type === 'pilihan_ganda' ? 'Pilihan Ganda' : 'Uraian'}
+                          <Badge colorPalette={a.type === 'pilihan_ganda' ? 'purple' : a.type === 'kuis' ? 'orange' : a.type === 'praktikum' ? 'pink' : 'teal'} variant="subtle">
+                            {a.type === 'pilihan_ganda' ? 'Pilihan Ganda' : a.type === 'kuis' ? 'Kuis' : a.type === 'praktikum' ? 'Praktikum' : 'Uraian'}
                           </Badge>
                           {!a.isActive && <Badge colorPalette="gray">Nonaktif</Badge>}
                         </Flex>
@@ -487,12 +560,17 @@ export default function TugasPage() {
                         <Flex gap="6px" wrap="wrap" justify="flex-end">
                           {canManage ? (
                             <RowActionsMenu actions={[
+                              ...(a.type === 'praktikum' ? [{ label: 'Atur Kelompok & Nilai', icon: LuUsers, onClick: () => { setMgrTarget(a); setMgrOpen(true) } }] : []),
                               { label: a.isActive ? 'Nonaktifkan tugas' : 'Aktifkan tugas', icon: LuPower, onClick: () => toggleActive(a) },
                               { label: 'Blokir siswa', icon: LuBan, onClick: () => openBlock(a) },
                               { label: 'Kirim ke WhatsApp', icon: LuMessageCircle, onClick: () => kirimWA(a) },
                               { label: 'Edit', icon: LuPencil, onClick: () => openEdit(a) },
                               { label: 'Hapus', icon: LuTrash2, onClick: () => remove(a), danger: true },
                             ]} />
+                          ) : a.type === 'praktikum' ? (
+                            <Button size="xs" bg={COLORS.success} color="white" onClick={() => { setGroupTarget(a); setGroupOpen(true) }}>
+                              <Icon as={LuUsers} /> Lihat Kelompok
+                            </Button>
                           ) : a.blocked ? (
                             <Badge colorPalette="red"><Icon as={LuBan} /> Diblokir</Badge>
                           ) : a.submitted ? (
@@ -504,6 +582,10 @@ export default function TugasPage() {
                           ) : a.type === 'pilihan_ganda' ? (
                             <Button size="xs" bg={COLORS.primary} color="white" onClick={() => openQuiz(a)}>
                               <Icon as={LuClipboardList} /> Kerjakan Kuis
+                            </Button>
+                          ) : a.type === 'kuis' ? (
+                            <Button size="xs" bg={COLORS.primary} color="white" onClick={() => { setKuisTarget(a); setKuisOpen(true) }}>
+                              <Icon as={LuClipboardCheck} /> Kerjakan Kuis
                             </Button>
                           ) : (
                             <Button size="xs" bg={COLORS.success} color="white" onClick={() => openSubmit(a)}>
@@ -563,17 +645,23 @@ export default function TugasPage() {
                     <Field.Label>Judul Tugas</Field.Label>
                     <Input value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} />
                   </Field.Root>
-                  <Field.Root>
-                    <Field.Label>Tipe Tugas</Field.Label>
-                    <NativeSelect.Root disabled={!!form.id}>
-                      <NativeSelect.Field value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}>
-                        <option value="uraian">Soal Uraian (jawaban teks + link)</option>
-                        <option value="pilihan_ganda">Soal Pilihan Ganda (kuis otomatis)</option>
-                      </NativeSelect.Field>
-                      <NativeSelect.Indicator />
-                    </NativeSelect.Root>
-                    {!!form.id && <Text fontSize="10px" color={COLORS.muted} mt="2px">Tipe tidak bisa diubah setelah dibuat.</Text>}
-                  </Field.Root>
+                  {(form.type === 'uraian' || form.type === 'pilihan_ganda') ? (
+                    <Field.Root>
+                      <Field.Label>Tipe Tugas</Field.Label>
+                      <NativeSelect.Root disabled={!!form.id}>
+                        <NativeSelect.Field value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}>
+                          <option value="uraian">Soal Uraian (jawaban teks + link)</option>
+                          <option value="pilihan_ganda">Soal Pilihan Ganda (kuis otomatis)</option>
+                        </NativeSelect.Field>
+                        <NativeSelect.Indicator />
+                      </NativeSelect.Root>
+                      {!!form.id && <Text fontSize="10px" color={COLORS.muted} mt="2px">Tipe tidak bisa diubah setelah dibuat.</Text>}
+                    </Field.Root>
+                  ) : (
+                    <Badge w="fit-content" colorPalette={form.type === 'kuis' ? 'orange' : 'pink'} variant="subtle">
+                      {form.type === 'kuis' ? 'Kuis (Benar/Salah/Mungkin)' : 'Praktikum (tugas kelompok)'}
+                    </Badge>
+                  )}
                   <Field.Root>
                     <Field.Label>Deskripsi / Instruksi</Field.Label>
                     <Textarea rows={4} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
@@ -643,6 +731,54 @@ export default function TugasPage() {
                         ))}
                       </Stack>
                       <Button size="xs" variant="outline" mt="8px" onClick={addQuestion}><Icon as={LuPlus} /> Tambah Soal</Button>
+                    </Box>
+                  )}
+
+                  {/* Kuis editor: pernyataan + centang Benar/Salah/Mungkin (boleh >1 benar) */}
+                  {form.type === 'kuis' && (
+                    <Box borderTop="1px solid" borderColor={COLORS.border} pt="12px">
+                      <Flex justify="space-between" align="center" mb="6px">
+                        <Text fontSize="13px" fontWeight="600">Soal Kuis ({form.kuisQuestions.length}) — minimal 5</Text>
+                      </Flex>
+                      <Text fontSize="11px" color={COLORS.muted} mb="8px">
+                        Tandai kunci jawaban dengan mencentang (boleh lebih dari satu). Nilai = 100 ÷ total jawaban benar semua soal.
+                      </Text>
+                      <Stack gap="10px">
+                        {form.kuisQuestions.map((q, qi) => (
+                          <Box key={qi} bg={COLORS.bg} p="10px" borderRadius="8px">
+                            <Flex gap="6px" mb="8px">
+                              <Input size="sm" flex="1" placeholder={`Pernyataan ${qi + 1}`} value={q.question}
+                                onChange={(e) => setKuisQ(qi, { question: e.target.value })} />
+                              <IconButton aria-label="hapus" size="sm" colorPalette="red" variant="outline"
+                                onClick={() => setForm((f) => ({ ...f, kuisQuestions: f.kuisQuestions.filter((_, idx) => idx !== qi) }))}><Icon as={LuTrash2} /></IconButton>
+                            </Flex>
+                            <Flex gap="8px" wrap="wrap">
+                              {BSM.map((label, idx) => {
+                                const on = q.correct.includes(idx)
+                                return (
+                                  <Flex key={idx} align="center" gap="6px" px="10px" py="6px" borderRadius="6px" cursor="pointer"
+                                    border="1px solid" borderColor={on ? COLORS.success : COLORS.border} bg={on ? '#DCFCE7' : 'white'}
+                                    onClick={() => toggleKuisCorrect(qi, idx)}>
+                                    <Flex align="center" justify="center" boxSize="16px" borderRadius="4px" border="2px solid"
+                                      borderColor={on ? COLORS.success : COLORS.border} bg={on ? COLORS.success : 'white'} color="white">
+                                      {on && <Icon as={LuCheck} boxSize="11px" />}
+                                    </Flex>
+                                    <Text fontSize="13px">{label}</Text>
+                                  </Flex>
+                                )
+                              })}
+                              <Text fontSize="11px" color={COLORS.muted} alignSelf="center">← centang jawaban benar</Text>
+                            </Flex>
+                          </Box>
+                        ))}
+                      </Stack>
+                      <Button size="xs" variant="outline" mt="8px" onClick={addKuis}><Icon as={LuPlus} /> Tambah Soal</Button>
+                    </Box>
+                  )}
+
+                  {form.type === 'praktikum' && (
+                    <Box bg={COLORS.bg} p="10px" borderRadius="8px" fontSize="12px" color={COLORS.muted}>
+                      <Icon as={LuUsers} /> Setelah disimpan, Anda akan diminta mengatur <b>kelompok</b> (manual atau acak). Satu pengumpulan per kelompok; nilai berlaku untuk semua anggota.
                     </Box>
                   )}
 
@@ -843,6 +979,13 @@ export default function TugasPage() {
           </Dialog.Content>
         </Dialog.Positioner>
       </Dialog.Root>
+
+      {/* Kuis (siswa) */}
+      <KuisRunner assignment={kuisTarget} open={kuisOpen} onClose={() => setKuisOpen(false)} onDone={load} />
+      {/* Praktikum: pengumpulan kelompok (siswa) */}
+      <GroupSubmitDialog assignment={groupTarget} open={groupOpen} onClose={() => setGroupOpen(false)} onDone={load} />
+      {/* Praktikum: pengatur kelompok & penilaian (guru) */}
+      <PraktikumManager assignment={mgrTarget} open={mgrOpen} onClose={() => setMgrOpen(false)} />
     </AppLayout>
   )
 }

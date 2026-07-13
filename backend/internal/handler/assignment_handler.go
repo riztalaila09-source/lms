@@ -293,7 +293,8 @@ func (h *AssignmentHandler) SetAssignmentQuestions(ctx context.Context, req *con
 	qs := make([]*repository.AssignmentQuestion, 0, len(req.Msg.Questions))
 	for _, q := range req.Msg.Questions {
 		qs = append(qs, &repository.AssignmentQuestion{
-			Question: q.Question, Options: q.Options, CorrectIndex: int(q.CorrectIndex), Image: q.Image,
+			Question: q.Question, Options: q.Options, CorrectIndex: int(q.CorrectIndex),
+			CorrectIndices: int32sToInts(q.CorrectIndices), Image: q.Image,
 		})
 	}
 	if err := h.svc.SetAssignmentQuestions(ctx, claims.Role, req.Msg.AssignmentId, qs); err != nil {
@@ -315,7 +316,8 @@ func (h *AssignmentHandler) ListAssignmentQuestions(ctx context.Context, req *co
 	for _, q := range qs {
 		out = append(out, &assignmentv1.AssignmentQuestion{
 			Id: q.ID, AssignmentId: q.AssignmentID, Question: q.Question,
-			Options: q.Options, CorrectIndex: int32(q.CorrectIndex), OrderIndex: int32(q.OrderIndex), Image: q.Image,
+			Options: q.Options, CorrectIndex: int32(q.CorrectIndex), CorrectIndices: intsToInt32s(q.CorrectIndices),
+			OrderIndex: int32(q.OrderIndex), Image: q.Image,
 		})
 	}
 	return connect.NewResponse(&assignmentv1.ListAssignmentQuestionsResponse{Questions: out}), nil
@@ -337,6 +339,135 @@ func (h *AssignmentHandler) SubmitQuiz(ctx context.Context, req *connect.Request
 	return connect.NewResponse(&assignmentv1.SubmitQuizResponse{
 		Accepted: accepted, Correct: int32(correct), Total: int32(total), Score: int32(score),
 	}), nil
+}
+
+func int32sToInts(in []int32) []int {
+	out := make([]int, len(in))
+	for i, v := range in {
+		out[i] = int(v)
+	}
+	return out
+}
+func intsToInt32s(in []int) []int32 {
+	out := make([]int32, len(in))
+	for i, v := range in {
+		out[i] = int32(v)
+	}
+	return out
+}
+
+func (h *AssignmentHandler) SubmitKuis(ctx context.Context, req *connect.Request[assignmentv1.SubmitKuisRequest]) (*connect.Response[assignmentv1.SubmitKuisResponse], error) {
+	claims, ok := middleware.ClaimsFromContext(ctx)
+	if !ok {
+		return nil, connect.NewError(connect.CodeUnauthenticated, nil)
+	}
+	answers := make(map[string][]int, len(req.Msg.Answers))
+	for _, ans := range req.Msg.Answers {
+		answers[ans.QuestionId] = int32sToInts(ans.OptionIndices)
+	}
+	score, earned, total, err := h.svc.SubmitKuis(ctx, claims.UserID, claims.Role, req.Msg.AssignmentId, answers, int(req.Msg.TimeTakenSeconds))
+	if err != nil {
+		return nil, mapAssignmentError(err)
+	}
+	return connect.NewResponse(&assignmentv1.SubmitKuisResponse{
+		Score: int32(score), Earned: int32(earned), Total: int32(total),
+	}), nil
+}
+
+// ── Praktikum ──
+
+func (h *AssignmentHandler) SetAssignmentGroups(ctx context.Context, req *connect.Request[assignmentv1.SetAssignmentGroupsRequest]) (*connect.Response[assignmentv1.SetAssignmentGroupsResponse], error) {
+	claims, ok := middleware.ClaimsFromContext(ctx)
+	if !ok {
+		return nil, connect.NewError(connect.CodeUnauthenticated, nil)
+	}
+	groups := make([]*repository.AssignGroup, 0, len(req.Msg.Groups))
+	for _, g := range req.Msg.Groups {
+		members := make([]repository.GroupMember, 0, len(g.StudentIds))
+		leader := g.LeaderId
+		if leader == "" && len(g.StudentIds) > 0 {
+			leader = g.StudentIds[0] // default: anggota pertama jadi ketua
+		}
+		for _, sid := range g.StudentIds {
+			members = append(members, repository.GroupMember{StudentID: sid, IsLeader: sid == leader})
+		}
+		groups = append(groups, &repository.AssignGroup{Name: g.Name, Members: members})
+	}
+	if err := h.svc.SetAssignmentGroups(ctx, claims.Role, req.Msg.AssignmentId, groups); err != nil {
+		return nil, mapAssignmentError(err)
+	}
+	return connect.NewResponse(&assignmentv1.SetAssignmentGroupsResponse{}), nil
+}
+
+func (h *AssignmentHandler) ListAssignmentGroups(ctx context.Context, req *connect.Request[assignmentv1.ListAssignmentGroupsRequest]) (*connect.Response[assignmentv1.ListAssignmentGroupsResponse], error) {
+	claims, ok := middleware.ClaimsFromContext(ctx)
+	if !ok {
+		return nil, connect.NewError(connect.CodeUnauthenticated, nil)
+	}
+	groups, myGroup, err := h.svc.ListAssignmentGroups(ctx, claims.UserID, claims.Role, req.Msg.AssignmentId)
+	if err != nil {
+		return nil, mapAssignmentError(err)
+	}
+	out := make([]*assignmentv1.AssignmentGroup, 0, len(groups))
+	for _, g := range groups {
+		members := make([]*assignmentv1.GroupMember, 0, len(g.Members))
+		for _, m := range g.Members {
+			members = append(members, &assignmentv1.GroupMember{StudentId: m.StudentID, StudentName: m.StudentName, StudentKelas: m.StudentKelas, IsLeader: m.IsLeader})
+		}
+		out = append(out, &assignmentv1.AssignmentGroup{Id: g.ID, AssignmentId: g.AssignmentID, Name: g.Name, Members: members})
+	}
+	return connect.NewResponse(&assignmentv1.ListAssignmentGroupsResponse{Groups: out, MyGroupId: myGroup}), nil
+}
+
+func (h *AssignmentHandler) SubmitGroupAssignment(ctx context.Context, req *connect.Request[assignmentv1.SubmitGroupRequest]) (*connect.Response[assignmentv1.GroupSubmission], error) {
+	claims, ok := middleware.ClaimsFromContext(ctx)
+	if !ok {
+		return nil, connect.NewError(connect.CodeUnauthenticated, nil)
+	}
+	gs, err := h.svc.SubmitGroupAssignment(ctx, claims.UserID, claims.Role, req.Msg.AssignmentId, req.Msg.Content, req.Msg.FileUrl)
+	if err != nil {
+		return nil, mapAssignmentError(err)
+	}
+	return connect.NewResponse(groupSubmissionToProto(gs)), nil
+}
+
+func (h *AssignmentHandler) ListGroupSubmissions(ctx context.Context, req *connect.Request[assignmentv1.ListGroupSubmissionsRequest]) (*connect.Response[assignmentv1.ListGroupSubmissionsResponse], error) {
+	claims, ok := middleware.ClaimsFromContext(ctx)
+	if !ok {
+		return nil, connect.NewError(connect.CodeUnauthenticated, nil)
+	}
+	subs, err := h.svc.ListGroupSubmissions(ctx, claims.UserID, claims.Role, req.Msg.AssignmentId)
+	if err != nil {
+		return nil, mapAssignmentError(err)
+	}
+	out := make([]*assignmentv1.GroupSubmission, 0, len(subs))
+	for _, gs := range subs {
+		out = append(out, groupSubmissionToProto(gs))
+	}
+	return connect.NewResponse(&assignmentv1.ListGroupSubmissionsResponse{Submissions: out}), nil
+}
+
+func (h *AssignmentHandler) GradeGroupSubmission(ctx context.Context, req *connect.Request[assignmentv1.GradeGroupRequest]) (*connect.Response[assignmentv1.GradeGroupResponse], error) {
+	claims, ok := middleware.ClaimsFromContext(ctx)
+	if !ok {
+		return nil, connect.NewError(connect.CodeUnauthenticated, nil)
+	}
+	if err := h.svc.GradeGroupSubmission(ctx, claims.Role, req.Msg.GroupId, int(req.Msg.Score), req.Msg.Feedback); err != nil {
+		return nil, mapAssignmentError(err)
+	}
+	return connect.NewResponse(&assignmentv1.GradeGroupResponse{}), nil
+}
+
+func groupSubmissionToProto(gs *repository.GroupSubmission) *assignmentv1.GroupSubmission {
+	out := &assignmentv1.GroupSubmission{
+		GroupId: gs.GroupID, GroupName: gs.GroupName, Content: gs.Content, FileUrl: gs.FileURL,
+		Submitted: gs.Submitted, Graded: gs.Graded, Score: int32(gs.Score), Feedback: gs.Feedback,
+		SubmittedByName: gs.SubmittedByName,
+	}
+	if gs.Submitted {
+		out.SubmittedAt = timestamppb.New(gs.SubmittedAt)
+	}
+	return out
 }
 
 func assignmentToProto(a *repository.Assignment) *assignmentv1.Assignment {

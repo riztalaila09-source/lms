@@ -4,11 +4,15 @@ import { useEditor, EditorContent } from '@tiptap/react'
 import {
   LuBold, LuItalic, LuUnderline, LuBaseline, LuAlignLeft, LuAlignCenter,
   LuAlignRight, LuAlignJustify, LuListOrdered, LuList, LuTable, LuImage, LuLink, LuUndo2, LuRedo2,
-  LuListChecks, LuYoutube, LuCode,
+  LuListChecks, LuYoutube, LuCode, LuLayoutList, LuFileText, LuPresentation, LuFileUp,
 } from 'react-icons/lu'
 import { COLORS } from '@/theme/tokens'
 import { fileToDataUrl } from '@/lib/image'
+import { importDocxToHtml } from '@/lib/docx'
 import { buildExtensions, CONTENT_CSS } from './tiptap'
+import { PHASES } from './PhaseNode'
+import { pdfEmbedUrl } from './PdfNode'
+import { slideEmbedUrl } from './SlideNode'
 import { parseYouTubeId } from './YouTubePlayer'
 import { toaster } from '@/components/ui/toaster'
 
@@ -26,6 +30,7 @@ const FONT_SIZES = ['12px', '14px', '16px', '18px', '24px', '32px']
  */
 export default function RichTextEditor({ value, onChange }: RichTextEditorProps) {
   const imgInput = useRef<HTMLInputElement>(null)
+  const docxInput = useRef<HTMLInputElement>(null)
 
   const editor = useEditor({
     extensions: buildExtensions(),
@@ -78,6 +83,44 @@ export default function RichTextEditor({ value, onChange }: RichTextEditorProps)
     if (!url) return
     if (!parseYouTubeId(url)) { toaster.create({ description: 'URL YouTube tidak valid.', type: 'error' }); return }
     editor.chain().focus().insertContent({ type: 'youtube', attrs: { src: url } }).run()
+  }
+  const insertPdf = () => {
+    const url = prompt('Tempel link Google Drive PDF (bagikan: siapa saja yang punya link) atau URL .pdf:', 'https://')
+    if (!url || url.trim() === 'https://') return
+    if (!pdfEmbedUrl(url)) { toaster.create({ description: 'Link PDF tidak dikenali.', type: 'error' }); return }
+    editor.chain().focus().insertContent({ type: 'pdf', attrs: { src: url.trim() } }).run()
+  }
+  const insertSlide = () => {
+    const url = prompt('Tempel link Canva (bagikan: siapa saja yang punya link) / Google Slides / .pptx:', 'https://')
+    if (!url || url.trim() === 'https://') return
+    if (!slideEmbedUrl(url)) { toaster.create({ description: 'Link presentasi tidak dikenali.', type: 'error' }); return }
+    editor.chain().focus().insertContent({ type: 'slide', attrs: { src: url.trim() } }).run()
+  }
+  const importWord = async (file?: File) => {
+    if (!file) return
+    if (!/\.docx$/i.test(file.name)) {
+      toaster.create({ description: 'Hanya file .docx (Word modern) yang didukung.', type: 'error' }); return
+    }
+    try {
+      const { html, warnings } = await importDocxToHtml(file)
+      if (!html) { toaster.create({ description: 'Dokumen kosong atau tidak terbaca.', type: 'warning' }); return }
+      editor.chain().focus().insertContent(html).run()
+      toaster.create({
+        description: `Materi dari Word diimpor.${warnings.length ? ' Sebagian format tidak didukung & dilewati.' : ''}`,
+        type: 'success',
+      })
+    } catch {
+      toaster.create({ description: 'Gagal membaca file Word. Pastikan formatnya .docx.', type: 'error' })
+    }
+  }
+  const phaseNode = (phase: string) => ({
+    type: 'phase', attrs: { phase, blockId: crypto.randomUUID() }, content: [{ type: 'paragraph' }],
+  })
+  const insertPhase = (phase: string) => {
+    editor.chain().focus().insertContent(phaseNode(phase)).run()
+  }
+  const insertAllPhases = () => {
+    editor.chain().focus().insertContent(PHASES.map((p) => phaseNode(p.key))).run()
   }
 
   return (
@@ -138,16 +181,32 @@ export default function RichTextEditor({ value, onChange }: RichTextEditorProps)
         <Tool label={<><Icon as={LuTable} /> Tabel</>} title="Sisip tabel" onClick={insertTable} />
         <Tool label={<><Icon as={LuImage} /> Gambar</>} title="Sisip gambar" onClick={() => imgInput.current?.click()} />
         <Tool label={<><Icon as={LuYoutube} /> Video</>} title="Sisip video YouTube (tertanam)" onClick={insertYoutube} />
+        <Tool label={<><Icon as={LuFileText} /> PDF</>} title="Sisip modul PDF (Google Drive / URL) tanpa upload" onClick={insertPdf} />
+        <Tool label={<><Icon as={LuPresentation} /> Slide</>} title="Sisip presentasi (Canva / Google Slides / PowerPoint) tanpa upload" onClick={insertSlide} />
+        <Tool label={<><Icon as={LuFileUp} /> Impor Word</>} title="Impor materi dari file Word (.docx) — heading, daftar & tabel ikut" onClick={() => docxInput.current?.click()} />
         <Tool label={<><Icon as={LuLink} /> Link</>} title="Sisip link" onClick={insertLink} />
         <Tool
           label={<><Icon as={LuListChecks} /> Soal PG</>}
           title="Sisip soal pilihan ganda di posisi kursor"
           onClick={insertMCQ}
         />
+        {/* Fase Pembelajaran (Kurikulum Merdeka) */}
+        <NativeSelect.Root size="xs" width="auto" title="Sisip fase pembelajaran">
+          <NativeSelect.Field fontSize="11px" value=""
+            onChange={(e) => { if (e.target.value) insertPhase(e.target.value); e.target.value = '' }}>
+            <option value="">＋ Fase</option>
+            {PHASES.map((p) => <option key={p.key} value={p.key}>{p.no}. {p.label}</option>)}
+          </NativeSelect.Field>
+          <NativeSelect.Indicator />
+        </NativeSelect.Root>
+        <Tool label={<><Icon as={LuLayoutList} /> Kerangka</>}
+          title="Sisip kerangka lengkap 20 fase pembelajaran" onClick={insertAllPhases} />
         <Tool label={<Icon as={LuUndo2} />} title="Undo" onClick={() => editor.chain().focus().undo().run()} />
         <Tool label={<Icon as={LuRedo2} />} title="Redo" onClick={() => editor.chain().focus().redo().run()} />
         <input ref={imgInput} type="file" accept="image/*" style={{ display: 'none' }}
           onChange={(e) => { insertImage(e.target.files?.[0]); e.target.value = '' }} />
+        <input ref={docxInput} type="file" accept=".docx" style={{ display: 'none' }}
+          onChange={(e) => { importWord(e.target.files?.[0]); e.target.value = '' }} />
       </Flex>
 
       <Box

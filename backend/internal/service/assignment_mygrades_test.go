@@ -25,7 +25,8 @@ func TestAssignmentService_ListMyGrades(t *testing.T) {
 	subRepo := repository.NewSubmissionRepository(db)
 	courseRepo := repository.NewCourseRepository(db)
 	qRepo := repository.NewAssignmentQuestionRepository(db)
-	svc := service.NewAssignmentService(assignRepo, subRepo, enrollRepo, courseRepo, qRepo)
+	gRepo := repository.NewAssignmentGroupRepository(db)
+	svc := service.NewAssignmentService(assignRepo, subRepo, enrollRepo, courseRepo, qRepo, gRepo)
 	now := time.Now().UTC().Truncate(time.Second)
 
 	mkUser := func(s, role string) *repository.User {

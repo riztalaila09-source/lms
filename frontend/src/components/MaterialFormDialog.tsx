@@ -1,9 +1,9 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   Badge, Box, Button, Dialog, Flex, Heading, Icon, IconButton, Image, Input, NativeSelect, RadioGroup, Stack, Switch, Text,
 } from '@chakra-ui/react'
 import {
-  LuX, LuTrash2, LuPencil, LuPlus, LuImage, LuImagePlus, LuChevronDown, LuEye, LuGlobe, LuTag, LuPaperclip, LuListChecks,
+  LuX, LuTrash2, LuPencil, LuPlus, LuImage, LuImagePlus, LuChevronDown, LuEye, LuGlobe, LuTag, LuPaperclip, LuListChecks, LuUpload, LuFileText,
 } from 'react-icons/lu'
 import { useEditor, EditorContent } from '@tiptap/react'
 import { materialClient } from '@/lib/client'
@@ -13,6 +13,7 @@ import RichTextEditor from './RichTextEditor'
 import { buildExtensions, READER_CSS } from './tiptap'
 import { MCQContext } from './MCQNode'
 import { VideoContext } from './YouTubeNode'
+import { PhaseContext } from './PhaseNode'
 import { fileToDataUrl } from '@/lib/image'
 import { COLORS, courseGradient, labelColor } from '@/theme/tokens'
 import { toaster } from '@/components/ui/toaster'
@@ -30,6 +31,83 @@ export function decodeLinks(s: string): LinkRow[] {
     return p.length > 1 ? { label: p[0], url: p[1] } : { label: '', url: p[0] }
   })
   return rows.length ? rows : [{ label: '', url: '' }]
+}
+
+// ── CSV bulk-import of questions (blok soal) ──
+// Reuse pola dari UsersPage; BOM agar Excel membaca UTF-8 dengan benar.
+function downloadCSV(content: string, filename: string) {
+  const blob = new Blob(['﻿' + content], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url; a.download = filename; a.click()
+  setTimeout(() => URL.revokeObjectURL(url), 1000)
+}
+
+// Parse satu baris CSV dengan hormat tanda kutip ganda (koma boleh di dalam
+// field, "" = kutip literal) — teks soal hampir pasti mengandung koma.
+function parseCsvLine(line: string): string[] {
+  const out: string[] = []
+  let cur = ''
+  let inQuotes = false
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i]
+    if (inQuotes) {
+      if (c === '"') {
+        if (line[i + 1] === '"') { cur += '"'; i++ } else inQuotes = false
+      } else cur += c
+    } else if (c === '"') inQuotes = true
+    else if (c === ',') { out.push(cur); cur = '' }
+    else cur += c
+  }
+  out.push(cur)
+  return out.map((s) => s.trim())
+}
+
+export const TEMPLATE_PG_CSV = [
+  'Soal,Opsi A,Opsi B,Opsi C,Opsi D,Opsi E,Jawaban Benar',
+  '"Ibu kota Indonesia adalah, secara resmi?",Jakarta,Bandung,Surabaya,Medan,,A',
+  'Hasil dari 2 + 3 adalah,3,4,5,6,,C',
+].join('\n')
+
+export const TEMPLATE_URAIAN_CSV = [
+  'Soal',
+  'Jelaskan pengertian jaringan komputer beserta contohnya.',
+  'Sebutkan langkah-langkah instalasi sistem operasi.',
+].join('\n')
+
+// Ambil baris CSV (buang header + baris kosong) sebagai array kolom.
+function csvRows(text: string): string[][] {
+  const lines = (text || '').replace(/^﻿/, '').split(/\r?\n/).filter((l) => l.trim())
+  if (lines.length < 2) return []
+  return lines.slice(1).map(parseCsvLine)
+}
+
+export function parsePgCsv(text: string): DraftQuestion[] {
+  const lines = (text || '').replace(/^﻿/, '').split(/\r?\n/).filter((l) => l.trim())
+  if (lines.length < 2) return []
+  const headers = parseCsvLine(lines[0]).map((h) => h.toLowerCase())
+  const findOpt = (letter: string) => headers.findIndex((h) => h.includes('opsi') && h.includes(letter))
+  const idx = {
+    question: headers.findIndex((h) => h.includes('soal')),
+    opts: ['a', 'b', 'c', 'd', 'e'].map(findOpt),
+    answer: headers.findIndex((h) => h.includes('jawaban')),
+  }
+  return lines.slice(1).map(parseCsvLine).map((vals) => {
+    const get = (i: number) => (i >= 0 ? (vals[i] || '').trim() : '')
+    const question = get(idx.question) || vals[0] || ''
+    const options = idx.opts.map(get).filter(Boolean)
+    // "Jawaban Benar" sebagai huruf A–E → index; fallback 0.
+    const ans = get(idx.answer).toUpperCase()
+    let correctIndex = ans ? ans.charCodeAt(0) - 65 : 0
+    if (correctIndex < 0 || correctIndex >= options.length) correctIndex = 0
+    return { question, options: options.length ? options : ['', ''], correctIndex }
+  }).filter((q) => q.question.trim())
+}
+
+export function parseUraianCsv(text: string): DraftEssayQuestion[] {
+  const headers = parseCsvLine(((text || '').replace(/^﻿/, '').split(/\r?\n/)[0]) || '').map((h) => h.toLowerCase())
+  const qi = headers.findIndex((h) => h.includes('soal'))
+  return csvRows(text).map((vals) => ({ question: (qi >= 0 ? vals[qi] : vals[0]) || '' })).filter((q) => q.question.trim())
 }
 
 interface Props {
@@ -74,9 +152,11 @@ function MaterialPreview({ title, description, content, coverImage, categoryName
       </Box>
       <MCQContext.Provider value={ctx}>
         <VideoContext.Provider value={videoCtx}>
-          <Box fontSize="16px" lineHeight="1.9" color={COLORS.text} css={{ '& .ProseMirror': { outline: 'none' }, ...READER_CSS }}>
-            <EditorContent editor={editor} />
-          </Box>
+          <PhaseContext.Provider value={{ interactive: false, materialId: '' }}>
+            <Box fontSize="16px" lineHeight="1.9" color={COLORS.text} css={{ '& .ProseMirror': { outline: 'none' }, ...READER_CSS }}>
+              <EditorContent editor={editor} />
+            </Box>
+          </PhaseContext.Provider>
         </VideoContext.Provider>
       </MCQContext.Provider>
       <Text fontSize="11px" color={COLORS.muted} mt="16px" fontStyle="italic">
@@ -194,6 +274,28 @@ export default function MaterialFormDialog({ open, onClose, courseId, material, 
   const setOpt = (qi: number, oi: number, val: string) =>
     setQuestions((arr) => arr.map((q, idx) => idx === qi
       ? { ...q, options: q.options.map((o, j) => (j === oi ? val : o)) } : q))
+
+  // ── Import soal dari CSV (append ke draft) ──
+  const pgImportRef = useRef<HTMLInputElement>(null)
+  const uraianImportRef = useRef<HTMLInputElement>(null)
+  const importPg = async (file?: File) => {
+    if (!file) return
+    try {
+      const rows = parsePgCsv(await file.text())
+      if (!rows.length) { toaster.create({ description: 'File kosong atau format tidak sesuai template.', type: 'error' }); return }
+      setQuestions((arr) => [...arr, ...rows])
+      toaster.create({ description: `${rows.length} soal pilihan ganda diimpor.`, type: 'success' })
+    } catch { toaster.create({ description: 'Gagal membaca file CSV.', type: 'error' }) }
+  }
+  const importUraian = async (file?: File) => {
+    if (!file) return
+    try {
+      const rows = parseUraianCsv(await file.text())
+      if (!rows.length) { toaster.create({ description: 'File kosong atau format tidak sesuai template.', type: 'error' }); return }
+      setEssayQuestions((arr) => [...arr, ...rows])
+      toaster.create({ description: `${rows.length} soal uraian diimpor.`, type: 'success' })
+    } catch { toaster.create({ description: 'Gagal membaca file CSV.', type: 'error' }) }
+  }
 
   const save = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -360,15 +462,26 @@ export default function MaterialFormDialog({ open, onClose, courseId, material, 
                           <Box p="12px">
                             <Text fontSize="11px" color={COLORS.muted} mb="10px">
                               Soal di sini tampil sebagai blok di <b>akhir</b> materi. Untuk soal <b>di tengah teks</b>, pakai tombol <b>Soal PG</b> di toolbar editor.
+                              Bisa juga <b>Import</b> dari CSV (unduh <b>Template</b> dulu) — soal ditambahkan ke daftar; gambar & jawaban bisa disunting setelah impor.
                             </Text>
 
                             {/* Soal Pilihan Ganda (blok) */}
-                            <Flex justify="space-between" align="center" mb="8px">
+                            <Flex justify="space-between" align="center" mb="8px" gap="6px" wrap="wrap">
                               <Text fontSize="12px" fontWeight="700">Soal Pilihan Ganda ({questions.length})</Text>
-                              <Button size="2xs" variant="outline"
-                                onClick={() => setQuestions((arr) => [...arr, { question: '', options: ['', '', '', ''], correctIndex: 0 }])}>
-                                <Icon as={LuPlus} /> Soal
-                              </Button>
+                              <Flex gap="4px">
+                                <Button size="2xs" variant="ghost" onClick={() => downloadCSV(TEMPLATE_PG_CSV, 'template-soal-pg.csv')}>
+                                  <Icon as={LuFileText} /> Template
+                                </Button>
+                                <Button size="2xs" variant="ghost" onClick={() => pgImportRef.current?.click()}>
+                                  <Icon as={LuUpload} /> Import
+                                </Button>
+                                <input ref={pgImportRef} type="file" accept=".csv,text/csv" hidden
+                                  onChange={(e) => { importPg(e.target.files?.[0]); e.target.value = '' }} />
+                                <Button size="2xs" variant="outline"
+                                  onClick={() => setQuestions((arr) => [...arr, { question: '', options: ['', '', '', ''], correctIndex: 0 }])}>
+                                  <Icon as={LuPlus} /> Soal
+                                </Button>
+                              </Flex>
                             </Flex>
                             <Stack gap="10px" mb="14px">
                               {questions.map((q, qi) => (
@@ -414,11 +527,21 @@ export default function MaterialFormDialog({ open, onClose, courseId, material, 
                             </Stack>
 
                             {/* Soal Uraian */}
-                            <Flex justify="space-between" align="center" mb="8px">
+                            <Flex justify="space-between" align="center" mb="8px" gap="6px" wrap="wrap">
                               <Text fontSize="12px" fontWeight="700" display="flex" alignItems="center" gap="5px"><Icon as={LuPencil} /> Soal Uraian ({essayQuestions.length})</Text>
-                              <Button size="2xs" variant="outline" onClick={() => setEssayQuestions((arr) => [...arr, { question: '' }])}>
-                                <Icon as={LuPlus} /> Soal
-                              </Button>
+                              <Flex gap="4px">
+                                <Button size="2xs" variant="ghost" onClick={() => downloadCSV(TEMPLATE_URAIAN_CSV, 'template-soal-uraian.csv')}>
+                                  <Icon as={LuFileText} /> Template
+                                </Button>
+                                <Button size="2xs" variant="ghost" onClick={() => uraianImportRef.current?.click()}>
+                                  <Icon as={LuUpload} /> Import
+                                </Button>
+                                <input ref={uraianImportRef} type="file" accept=".csv,text/csv" hidden
+                                  onChange={(e) => { importUraian(e.target.files?.[0]); e.target.value = '' }} />
+                                <Button size="2xs" variant="outline" onClick={() => setEssayQuestions((arr) => [...arr, { question: '' }])}>
+                                  <Icon as={LuPlus} /> Soal
+                                </Button>
+                              </Flex>
                             </Flex>
                             {essayQuestions.length === 0 ? (
                               <Text fontSize="11px" color={COLORS.muted}>Belum ada. Siswa menjawab lewat kolom komentar.</Text>

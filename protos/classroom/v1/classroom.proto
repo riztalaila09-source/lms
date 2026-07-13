@@ -1,0 +1,110 @@
+syntax = "proto3";
+
+package classroom.v1;
+
+option go_package = "lms/backend/gen/classroom/v1;classroomv1";
+
+// ── Jadwal mingguan ──
+message ScheduleEntry {
+  string id           = 1;
+  string course_id    = 2;
+  int32  day_of_week  = 3; // 1=Senin .. 7=Minggu
+  int32  jam_ke_mulai = 4;
+  int32  jam_ke_akhir = 5;
+  string kelas        = 6;
+  string ruang        = 7;
+}
+
+message ListSchedulesRequest  { string course_id = 1; }
+message ListSchedulesResponse { repeated ScheduleEntry entries = 1; }
+
+message CreateScheduleRequest {
+  string course_id    = 1;
+  int32  day_of_week  = 2;
+  int32  jam_ke_mulai = 3;
+  int32  jam_ke_akhir = 4;
+  string kelas        = 5;
+  string ruang        = 6;
+}
+message UpdateScheduleRequest {
+  string id           = 1;
+  int32  day_of_week  = 2;
+  int32  jam_ke_mulai = 3;
+  int32  jam_ke_akhir = 4;
+  string kelas        = 5;
+  string ruang        = 6;
+}
+message DeleteScheduleRequest  { string id = 1; }
+message DeleteScheduleResponse {}
+
+// ── Kalender: rencana pembelajaran ──
+message LessonPlan {
+  string id             = 1;
+  string course_id      = 2;
+  string tanggal        = 3; // YYYY-MM-DD
+  string title          = 4;
+  string material_id    = 5; // opsional
+  string material_title = 6; // hasil join, read-only
+  string note           = 7;
+}
+
+message ListLessonPlansRequest  { string course_id = 1; }
+message ListLessonPlansResponse { repeated LessonPlan plans = 1; }
+
+message CreateLessonPlanRequest {
+  string course_id   = 1;
+  string tanggal     = 2;
+  string title       = 3;
+  string material_id = 4;
+  string note        = 5;
+}
+message UpdateLessonPlanRequest {
+  string id          = 1;
+  string tanggal     = 2;
+  string title       = 3;
+  string material_id = 4;
+  string note        = 5;
+}
+message DeleteLessonPlanRequest  { string id = 1; }
+message DeleteLessonPlanResponse {}
+
+// ── Keaktifan / apersepsi siswa (poin kumulatif) ──
+
+// Satu penilaian = tambah poin 1..10 ke siswa (boleh berkali-kali).
+message AddActivityPointRequest {
+  string course_id  = 1;
+  string student_id = 2;
+  string tanggal    = 3; // YYYY-MM-DD
+  int32  points     = 4; // 1..10
+}
+message AddActivityPointResponse {
+  int32 total_points = 1; // akumulasi keseluruhan siswa ini
+  int32 day_points   = 2; // akumulasi pada tanggal tsb
+}
+
+// Papan peringkat: total poin per siswa. tanggal "" = akumulasi semua;
+// tanggal terisi = jumlah poin pada hari itu saja.
+message LeaderboardEntry {
+  string student_id    = 1;
+  string student_name  = 2;
+  string student_kelas = 3;
+  int32  points        = 4;
+  int32  entry_count   = 5; // berapa kali dinilai
+}
+message ListLeaderboardRequest  { string course_id = 1; string tanggal = 2; }
+message ListLeaderboardResponse { repeated LeaderboardEntry entries = 1; }
+
+service ClassroomService {
+  rpc ListSchedules(ListSchedulesRequest) returns (ListSchedulesResponse);
+  rpc CreateSchedule(CreateScheduleRequest) returns (ScheduleEntry);
+  rpc UpdateSchedule(UpdateScheduleRequest) returns (ScheduleEntry);
+  rpc DeleteSchedule(DeleteScheduleRequest) returns (DeleteScheduleResponse);
+
+  rpc ListLessonPlans(ListLessonPlansRequest) returns (ListLessonPlansResponse);
+  rpc CreateLessonPlan(CreateLessonPlanRequest) returns (LessonPlan);
+  rpc UpdateLessonPlan(UpdateLessonPlanRequest) returns (LessonPlan);
+  rpc DeleteLessonPlan(DeleteLessonPlanRequest) returns (DeleteLessonPlanResponse);
+
+  rpc AddActivityPoint(AddActivityPointRequest) returns (AddActivityPointResponse);
+  rpc ListLeaderboard(ListLeaderboardRequest) returns (ListLeaderboardResponse);
+}

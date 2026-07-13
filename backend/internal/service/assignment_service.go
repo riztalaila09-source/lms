@@ -23,6 +23,7 @@ type AssignmentService struct {
 	enrollmentRepo repository.EnrollmentRepository
 	courseRepo     repository.CourseRepository
 	questionRepo   repository.AssignmentQuestionRepository
+	groupRepo      repository.AssignmentGroupRepository
 }
 
 func NewAssignmentService(
@@ -31,6 +32,7 @@ func NewAssignmentService(
 	enrollmentRepo repository.EnrollmentRepository,
 	courseRepo repository.CourseRepository,
 	questionRepo repository.AssignmentQuestionRepository,
+	groupRepo repository.AssignmentGroupRepository,
 ) *AssignmentService {
 	return &AssignmentService{
 		assignmentRepo: assignmentRepo,
@@ -38,6 +40,7 @@ func NewAssignmentService(
 		enrollmentRepo: enrollmentRepo,
 		courseRepo:     courseRepo,
 		questionRepo:   questionRepo,
+		groupRepo:      groupRepo,
 	}
 }
 
@@ -362,17 +365,105 @@ func (s *AssignmentService) canStudentAttempt(ctx context.Context, a *repository
 	return nil
 }
 
+// KuisOptions adalah opsi tetap untuk soal Kuis.
+var KuisOptions = []string{"Benar", "Salah", "Mungkin"}
+
 func (s *AssignmentService) SetAssignmentQuestions(ctx context.Context, callerRole, assignmentID string, qs []*repository.AssignmentQuestion) error {
 	if !isManager(callerRole) {
 		return ErrPermissionDenied
 	}
-	if _, err := s.assignmentRepo.GetByID(ctx, assignmentID); err != nil {
+	a, err := s.assignmentRepo.GetByID(ctx, assignmentID)
+	if err != nil {
 		if errors.Is(err, repository.ErrAssignmentNotFound) {
 			return ErrAssignmentNotFound
 		}
 		return fmt.Errorf("get assignment: %w", err)
 	}
+	if a.Type == "kuis" {
+		if len(qs) < 5 {
+			return fmt.Errorf("kuis minimal 5 soal")
+		}
+		for _, q := range qs {
+			q.Options = KuisOptions // opsi tetap Benar/Salah/Mungkin
+			q.CorrectIndex = -1
+			seen := map[int]bool{}
+			valid := make([]int, 0, len(q.CorrectIndices))
+			for _, idx := range q.CorrectIndices {
+				if idx < 0 || idx > 2 || seen[idx] {
+					continue
+				}
+				seen[idx] = true
+				valid = append(valid, idx)
+			}
+			if len(valid) == 0 {
+				return fmt.Errorf("setiap soal kuis harus punya minimal 1 jawaban benar")
+			}
+			q.CorrectIndices = valid
+		}
+	}
 	return s.questionRepo.SetForAssignment(ctx, assignmentID, qs)
+}
+
+// SubmitKuis menilai kuis multi-jawaban (Benar/Salah/Mungkin). Partial credit:
+// total unit = jumlah seluruh jawaban benar; earned per soal = max(0, benar-dipilih
+// − salah-dipilih); skor = round(earned/total*100). Tanpa aturan retry.
+func (s *AssignmentService) SubmitKuis(ctx context.Context, callerID, callerRole, assignmentID string, answers map[string][]int, timeTaken int) (score, earned, total int, err error) {
+	if callerRole != "student" {
+		return 0, 0, 0, ErrPermissionDenied
+	}
+	a, err := s.assignmentRepo.GetByID(ctx, assignmentID)
+	if err != nil {
+		if errors.Is(err, repository.ErrAssignmentNotFound) {
+			return 0, 0, 0, ErrAssignmentNotFound
+		}
+		return 0, 0, 0, fmt.Errorf("get assignment: %w", err)
+	}
+	if err := s.canStudentAttempt(ctx, a, callerID); err != nil {
+		return 0, 0, 0, err
+	}
+	qs, err := s.questionRepo.ListByAssignment(ctx, assignmentID)
+	if err != nil {
+		return 0, 0, 0, err
+	}
+	for _, q := range qs {
+		correct := map[int]bool{}
+		for _, idx := range q.CorrectIndices {
+			correct[idx] = true
+		}
+		total += len(correct)
+		sel := answers[q.ID]
+		var rightSel, wrongSel int
+		seen := map[int]bool{}
+		for _, idx := range sel {
+			if seen[idx] {
+				continue
+			}
+			seen[idx] = true
+			if correct[idx] {
+				rightSel++
+			} else {
+				wrongSel++
+			}
+		}
+		e := rightSel - wrongSel
+		if e > 0 {
+			earned += e
+		}
+	}
+	if total == 0 {
+		return 0, 0, 0, fmt.Errorf("kuis ini belum punya soal")
+	}
+	score = (earned*100 + total/2) / total
+	if score < 0 {
+		score = 0
+	}
+	if score > 100 {
+		score = 100
+	}
+	if err := s.submissionRepo.CreateQuizSubmission(ctx, uuid.New().String(), assignmentID, callerID, score, timeTaken); err != nil {
+		return 0, 0, 0, err
+	}
+	return score, earned, total, nil
 }
 
 func (s *AssignmentService) ListAssignmentQuestions(ctx context.Context, callerID, callerRole, assignmentID string) ([]*repository.AssignmentQuestion, error) {
@@ -395,6 +486,7 @@ func (s *AssignmentService) ListAssignmentQuestions(ctx context.Context, callerI
 	if !isManager(callerRole) {
 		for _, q := range qs {
 			q.CorrectIndex = -1 // never expose the answer key to students
+			q.CorrectIndices = nil
 		}
 	}
 	return qs, nil
@@ -440,6 +532,138 @@ func (s *AssignmentService) SubmitQuiz(ctx context.Context, callerID, callerRole
 		return false, correct, total, 0, err
 	}
 	return true, correct, total, score, nil
+}
+
+// ── Praktikum (tugas kelompok) ──
+
+// canSubmitGroup memvalidasi siswa boleh mengumpulkan tugas kelompok (tanpa
+// aturan submit-once — pengumpulan kelompok bisa ditimpa).
+func (s *AssignmentService) canSubmitGroup(ctx context.Context, a *repository.Assignment, studentID string) error {
+	enrolled, err := s.enrollmentRepo.IsEnrolled(ctx, a.CourseID, studentID)
+	if err != nil {
+		return fmt.Errorf("check enrollment: %w", err)
+	}
+	if !enrolled {
+		return ErrPermissionDenied
+	}
+	if blocked, _ := s.assignmentRepo.IsBlocked(ctx, a.ID, studentID); blocked {
+		return fmt.Errorf("Anda diblokir untuk tugas ini")
+	}
+	if !a.IsActive {
+		return fmt.Errorf("tugas tidak aktif")
+	}
+	if a.Deadline.Valid && time.Now().After(a.Deadline.Time) {
+		return fmt.Errorf("deadline sudah lewat")
+	}
+	return nil
+}
+
+func (s *AssignmentService) SetAssignmentGroups(ctx context.Context, callerRole, assignmentID string, groups []*repository.AssignGroup) error {
+	if !isManager(callerRole) {
+		return ErrPermissionDenied
+	}
+	a, err := s.assignmentRepo.GetByID(ctx, assignmentID)
+	if err != nil {
+		if errors.Is(err, repository.ErrAssignmentNotFound) {
+			return ErrAssignmentNotFound
+		}
+		return fmt.Errorf("get assignment: %w", err)
+	}
+	seen := map[string]bool{}
+	for _, g := range groups {
+		for _, m := range g.Members {
+			if seen[m.StudentID] {
+				return fmt.Errorf("seorang siswa tidak boleh berada di dua kelompok")
+			}
+			seen[m.StudentID] = true
+			enrolled, err := s.enrollmentRepo.IsEnrolled(ctx, a.CourseID, m.StudentID)
+			if err != nil {
+				return fmt.Errorf("check enrollment: %w", err)
+			}
+			if !enrolled {
+				return fmt.Errorf("ada anggota kelompok yang bukan siswa mapel ini")
+			}
+		}
+	}
+	return s.groupRepo.SetGroups(ctx, assignmentID, groups)
+}
+
+func (s *AssignmentService) ListAssignmentGroups(ctx context.Context, callerID, callerRole, assignmentID string) ([]*repository.AssignGroup, string, error) {
+	groups, err := s.groupRepo.ListGroups(ctx, assignmentID)
+	if err != nil {
+		return nil, "", err
+	}
+	myGroup := ""
+	if callerRole == "student" {
+		myGroup, _ = s.groupRepo.GroupOfStudent(ctx, assignmentID, callerID)
+	}
+	return groups, myGroup, nil
+}
+
+func (s *AssignmentService) SubmitGroupAssignment(ctx context.Context, callerID, callerRole, assignmentID, content, fileURL string) (*repository.GroupSubmission, error) {
+	if callerRole != "student" {
+		return nil, ErrPermissionDenied
+	}
+	a, err := s.assignmentRepo.GetByID(ctx, assignmentID)
+	if err != nil {
+		if errors.Is(err, repository.ErrAssignmentNotFound) {
+			return nil, ErrAssignmentNotFound
+		}
+		return nil, fmt.Errorf("get assignment: %w", err)
+	}
+	if err := s.canSubmitGroup(ctx, a, callerID); err != nil {
+		return nil, err
+	}
+	groupID, err := s.groupRepo.GroupOfStudent(ctx, assignmentID, callerID)
+	if err != nil {
+		return nil, err
+	}
+	if groupID == "" {
+		return nil, fmt.Errorf("Anda belum masuk kelompok mana pun untuk tugas ini")
+	}
+	isLeader, err := s.groupRepo.IsGroupLeader(ctx, groupID, callerID)
+	if err != nil {
+		return nil, err
+	}
+	if !isLeader {
+		return nil, fmt.Errorf("hanya ketua kelompok yang boleh mengumpulkan tugas ini")
+	}
+	if err := s.groupRepo.UpsertGroupSubmission(ctx, groupID, content, fileURL, callerID); err != nil {
+		return nil, err
+	}
+	return s.groupRepo.GroupSubmissionByGroup(ctx, groupID)
+}
+
+func (s *AssignmentService) ListGroupSubmissions(ctx context.Context, callerID, callerRole, assignmentID string) ([]*repository.GroupSubmission, error) {
+	if isManager(callerRole) {
+		return s.groupRepo.ListGroupSubmissions(ctx, assignmentID)
+	}
+	// Siswa: hanya submission kelompoknya sendiri.
+	groupID, err := s.groupRepo.GroupOfStudent(ctx, assignmentID, callerID)
+	if err != nil || groupID == "" {
+		return nil, err
+	}
+	gs, err := s.groupRepo.GroupSubmissionByGroup(ctx, groupID)
+	if err != nil {
+		if errors.Is(err, repository.ErrGroupNotFound) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return []*repository.GroupSubmission{gs}, nil
+}
+
+func (s *AssignmentService) GradeGroupSubmission(ctx context.Context, callerRole, groupID string, score int, feedback string) error {
+	if !isManager(callerRole) {
+		return ErrPermissionDenied
+	}
+	if score < 0 {
+		score = 0
+	}
+	if score > 100 {
+		score = 100
+	}
+	return s.groupRepo.GradeGroupSubmission(ctx, groupID, score, feedback)
 }
 
 // GradeGrid is the assembled data for the Nilai page.
@@ -500,6 +724,15 @@ func (s *AssignmentService) ListGrades(ctx context.Context, callerID, callerRole
 			scoresByStudent[sub.StudentID] = map[string]int{}
 		}
 		scoresByStudent[sub.StudentID][sub.AssignmentID] = int(sub.Score.Int64)
+	}
+	// Nilai praktikum: nilai kelompok berlaku untuk SETIAP anggota.
+	if pscores, err := s.groupRepo.PraktikumScores(ctx, ids); err == nil {
+		for _, p := range pscores {
+			if scoresByStudent[p.StudentID] == nil {
+				scoresByStudent[p.StudentID] = map[string]int{}
+			}
+			scoresByStudent[p.StudentID][p.AssignmentID] = p.Score
+		}
 	}
 
 	// Build student rows from enrollments across the involved courses.
@@ -618,6 +851,14 @@ func (s *AssignmentService) ListMyGrades(ctx context.Context, studentID string) 
 			continue
 		}
 		scoreByID[sub.AssignmentID] = int(sub.Score.Int64)
+	}
+	// Nilai praktikum (kelompok) untuk siswa ini = nilai kelompoknya.
+	if pscores, err := s.groupRepo.PraktikumScores(ctx, allIDs); err == nil {
+		for _, p := range pscores {
+			if p.StudentID == studentID {
+				scoreByID[p.AssignmentID] = p.Score
+			}
+		}
 	}
 
 	result := &MyGrades{}

@@ -358,6 +358,33 @@ func (h *MaterialHandler) ListEssayComments(ctx context.Context, req *connect.Re
 	return connect.NewResponse(&materialv1.ListEssayCommentsResponse{Comments: out}), nil
 }
 
+func (h *MaterialHandler) AddPhaseComment(ctx context.Context, req *connect.Request[materialv1.AddPhaseCommentRequest]) (*connect.Response[materialv1.PhaseComment], error) {
+	claims, ok := middleware.ClaimsFromContext(ctx)
+	if !ok {
+		return nil, connect.NewError(connect.CodeUnauthenticated, nil)
+	}
+	c, err := h.essaySvc.AddPhaseComment(ctx, claims.UserID, claims.Role, req.Msg.MaterialId, req.Msg.BlockId, req.Msg.ParentId, req.Msg.Content)
+	if err != nil {
+		return nil, mapMaterialServiceError(err)
+	}
+	return connect.NewResponse(phaseCommentToProto(c)), nil
+}
+
+func (h *MaterialHandler) ListPhaseComments(ctx context.Context, req *connect.Request[materialv1.ListPhaseCommentsRequest]) (*connect.Response[materialv1.ListPhaseCommentsResponse], error) {
+	if _, ok := middleware.ClaimsFromContext(ctx); !ok {
+		return nil, connect.NewError(connect.CodeUnauthenticated, nil)
+	}
+	cs, err := h.essaySvc.ListPhaseComments(ctx, req.Msg.MaterialId, req.Msg.BlockId)
+	if err != nil {
+		return nil, mapMaterialServiceError(err)
+	}
+	out := make([]*materialv1.PhaseComment, 0, len(cs))
+	for _, c := range cs {
+		out = append(out, phaseCommentToProto(c))
+	}
+	return connect.NewResponse(&materialv1.ListPhaseCommentsResponse{Comments: out}), nil
+}
+
 func essayQuestionToProto(q *repository.EssayQuestion) *materialv1.EssayQuestion {
 	return &materialv1.EssayQuestion{
 		Id:         q.ID,
@@ -374,8 +401,24 @@ func essayCommentToProto(c *repository.EssayComment) *materialv1.EssayComment {
 		AuthorId:        c.AuthorID,
 		AuthorName:      c.AuthorName,
 		AuthorRole:      c.AuthorRole,
+		AuthorPhoto:     c.AuthorPhoto,
 		Content:         c.Content,
 		CreatedAt:       timestamppb.New(c.CreatedAt),
+	}
+}
+
+func phaseCommentToProto(c *repository.PhaseComment) *materialv1.PhaseComment {
+	return &materialv1.PhaseComment{
+		Id:         c.ID,
+		MaterialId: c.MaterialID,
+		BlockId:    c.BlockID,
+		AuthorId:   c.AuthorID,
+		AuthorName: c.AuthorName,
+		AuthorRole:  c.AuthorRole,
+		AuthorPhoto: c.AuthorPhoto,
+		Content:     c.Content,
+		CreatedAt:   timestamppb.New(c.CreatedAt),
+		ParentId:    c.ParentID,
 	}
 }
 
@@ -506,6 +549,8 @@ func mapMaterialServiceError(err error) error {
 		return connect.NewError(connect.CodeNotFound, err)
 	case errors.Is(err, service.ErrPermissionDenied):
 		return connect.NewError(connect.CodePermissionDenied, err)
+	case errors.Is(err, service.ErrEmptyComment):
+		return connect.NewError(connect.CodeInvalidArgument, err)
 	default:
 		return connect.NewError(connect.CodeInternal, err)
 	}

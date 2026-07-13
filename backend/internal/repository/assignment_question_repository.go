@@ -10,13 +10,14 @@ import (
 )
 
 type AssignmentQuestion struct {
-	ID           string
-	AssignmentID string
-	Question     string
-	Options      []string
-	CorrectIndex int
-	OrderIndex   int
-	Image        string
+	ID             string
+	AssignmentID   string
+	Question       string
+	Options        []string
+	CorrectIndex   int
+	CorrectIndices []int // kuis: >=1 jawaban benar
+	OrderIndex     int
+	Image          string
 }
 
 type AssignmentQuestionRepository interface {
@@ -43,10 +44,11 @@ func (r *sqliteAssignmentQuestionRepository) SetForAssignment(ctx context.Contex
 	}
 	for i, q := range qs {
 		opts, _ := json.Marshal(q.Options)
+		ci, _ := json.Marshal(q.CorrectIndices)
 		if _, err := tx.ExecContext(ctx, `
-			INSERT INTO assignment_questions (id, assignment_id, question, options_json, correct_index, order_index, image)
-			VALUES (?, ?, ?, ?, ?, ?, ?)`,
-			uuid.New().String(), assignmentID, q.Question, string(opts), q.CorrectIndex, i, q.Image); err != nil {
+			INSERT INTO assignment_questions (id, assignment_id, question, options_json, correct_index, correct_indices, order_index, image)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+			uuid.New().String(), assignmentID, q.Question, string(opts), q.CorrectIndex, string(ci), i, q.Image); err != nil {
 			return fmt.Errorf("insert question: %w", err)
 		}
 	}
@@ -55,7 +57,7 @@ func (r *sqliteAssignmentQuestionRepository) SetForAssignment(ctx context.Contex
 
 func (r *sqliteAssignmentQuestionRepository) ListByAssignment(ctx context.Context, assignmentID string) ([]*AssignmentQuestion, error) {
 	rows, err := r.db.QueryContext(ctx, `
-		SELECT id, assignment_id, question, options_json, correct_index, order_index, image
+		SELECT id, assignment_id, question, options_json, correct_index, COALESCE(correct_indices,'[]'), order_index, image
 		FROM assignment_questions WHERE assignment_id = ? ORDER BY order_index ASC, created_at ASC`, assignmentID)
 	if err != nil {
 		return nil, fmt.Errorf("list questions: %w", err)
@@ -65,11 +67,12 @@ func (r *sqliteAssignmentQuestionRepository) ListByAssignment(ctx context.Contex
 	var out []*AssignmentQuestion
 	for rows.Next() {
 		q := &AssignmentQuestion{}
-		var optsJSON string
-		if err := rows.Scan(&q.ID, &q.AssignmentID, &q.Question, &optsJSON, &q.CorrectIndex, &q.OrderIndex, &q.Image); err != nil {
+		var optsJSON, ciJSON string
+		if err := rows.Scan(&q.ID, &q.AssignmentID, &q.Question, &optsJSON, &q.CorrectIndex, &ciJSON, &q.OrderIndex, &q.Image); err != nil {
 			return nil, fmt.Errorf("scan question: %w", err)
 		}
 		_ = json.Unmarshal([]byte(optsJSON), &q.Options)
+		_ = json.Unmarshal([]byte(ciJSON), &q.CorrectIndices)
 		out = append(out, q)
 	}
 	return out, rows.Err()

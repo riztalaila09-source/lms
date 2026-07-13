@@ -17,6 +17,7 @@ import (
 	"lms/backend/gen/assignment/v1/assignmentv1connect"
 	"lms/backend/gen/attendance/v1/attendancev1connect"
 	"lms/backend/gen/class/v1/classv1connect"
+	"lms/backend/gen/classroom/v1/classroomv1connect"
 	"lms/backend/gen/jurusan/v1/jurusanv1connect"
 	"lms/backend/gen/school/v1/schoolv1connect"
 	"lms/backend/gen/course/v1/coursev1connect"
@@ -66,6 +67,7 @@ func main() {
 	assignmentRepo := repository.NewAssignmentRepository(db)
 	submissionRepo := repository.NewSubmissionRepository(db)
 	assignmentQuestionRepo := repository.NewAssignmentQuestionRepository(db)
+	assignmentGroupRepo := repository.NewAssignmentGroupRepository(db)
 	dashboardRepo := repository.NewDashboardRepository(db)
 	classRepo := repository.NewClassRepository(db)
 	jurusanRepo := repository.NewJurusanRepository(db)
@@ -75,6 +77,7 @@ func main() {
 	categoryRepo := repository.NewCategoryRepository(db)
 	attendanceRepo := repository.NewAttendanceRepository(db)
 	pklRepo := repository.NewPklRepository(db)
+	classroomRepo := repository.NewClassroomRepository(db)
 
 	// Business logic
 	userSvc := service.NewUserService(userRepo, jwtSvc, activityRepo)
@@ -82,13 +85,14 @@ func main() {
 	materialSvc := service.NewMaterialService(materialRepo, enrollmentRepo, questionRepo, categoryRepo)
 	completionSvc := service.NewCompletionService(completionRepo, essayRepo)
 	essaySvc := service.NewEssayService(essayRepo, materialRepo)
-	assignmentSvc := service.NewAssignmentService(assignmentRepo, submissionRepo, enrollmentRepo, courseRepo, assignmentQuestionRepo)
+	assignmentSvc := service.NewAssignmentService(assignmentRepo, submissionRepo, enrollmentRepo, courseRepo, assignmentQuestionRepo, assignmentGroupRepo)
 	dashboardSvc := service.NewDashboardService(dashboardRepo)
 	classSvc := service.NewClassService(classRepo)
 	jurusanSvc := service.NewJurusanService(jurusanRepo)
 	schoolSvc := service.NewSchoolService(schoolRepo)
 	attendanceSvc := service.NewAttendanceService(attendanceRepo, courseRepo)
 	pklSvc := service.NewPklService(pklRepo)
+	classroomSvc := service.NewClassroomService(classroomRepo)
 
 	// Handlers
 	userHandler := handler.NewUserHandler(userSvc, courseSvc)
@@ -101,6 +105,7 @@ func main() {
 	schoolHandler := handler.NewSchoolHandler(schoolSvc)
 	attendanceHandler := handler.NewAttendanceHandler(attendanceSvc)
 	pklHandler := handler.NewPklHandler(pklSvc)
+	classroomHandler := handler.NewClassroomHandler(classroomSvc)
 
 	// Auth interceptor applied to all handlers
 	authInterceptor := middleware.NewAuthInterceptor(jwtSvc)
@@ -118,6 +123,7 @@ func main() {
 	schoolPath, schoolAPI := schoolv1connect.NewSchoolServiceHandler(schoolHandler, interceptors)
 	attendancePath, attendanceAPI := attendancev1connect.NewAttendanceServiceHandler(attendanceHandler, interceptors)
 	pklPath, pklAPI := pklv1connect.NewPklServiceHandler(pklHandler, interceptors)
+	classroomPath, classroomAPI := classroomv1connect.NewClassroomServiceHandler(classroomHandler, interceptors)
 
 	mux.Handle(userPath, userAPI)
 	mux.Handle(coursePath, courseAPI)
@@ -129,6 +135,7 @@ func main() {
 	mux.Handle(schoolPath, schoolAPI)
 	mux.Handle(attendancePath, attendanceAPI)
 	mux.Handle(pklPath, pklAPI)
+	mux.Handle(classroomPath, classroomAPI)
 
 	// Serve material cover images as cacheable binary (NOT base64 in JSON), so
 	// the materials list payload stays tiny and images load lazily/cached.

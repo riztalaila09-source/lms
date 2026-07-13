@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { Badge, Box, Button, Dialog, Flex, Heading, Icon, Image, Input, Spinner, Stack, Text, useBreakpointValue } from '@chakra-ui/react'
 import {
   LuCircleCheck, LuPaperclip, LuPencil, LuCheck, LuClock, LuExternalLink,
-  LuGraduationCap, LuCalendar, LuList, LuChevronDown, LuPlay,
+  LuGraduationCap, LuCalendar, LuList, LuChevronDown, LuPlay, LuListChecks,
 } from 'react-icons/lu'
 import { timestampDate } from '@bufbuild/protobuf/wkt'
 import { useEditor, EditorContent } from '@tiptap/react'
@@ -11,9 +11,13 @@ import type { Material, Question, MaterialCompletion, EssayQuestion, EssayCommen
 import { Role } from '@/gen/user/v1/user_pb'
 import { decodeLinks } from './MaterialFormDialog'
 import { StarsDisplay, StarsInput } from '@/components/StarRating'
+import MaterialComments from './MaterialComments'
+import CommentAvatar from './CommentAvatar'
+import ActivityScoringPanel from './classroom/ActivityScoringPanel'
 import { buildExtensions, READER_CSS } from './tiptap'
 import { MCQContext } from './MCQNode'
 import { VideoContext } from './YouTubeNode'
+import { PhaseContext } from './PhaseNode'
 import YouTubePlayer, { parseYouTubeId } from './YouTubePlayer'
 import { COLORS, courseGradient, labelColor } from '@/theme/tokens'
 import { useAuth } from '@/hooks/useAuth'
@@ -160,6 +164,9 @@ export default function MaterialViewer({ open, onClose, material }: Props) {
   const [ratingCount, setRatingCount] = useState(0)
   const [myRating, setMyRating] = useState(0)
   const [ratingSaving, setRatingSaving] = useState(false)
+
+  // Dialog "Keaktifan Siswa" (khusus guru).
+  const [activeOpen, setActiveOpen] = useState(false)
 
   const isComplete = !!completion
   const hasMCQ = mcqKeys.size + quiz.length > 0
@@ -352,6 +359,7 @@ export default function MaterialViewer({ open, onClose, material }: Props) {
   }
 
   return (
+    <>
     <Dialog.Root open={open} onOpenChange={(e) => { if (!e.open) onClose() }} scrollBehavior="inside" size="full">
       <Dialog.Backdrop />
       <Dialog.Positioner>
@@ -404,7 +412,7 @@ export default function MaterialViewer({ open, onClose, material }: Props) {
               <Flex direction={{ base: 'column', lg: 'row' }} gap={{ base: '18px', lg: '28px' }} align="flex-start" mt="18px">
                 {/* MAIN */}
                 <Box flex="1" minW={0} w="full">
-                  <Stack gap="16px" maxW={{ lg: '1000px' }}>
+                  <Stack gap="16px" maxW={{ lg: '1120px' }} mx="auto">
                     {material?.description && (
                       <Text fontSize={`${17 * fontScale}px`} color={COLORS.text} fontWeight="500" lineHeight="1.7"
                         borderLeft="3px solid" borderColor={COLORS.primary} pl="14px">{material.description}</Text>
@@ -412,10 +420,12 @@ export default function MaterialViewer({ open, onClose, material }: Props) {
 
                     <MCQContext.Provider value={mcqCtx}>
                       <VideoContext.Provider value={videoCtx}>
-                        <Box ref={contentRef} fontSize={`${16 * fontScale}px`} lineHeight="1.9" color={COLORS.text}
-                          css={{ '& .ProseMirror': { outline: 'none' }, ...READER_CSS }}>
-                          <EditorContent editor={contentEditor} />
-                        </Box>
+                        <PhaseContext.Provider value={{ interactive: true, materialId: material?.id ?? '' }}>
+                          <Box ref={contentRef} fontSize={`${16 * fontScale}px`} lineHeight="1.9" color={COLORS.text}
+                            css={{ '& .ProseMirror': { outline: 'none' }, ...READER_CSS }}>
+                            <EditorContent editor={contentEditor} />
+                          </Box>
+                        </PhaseContext.Provider>
                       </VideoContext.Provider>
                     </MCQContext.Provider>
 
@@ -537,11 +547,14 @@ export default function MaterialViewer({ open, onClose, material }: Props) {
                                   <Stack gap="8px" mb="10px">
                                     {comments.map((c) => (
                                       <Flex key={c.id} gap="8px" align="flex-start" bg={COLORS.surface} p="8px" borderRadius="6px" border="1px solid" borderColor={COLORS.border}>
-                                        <Badge colorPalette={c.authorRole === 'teacher' || c.authorRole === 'admin' ? 'purple' : 'blue'} variant="subtle" fontSize="10px" flexShrink={0} mt="1px">
-                                          {c.authorRole === 'teacher' || c.authorRole === 'admin' ? 'Guru' : 'Siswa'}
-                                        </Badge>
-                                        <Box flex={1}>
-                                          <Text fontSize="12px" fontWeight="600" color={COLORS.text}>{c.authorName}</Text>
+                                        <CommentAvatar name={c.authorName} photo={c.authorPhoto} size={30} />
+                                        <Box flex={1} minW={0}>
+                                          <Flex align="center" gap="6px">
+                                            <Text fontSize="12px" fontWeight="600" color={COLORS.text}>{c.authorName}</Text>
+                                            <Badge colorPalette={c.authorRole === 'teacher' || c.authorRole === 'admin' ? 'purple' : 'blue'} variant="subtle" fontSize="10px" flexShrink={0}>
+                                              {c.authorRole === 'teacher' || c.authorRole === 'admin' ? 'Guru' : 'Siswa'}
+                                            </Badge>
+                                          </Flex>
                                           <Text fontSize="13px" color={COLORS.text} mt="2px">{c.content}</Text>
                                         </Box>
                                       </Flex>
@@ -611,6 +624,22 @@ export default function MaterialViewer({ open, onClose, material }: Props) {
                         <StarsInput value={myRating} onRate={rate} size={26} disabled={ratingSaving} />
                       </Box>
                     )}
+
+                    {/* Keaktifan siswa — KHUSUS guru (siswa tidak melihat) */}
+                    {!isStudent && material && material.courseId && material.courseId !== 'general' && (
+                      <Box border="1px solid" borderColor={COLORS.border} borderRadius="10px" p="12px" bg={COLORS.surface}>
+                        <Flex align="center" gap="6px" mb="8px">
+                          <Icon as={LuListChecks} boxSize="15px" color={COLORS.primary} />
+                          <Text fontSize="13px" fontWeight="700" color={COLORS.text}>Keaktifan Siswa</Text>
+                        </Flex>
+                        <Text fontSize="11px" color={COLORS.muted} mb="8px">Nilai apersepsi/keaktifan siswa sambil mengajar.</Text>
+                        <Button size="sm" w="full" variant="outline" onClick={() => setActiveOpen(true)}>
+                          <Icon as={LuListChecks} /> Nilai Keaktifan
+                        </Button>
+                      </Box>
+                    )}
+
+                    {material && <MaterialComments materialId={material.id} />}
                   </Stack>
                 </Box>
               </Flex>
@@ -650,5 +679,29 @@ export default function MaterialViewer({ open, onClose, material }: Props) {
         </Dialog.Content>
       </Dialog.Positioner>
     </Dialog.Root>
+
+    {/* Dialog penilaian keaktifan siswa (khusus guru) */}
+    {!isStudent && material && material.courseId && material.courseId !== 'general' && (
+      <Dialog.Root open={activeOpen} onOpenChange={(e) => setActiveOpen(e.open)} scrollBehavior="inside" size="xl">
+        <Dialog.Backdrop />
+        <Dialog.Positioner>
+          <Dialog.Content>
+            <Dialog.Header>
+              <Flex align="center" gap="8px" w="full">
+                <Icon as={LuListChecks} color={COLORS.primary} />
+                <Dialog.Title flex="1" fontSize="15px">Keaktifan Siswa — {material.title}</Dialog.Title>
+              </Flex>
+            </Dialog.Header>
+            <Dialog.Body>
+              <ActivityScoringPanel courseId={material.courseId} />
+            </Dialog.Body>
+            <Dialog.Footer>
+              <Button variant="outline" onClick={() => setActiveOpen(false)}>Tutup</Button>
+            </Dialog.Footer>
+          </Dialog.Content>
+        </Dialog.Positioner>
+      </Dialog.Root>
+    )}
+    </>
   )
 }

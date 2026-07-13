@@ -232,6 +232,7 @@ message EssayComment {
   string author_role        = 5;
   string content            = 6;
   google.protobuf.Timestamp created_at = 7;
+  string author_photo       = 8; // foto profil penulis (URL/data), "" bila tak ada
 }
 
 message CreateEssayQuestionRequest {
@@ -253,6 +254,33 @@ message AddEssayCommentRequest {
 
 message ListEssayCommentsRequest  { string essay_question_id = 1; }
 message ListEssayCommentsResponse { repeated EssayComment comments = 1; }
+
+// ── Diskusi per-fase (komentar menempel ke blok "Fase Pembelajaran") ──
+message PhaseComment {
+  string id          = 1;
+  string material_id = 2;
+  string block_id    = 3;
+  string author_id   = 4;
+  string author_name = 5;
+  string author_role = 6;
+  string content     = 7;
+  google.protobuf.Timestamp created_at = 8;
+  string parent_id   = 9; // "" = komentar utama; berisi id komentar induk untuk balasan
+  string author_photo = 10; // foto profil penulis (URL/data), "" bila tak ada
+}
+
+message AddPhaseCommentRequest {
+  string material_id = 1;
+  string block_id    = 2;
+  string content     = 3;
+  string parent_id   = 4; // opsional: id komentar yang dibalas
+}
+
+message ListPhaseCommentsRequest {
+  string material_id = 1;
+  string block_id    = 2;
+}
+message ListPhaseCommentsResponse { repeated PhaseComment comments = 1; }
 
 service MaterialService {
   rpc CreateMaterial(CreateMaterialRequest) returns (Material);
@@ -278,4 +306,6 @@ service MaterialService {
   rpc DeleteEssayQuestion(DeleteEssayQuestionRequest) returns (DeleteEssayQuestionResponse);
   rpc AddEssayComment(AddEssayCommentRequest)         returns (EssayComment);
   rpc ListEssayComments(ListEssayCommentsRequest)     returns (ListEssayCommentsResponse);
+  rpc AddPhaseComment(AddPhaseCommentRequest)         returns (PhaseComment);
+  rpc ListPhaseComments(ListPhaseCommentsRequest)     returns (ListPhaseCommentsResponse);
 }

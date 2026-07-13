@@ -58,9 +58,10 @@ message AssignmentQuestion {
   string assignment_id = 2;
   string question = 3;
   repeated string options = 4;
-  int32 correct_index = 5; // hidden (=-1) for students
+  int32 correct_index = 5; // hidden (=-1) for students; single-correct (pilihan_ganda)
   int32 order_index = 6;
   string image = 7;        // optional image (data URL)
+  repeated int32 correct_indices = 8; // kuis: >=1 jawaban benar (kosong utk siswa)
 }
 
 message QuestionInput {
@@ -68,6 +69,20 @@ message QuestionInput {
   repeated string options = 2;
   int32 correct_index = 3;
   string image = 4;        // optional image (data URL)
+  repeated int32 correct_indices = 5; // kuis multi-benar
+}
+
+// ── Kuis (Benar/Salah/Mungkin, boleh >1 benar; partial credit) ──
+message KuisAnswer { string question_id = 1; repeated int32 option_indices = 2; }
+message SubmitKuisRequest {
+  string assignment_id = 1;
+  repeated KuisAnswer answers = 2;
+  int32 time_taken_seconds = 3;
+}
+message SubmitKuisResponse {
+  int32 score = 1; // 0..100
+  int32 earned = 2;
+  int32 total = 3; // total jawaban-benar (unit)
 }
 
 // Replace the full set of questions for an assignment.
@@ -195,6 +210,58 @@ message ListMyGradesResponse {
   bool has_grade = 3;
 }
 
+// ── Praktikum: tugas kelompok ──
+message GroupMember {
+  string student_id = 1;
+  string student_name = 2;
+  string student_kelas = 3;
+  bool   is_leader = 4; // ketua kelompok
+}
+message AssignmentGroup {
+  string id = 1;
+  string assignment_id = 2;
+  string name = 3;
+  repeated GroupMember members = 4;
+}
+message GroupInput {
+  string name = 1;
+  repeated string student_ids = 2;
+  string leader_id = 3; // student_id ketua (harus salah satu anggota)
+}
+message SetAssignmentGroupsRequest {
+  string assignment_id = 1;
+  repeated GroupInput groups = 2;
+}
+message SetAssignmentGroupsResponse {}
+
+message ListAssignmentGroupsRequest { string assignment_id = 1; }
+message ListAssignmentGroupsResponse {
+  repeated AssignmentGroup groups = 1;
+  string my_group_id = 2; // (student view) grup pemanggil, "" bila tak ada
+}
+
+message GroupSubmission {
+  string group_id = 1;
+  string group_name = 2;
+  string content = 3;
+  string file_url = 4;
+  bool submitted = 5;
+  google.protobuf.Timestamp submitted_at = 6;
+  bool graded = 7;
+  int32 score = 8;
+  string feedback = 9;
+  string submitted_by_name = 10;
+}
+message SubmitGroupRequest {
+  string assignment_id = 1;
+  string content = 2;
+  string file_url = 3;
+}
+message ListGroupSubmissionsRequest { string assignment_id = 1; }
+message ListGroupSubmissionsResponse { repeated GroupSubmission submissions = 1; }
+message GradeGroupRequest { string group_id = 1; int32 score = 2; string feedback = 3; }
+message GradeGroupResponse {}
+
 service AssignmentService {
   rpc CreateAssignment(CreateAssignmentRequest) returns (Assignment);
   rpc GetAssignment(GetAssignmentRequest) returns (Assignment);
@@ -212,4 +279,12 @@ service AssignmentService {
   rpc SetAssignmentQuestions(SetAssignmentQuestionsRequest) returns (SetAssignmentQuestionsResponse);
   rpc ListAssignmentQuestions(ListAssignmentQuestionsRequest) returns (ListAssignmentQuestionsResponse);
   rpc SubmitQuiz(SubmitQuizRequest) returns (SubmitQuizResponse);
+  rpc SubmitKuis(SubmitKuisRequest) returns (SubmitKuisResponse);
+
+  // Praktikum (tugas kelompok)
+  rpc SetAssignmentGroups(SetAssignmentGroupsRequest) returns (SetAssignmentGroupsResponse);
+  rpc ListAssignmentGroups(ListAssignmentGroupsRequest) returns (ListAssignmentGroupsResponse);
+  rpc SubmitGroupAssignment(SubmitGroupRequest) returns (GroupSubmission);
+  rpc ListGroupSubmissions(ListGroupSubmissionsRequest) returns (ListGroupSubmissionsResponse);
+  rpc GradeGroupSubmission(GradeGroupRequest) returns (GradeGroupResponse);
 }

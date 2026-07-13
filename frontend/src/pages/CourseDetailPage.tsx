@@ -19,10 +19,13 @@ import MaterialViewer from '@/components/MaterialViewer'
 import ConfirmDialog, { type ConfirmState } from '@/components/ConfirmDialog'
 import Pagination, { usePaged } from '@/components/Pagination'
 import { StarsDisplay } from '@/components/StarRating'
+import ScheduleTab from '@/components/classroom/ScheduleTab'
+import LessonCalendarTab from '@/components/classroom/LessonCalendarTab'
+import ActivityLeaderboard from '@/components/classroom/ActivityLeaderboard'
 import { COLORS, UDEMY, courseGradient } from '@/theme/tokens'
 import { toaster } from '@/components/ui/toaster'
 
-type ActiveTab = 'materials' | 'students' | 'completions' | 'categories' | 'about'
+type ActiveTab = 'materials' | 'students' | 'completions' | 'categories' | 'about' | 'schedule' | 'calendar' | 'active'
 
 // Bullet points stored newline-separated (mirrors encodeLinks/decodeLinks).
 const decodePoints = (s: string): string[] => (s || '').split('\n').map((p) => p.trim()).filter(Boolean)
@@ -419,6 +422,30 @@ export default function CourseDetailPage({ forcedCourseId }: { forcedCourseId?: 
                 color={activeTab === 'completions' ? COLORS.primary : 'gray.600'}
                 onClick={() => setActiveTab('completions')}>
                 Siswa Selesai
+              </Button>
+            )}
+            {!isGeneral && (
+              <Button variant="ghost" borderRadius={0} borderBottom="2px solid"
+                borderColor={activeTab === 'schedule' ? COLORS.primary : 'transparent'}
+                color={activeTab === 'schedule' ? COLORS.primary : 'gray.600'}
+                onClick={() => setActiveTab('schedule')}>
+                Jadwal
+              </Button>
+            )}
+            {!isGeneral && (
+              <Button variant="ghost" borderRadius={0} borderBottom="2px solid"
+                borderColor={activeTab === 'calendar' ? COLORS.primary : 'transparent'}
+                color={activeTab === 'calendar' ? COLORS.primary : 'gray.600'}
+                onClick={() => setActiveTab('calendar')}>
+                Kalender
+              </Button>
+            )}
+            {!isGeneral && (
+              <Button variant="ghost" borderRadius={0} borderBottom="2px solid"
+                borderColor={activeTab === 'active' ? COLORS.primary : 'transparent'}
+                color={activeTab === 'active' ? COLORS.primary : 'gray.600'}
+                onClick={() => setActiveTab('active')}>
+                Siswa Aktif
               </Button>
             )}
             {canManage && isGeneral && (
@@ -839,6 +866,22 @@ export default function CourseDetailPage({ forcedCourseId }: { forcedCourseId?: 
                 </Box>
                 <Pagination page={compPaged.page} pageSize={compPaged.pageSize} total={compPaged.total} onPageChange={compPaged.setPage} />
               </Card.Body></Card.Root>
+          )}
+
+          {/* Jadwal mingguan */}
+          {activeTab === 'schedule' && !isGeneral && id && (
+            <ScheduleTab courseId={id} canManage={canManage} />
+          )}
+
+          {/* Kalender rencana pembelajaran */}
+          {activeTab === 'calendar' && !isGeneral && id && (
+            <LessonCalendarTab courseId={id} canManage={canManage}
+              materials={materials.map((m) => ({ id: m.id, title: m.title }))} />
+          )}
+
+          {/* Siswa Aktif — papan peringkat poin keaktifan (guru & siswa) */}
+          {activeTab === 'active' && !isGeneral && id && (
+            <ActivityLeaderboard courseId={id} canManage={canManage} />
           )}
 
           {/* Kategori (Materi Umum) */}

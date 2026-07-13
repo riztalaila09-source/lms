@@ -5,6 +5,9 @@ import Image from '@tiptap/extension-image'
 import { TableKit } from '@tiptap/extension-table'
 import { MCQNode } from './MCQNode'
 import { YouTubeNode } from './YouTubeNode'
+import { PhaseNode } from './PhaseNode'
+import { PdfNode } from './PdfNode'
+import { SlideNode } from './SlideNode'
 
 /** Shared TipTap extension set used by both the editor and the read-only viewer. */
 export function buildExtensions() {
@@ -18,6 +21,9 @@ export function buildExtensions() {
     TableKit,
     MCQNode,
     YouTubeNode,
+    PhaseNode,
+    PdfNode,
+    SlideNode,
   ]
 }
 

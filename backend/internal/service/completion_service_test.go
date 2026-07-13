@@ -67,6 +67,16 @@ func (m *mockEssayRepo) DeleteCommentsByStudentCourse(ctx context.Context, cours
 	args := m.Called(ctx, courseID, authorID)
 	return args.Get(0).(int64), args.Error(1)
 }
+func (m *mockEssayRepo) CreatePhaseComment(ctx context.Context, c *repository.PhaseComment) error {
+	return m.Called(ctx, c).Error(0)
+}
+func (m *mockEssayRepo) ListPhaseComments(ctx context.Context, materialID, blockID string) ([]*repository.PhaseComment, error) {
+	args := m.Called(ctx, materialID, blockID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]*repository.PhaseComment), args.Error(1)
+}
 
 func TestCompletionService_ResetStudentProgress(t *testing.T) {
 	ctx := context.Background()
