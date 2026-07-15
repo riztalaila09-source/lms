@@ -138,8 +138,8 @@ function TeacherNilai() {
 
     const lines = [header.join(',')]
     for (const r of data) {
-      const cells = r.cells.map((c) => (c.hasScore ? String(c.score) : ''))
-      const avg = r.average ? r.average.toFixed(1) : ''
+      const cells = r.cells.map((c) => (c.hasScore ? String(c.score) : '0'))
+      const avg = r.average.toFixed(1)
       lines.push([csv(r.studentName), csv(r.kelas), csv(r.jurusan), ...cells, avg].join(','))
     }
     const blob = new Blob(['﻿' + lines.join('\n')], { type: 'text/csv;charset=utf-8' })
@@ -195,9 +195,9 @@ function TeacherNilai() {
                 <Table.Row>
                   <Table.ColumnHeader position="sticky" left={0} bg={COLORS.bg}>Nama</Table.ColumnHeader>
                   <Table.ColumnHeader>Kelas</Table.ColumnHeader>
-                  {columns.map((c) => (
-                    <Table.ColumnHeader key={c.assignmentId} title={c.assignmentTitle}>
-                      {c.assignmentTitle.length > 14 ? c.assignmentTitle.slice(0, 12) + '…' : c.assignmentTitle}
+                  {columns.map((c, i) => (
+                    <Table.ColumnHeader key={c.assignmentId} title={c.assignmentTitle} textAlign="center">
+                      {i + 1}
                     </Table.ColumnHeader>
                   ))}
                   <Table.ColumnHeader>Rata²</Table.ColumnHeader>
@@ -222,12 +222,12 @@ function TeacherNilai() {
                             {c.score}
                           </Text>
                         ) : (
-                          <Text color={COLORS.muted}>–</Text>
+                          <Text color={COLORS.muted}>0</Text>
                         )}
                       </Table.Cell>
                     ))}
                     <Table.Cell textAlign="center" fontWeight="bold" color={COLORS.primary}>
-                      {r.average ? r.average.toFixed(1) : '–'}
+                      {r.average.toFixed(1)}
                     </Table.Cell>
                   </Table.Row>
                 ))}
@@ -235,6 +235,22 @@ function TeacherNilai() {
             </Table.Root>
           </Box>
           <Pagination page={rowsPaged.page} pageSize={rowsPaged.pageSize} total={rowsPaged.total} onPageChange={rowsPaged.setPage} />
+
+          {columns.length > 0 && (
+            <Box mt="14px" pt="12px" borderTop="1px solid" borderColor={COLORS.border}>
+              <Text fontSize="12px" fontWeight="700" mb="8px" color={COLORS.text}>Keterangan Nomor Tugas</Text>
+              <Stack gap="3px">
+                {columns.map((c, i) => (
+                  <Flex key={c.assignmentId} gap="6px" align="baseline">
+                    <Text fontSize="12px" fontWeight="700" color={COLORS.primary} minW="20px">{i + 1}.</Text>
+                    <Text fontSize="12px" color={COLORS.text}>
+                      {c.assignmentTitle} <Text as="span" color={COLORS.muted}>(nilai maksimal {c.maxScore})</Text>
+                    </Text>
+                  </Flex>
+                ))}
+              </Stack>
+            </Box>
+          )}
         </Card>
       </Stack>
     </AppLayout>

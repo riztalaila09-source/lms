@@ -57,7 +57,7 @@ func (h *UserHandler) CreateUser(
 	}
 
 	role := protoRoleToString(req.Msg.Role)
-	u, err := h.userSvc.CreateUser(ctx, claims.Role, req.Msg.Username, req.Msg.Email, req.Msg.Password, req.Msg.FullName, role, req.Msg.Kelas, req.Msg.Jurusan, req.Msg.Mapel, req.Msg.Gender)
+	u, err := h.userSvc.CreateUser(ctx, claims.Role, req.Msg.Username, req.Msg.Email, req.Msg.Password, req.Msg.FullName, role, req.Msg.Kelas, req.Msg.Jurusan, req.Msg.Mapel, req.Msg.Gender, req.Msg.Phone)
 	if err != nil {
 		return nil, mapServiceError(err)
 	}
@@ -127,6 +127,9 @@ func (h *UserHandler) UpdateUser(
 	}
 	if req.Msg.Gender != nil {
 		input.Gender = req.Msg.Gender
+	}
+	if req.Msg.Phone != nil {
+		input.Phone = req.Msg.Phone
 	}
 
 	u, err := h.userSvc.UpdateUser(ctx, claims.Role, req.Msg.Id, input)
@@ -238,6 +241,20 @@ func (h *UserHandler) ListActivityLogs(
 			TotalPages: totalPages,
 		},
 	}), nil
+}
+
+func (h *UserHandler) ResetActivityLogs(
+	ctx context.Context,
+	_ *connect.Request[userv1.ResetActivityLogsRequest],
+) (*connect.Response[userv1.ResetActivityLogsResponse], error) {
+	claims, ok := middleware.ClaimsFromContext(ctx)
+	if !ok {
+		return nil, connect.NewError(connect.CodeUnauthenticated, nil)
+	}
+	if err := h.userSvc.ResetActivityLogs(ctx, claims.Role); err != nil {
+		return nil, mapServiceError(err)
+	}
+	return connect.NewResponse(&userv1.ResetActivityLogsResponse{}), nil
 }
 
 func (h *UserHandler) DeleteUser(
@@ -380,6 +397,7 @@ func domainToProto(u *repository.User) *userv1.User {
 		Story:     u.Story,
 		Mapel:     u.Mapel,
 		Gender:    u.Gender,
+		Phone:     u.Phone,
 		CreatedAt: timestamppb.New(u.CreatedAt),
 		UpdatedAt: timestamppb.New(u.UpdatedAt),
 	}

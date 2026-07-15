@@ -700,14 +700,36 @@ func (s *AssignmentService) ListGrades(ctx context.Context, callerID, callerRole
 
 	grid := &GradeGrid{}
 	ids := make([]string, 0, len(assignments))
-	// Collect distinct courses to gather their students.
+	// Collect distinct courses to gather their students (dari SEMUA tugas, agar
+	// siswa kelas terpilih tetap tampil walau kolomnya nol).
 	courseSet := map[string]bool{}
 	for _, a := range assignments {
+		courseSet[a.CourseID] = true
+	}
+
+	// Saat kelas difilter: tugas PRAKTIKUM hanya jadi kolom bila kelas itu punya
+	// kelompok pada tugas tsb. Tugas lain (uraian/pilihan_ganda/kuis) tetap tampil.
+	praktikumWithGroup := map[string]bool{}
+	if kelas != "" {
+		praktikumIDs := []string{}
+		for _, a := range assignments {
+			if a.Type == "praktikum" {
+				praktikumIDs = append(praktikumIDs, a.ID)
+			}
+		}
+		if len(praktikumIDs) > 0 {
+			praktikumWithGroup, _ = s.groupRepo.PraktikumKelasWithGroup(ctx, praktikumIDs, kelas)
+		}
+	}
+
+	for _, a := range assignments {
+		if kelas != "" && a.Type == "praktikum" && !praktikumWithGroup[a.ID] {
+			continue // kelas ini tak punya kelompok pada praktikum ini → sembunyikan kolom
+		}
 		grid.Columns = append(grid.Columns, GradeColumn{
 			AssignmentID: a.ID, AssignmentTitle: a.Title, MaxScore: a.MaxScore,
 		})
 		ids = append(ids, a.ID)
-		courseSet[a.CourseID] = true
 	}
 
 	subs, err := s.submissionRepo.ListByAssignmentIDs(ctx, ids)

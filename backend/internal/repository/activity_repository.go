@@ -22,6 +22,8 @@ type ActivityRepository interface {
 	Record(ctx context.Context, id, userID, action string) error
 	// Aggregate returns per-user login stats, most-recent first.
 	Aggregate(ctx context.Context, userID string, page, pageSize int) ([]*ActivityLogEntry, int, error)
+	// ResetAll menghapus seluruh catatan log aktivitas.
+	ResetAll(ctx context.Context) error
 }
 
 type sqliteActivityRepository struct{ db *sql.DB }
@@ -45,6 +47,13 @@ func (r *sqliteActivityRepository) Record(ctx context.Context, id, userID, actio
 		`INSERT INTO activity_logs (id, user_id, action) VALUES (?, ?, ?)`, id, userID, action)
 	if err != nil {
 		return fmt.Errorf("record activity: %w", err)
+	}
+	return nil
+}
+
+func (r *sqliteActivityRepository) ResetAll(ctx context.Context) error {
+	if _, err := r.db.ExecContext(ctx, `DELETE FROM activity_logs`); err != nil {
+		return fmt.Errorf("reset activity logs: %w", err)
 	}
 	return nil
 }

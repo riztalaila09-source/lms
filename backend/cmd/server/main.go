@@ -7,6 +7,8 @@ import (
 	"io/fs"
 	"log"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"connectrpc.com/connect"
@@ -24,6 +26,7 @@ import (
 	"lms/backend/gen/dashboard/v1/dashboardv1connect"
 	"lms/backend/gen/pkl/v1/pklv1connect"
 	"lms/backend/gen/material/v1/materialv1connect"
+	"lms/backend/gen/parent/v1/parentv1connect"
 	"lms/backend/gen/user/v1/userv1connect"
 	"lms/backend/internal/config"
 	"lms/backend/internal/database"
@@ -35,13 +38,46 @@ import (
 
 var version = "dev"
 
+func fileExists(p string) bool {
+	info, err := os.Stat(p)
+	return err == nil && !info.IsDir()
+}
+
 func main() {
-	configPath := flag.String("config", "../config.yaml", "path to config.yaml")
+	configPath := flag.String("config", "", "path to config.yaml (default: config.yaml beside the exe, else ../config.yaml)")
 	flag.Parse()
 
-	cfg, err := config.Load(*configPath)
+	// Cari config.yaml. Bila -config tak diberi (mis. saat lms.exe diklik dua kali),
+	// pakai config.yaml yang ada DI SAMPING exe; jika tak ada, jatuh ke ../config.yaml
+	// (mode dev, folder kerja = backend/).
+	exeDir := ""
+	if exe, e := os.Executable(); e == nil {
+		exeDir = filepath.Dir(exe)
+	}
+	path := *configPath
+	usedExeConfig := false
+	if path == "" {
+		if exeDir != "" {
+			if cand := filepath.Join(exeDir, "config.yaml"); fileExists(cand) {
+				path, usedExeConfig = cand, true
+			}
+		}
+		if path == "" {
+			path = "../config.yaml"
+		}
+	}
+
+	cfg, err := config.Load(path)
 	if err != nil {
-		log.Fatalf("load config: %v", err)
+		log.Fatalf("load config (%s): %v", path, err)
+	}
+
+	// Mode terpaket (config di samping exe): buat path DB relatif menempel ke folder
+	// exe, sehingga klik-dua-kali dari folder kerja mana pun tetap menemukan/menyimpan
+	// database di samping lms.exe.
+	if usedExeConfig && !filepath.IsAbs(cfg.Database.Path) {
+		cfg.Database.Path = filepath.Join(exeDir, cfg.Database.Path)
+		_ = os.MkdirAll(filepath.Dir(cfg.Database.Path), 0o755)
 	}
 
 	db, err := database.Open(cfg.Database.Path)
@@ -78,6 +114,7 @@ func main() {
 	attendanceRepo := repository.NewAttendanceRepository(db)
 	pklRepo := repository.NewPklRepository(db)
 	classroomRepo := repository.NewClassroomRepository(db)
+	parentRepo := repository.NewParentRepository(db)
 
 	// Business logic
 	userSvc := service.NewUserService(userRepo, jwtSvc, activityRepo)
@@ -93,6 +130,7 @@ func main() {
 	attendanceSvc := service.NewAttendanceService(attendanceRepo, courseRepo)
 	pklSvc := service.NewPklService(pklRepo)
 	classroomSvc := service.NewClassroomService(classroomRepo)
+	parentSvc := service.NewParentService(parentRepo, userRepo)
 
 	// Handlers
 	userHandler := handler.NewUserHandler(userSvc, courseSvc)
@@ -106,6 +144,7 @@ func main() {
 	attendanceHandler := handler.NewAttendanceHandler(attendanceSvc)
 	pklHandler := handler.NewPklHandler(pklSvc)
 	classroomHandler := handler.NewClassroomHandler(classroomSvc)
+	parentHandler := handler.NewParentHandler(parentSvc)
 
 	// Auth interceptor applied to all handlers
 	authInterceptor := middleware.NewAuthInterceptor(jwtSvc)
@@ -124,6 +163,7 @@ func main() {
 	attendancePath, attendanceAPI := attendancev1connect.NewAttendanceServiceHandler(attendanceHandler, interceptors)
 	pklPath, pklAPI := pklv1connect.NewPklServiceHandler(pklHandler, interceptors)
 	classroomPath, classroomAPI := classroomv1connect.NewClassroomServiceHandler(classroomHandler, interceptors)
+	parentPath, parentAPI := parentv1connect.NewParentServiceHandler(parentHandler, interceptors)
 
 	mux.Handle(userPath, userAPI)
 	mux.Handle(coursePath, courseAPI)
@@ -136,6 +176,7 @@ func main() {
 	mux.Handle(attendancePath, attendanceAPI)
 	mux.Handle(pklPath, pklAPI)
 	mux.Handle(classroomPath, classroomAPI)
+	mux.Handle(parentPath, parentAPI)
 
 	// Serve material cover images as cacheable binary (NOT base64 in JSON), so
 	// the materials list payload stays tiny and images load lazily/cached.

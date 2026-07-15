@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -98,6 +99,10 @@ func (r *sqliteClassRepository) Rename(ctx context.Context, id, newName string) 
 			 WHERE kelas = ? AND role = 'student'`, newName, jur, jur, oldName); err != nil {
 			return nil, fmt.Errorf("cascade kelas: %w", err)
 		}
+		// Teachers reference classes as a comma-joined list; rename the token there too.
+		if err := rewriteTeacherKelas(ctx, tx, oldName, newName); err != nil {
+			return nil, err
+		}
 	}
 	if err := tx.Commit(); err != nil {
 		return nil, fmt.Errorf("commit: %w", err)
@@ -105,14 +110,89 @@ func (r *sqliteClassRepository) Rename(ctx context.Context, id, newName string) 
 	return &Class{ID: id, Name: newName, CreatedAt: createdAt}, nil
 }
 
-func (r *sqliteClassRepository) Delete(ctx context.Context, id string) error {
-	res, err := r.db.ExecContext(ctx, `DELETE FROM classes WHERE id = ?`, id)
+// rewriteTeacherKelas updates the comma-joined "kelas" list of every teacher
+// that references oldName: it renames the token to newName, or drops it entirely
+// when newName is "". Other classes the teacher teaches are preserved. Runs
+// inside the caller's transaction. Exact-token match avoids clobbering names
+// that merely share a prefix (e.g. X-TKJ-1 vs X-TKJ-10).
+func rewriteTeacherKelas(ctx context.Context, tx *sql.Tx, oldName, newName string) error {
+	rows, err := tx.QueryContext(ctx,
+		`SELECT id, kelas FROM users WHERE role = 'teacher' AND kelas LIKE ?`, "%"+oldName+"%")
 	if err != nil {
-		return fmt.Errorf("delete class: %w", err)
+		return fmt.Errorf("find teachers: %w", err)
 	}
-	n, _ := res.RowsAffected()
-	if n == 0 {
-		return ErrClassNotFound
+	type upd struct{ id, kelas string }
+	var updates []upd
+	for rows.Next() {
+		var uid, kelas string
+		if err := rows.Scan(&uid, &kelas); err != nil {
+			rows.Close()
+			return fmt.Errorf("scan teacher: %w", err)
+		}
+		var kept []string
+		changed := false
+		for _, p := range strings.Split(kelas, ",") {
+			t := strings.TrimSpace(p)
+			if t == "" {
+				continue
+			}
+			if t == oldName {
+				changed = true
+				if newName != "" {
+					kept = append(kept, newName)
+				}
+				continue
+			}
+			kept = append(kept, t)
+		}
+		if changed {
+			updates = append(updates, upd{uid, strings.Join(kept, ", ")})
+		}
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("iterate teachers: %w", err)
+	}
+	// Apply after the cursor is closed (SQLite is single-connection here).
+	for _, u := range updates {
+		if _, err := tx.ExecContext(ctx, `UPDATE users SET kelas = ? WHERE id = ?`, u.kelas, u.id); err != nil {
+			return fmt.Errorf("update teacher kelas: %w", err)
+		}
 	}
 	return nil
+}
+
+func (r *sqliteClassRepository) Delete(ctx context.Context, id string) error {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin tx: %w", err)
+	}
+	defer tx.Rollback()
+
+	var name string
+	err = tx.QueryRowContext(ctx, `SELECT name FROM classes WHERE id = ?`, id).Scan(&name)
+	if errors.Is(err, sql.ErrNoRows) {
+		return ErrClassNotFound
+	}
+	if err != nil {
+		return fmt.Errorf("get class: %w", err)
+	}
+
+	if _, err := tx.ExecContext(ctx, `DELETE FROM classes WHERE id = ?`, id); err != nil {
+		return fmt.Errorf("delete class: %w", err)
+	}
+
+	// Students in the deleted class lose their assignment (shown as "-") until a
+	// manager reassigns them via edit; their derived jurusan is cleared too.
+	if _, err := tx.ExecContext(ctx,
+		`UPDATE users SET kelas = '', jurusan = '' WHERE kelas = ? AND role = 'student'`, name); err != nil {
+		return fmt.Errorf("clear student kelas: %w", err)
+	}
+
+	// Teachers may teach several classes; drop just the deleted one.
+	if err := rewriteTeacherKelas(ctx, tx, name, ""); err != nil {
+		return err
+	}
+
+	return tx.Commit()
 }

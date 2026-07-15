@@ -27,6 +27,8 @@ type User struct {
 	Story         string
 	Mapel         string
 	Gender        string // '' | 'L' | 'P'
+	Phone         string
+	ParentID      string // '' when no parent linked (students only)
 	CreatedAt     time.Time
 	UpdatedAt     time.Time
 }
@@ -74,20 +76,20 @@ func NewUserRepository(db *sql.DB) UserRepository {
 	return &sqliteUserRepository{db: db}
 }
 
-const userColumns = `id, username, email, password_hash, password_plain, role, full_name, is_active, kelas, jurusan, photo_url, story, mapel, gender, created_at, updated_at`
+const userColumns = `id, username, email, password_hash, password_plain, role, full_name, is_active, kelas, jurusan, photo_url, story, mapel, gender, phone, COALESCE(parent_id, '') AS parent_id, created_at, updated_at`
 
 func scanUser(s interface {
 	Scan(dest ...any) error
 }, u *User) error {
 	return s.Scan(&u.ID, &u.Username, &u.Email, &u.PasswordHash, &u.PasswordPlain, &u.Role, &u.FullName,
-		&u.IsActive, &u.Kelas, &u.Jurusan, &u.PhotoURL, &u.Story, &u.Mapel, &u.Gender, &u.CreatedAt, &u.UpdatedAt)
+		&u.IsActive, &u.Kelas, &u.Jurusan, &u.PhotoURL, &u.Story, &u.Mapel, &u.Gender, &u.Phone, &u.ParentID, &u.CreatedAt, &u.UpdatedAt)
 }
 
 func (r *sqliteUserRepository) Create(ctx context.Context, u *User) error {
 	_, err := r.db.ExecContext(ctx, `
-		INSERT INTO users (id, username, email, password_hash, password_plain, role, full_name, is_active, kelas, jurusan, photo_url, story, mapel, gender, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		u.ID, u.Username, u.Email, u.PasswordHash, u.PasswordPlain, u.Role, u.FullName, u.IsActive, u.Kelas, u.Jurusan, u.PhotoURL, u.Story, u.Mapel, u.Gender, u.CreatedAt, u.UpdatedAt,
+		INSERT INTO users (id, username, email, password_hash, password_plain, role, full_name, is_active, kelas, jurusan, photo_url, story, mapel, gender, phone, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		u.ID, u.Username, u.Email, u.PasswordHash, u.PasswordPlain, u.Role, u.FullName, u.IsActive, u.Kelas, u.Jurusan, u.PhotoURL, u.Story, u.Mapel, u.Gender, u.Phone, u.CreatedAt, u.UpdatedAt,
 	)
 	if err != nil {
 		if isSQLiteConstraintError(err) {
@@ -126,9 +128,9 @@ func (r *sqliteUserRepository) Update(ctx context.Context, u *User) error {
 	u.UpdatedAt = time.Now()
 	res, err := r.db.ExecContext(ctx, `
 		UPDATE users
-		SET username=?, email=?, password_hash=?, password_plain=?, role=?, full_name=?, is_active=?, kelas=?, jurusan=?, photo_url=?, story=?, mapel=?, gender=?, updated_at=?
+		SET username=?, email=?, password_hash=?, password_plain=?, role=?, full_name=?, is_active=?, kelas=?, jurusan=?, photo_url=?, story=?, mapel=?, gender=?, phone=?, updated_at=?
 		WHERE id=?`,
-		u.Username, u.Email, u.PasswordHash, u.PasswordPlain, u.Role, u.FullName, u.IsActive, u.Kelas, u.Jurusan, u.PhotoURL, u.Story, u.Mapel, u.Gender, u.UpdatedAt, u.ID,
+		u.Username, u.Email, u.PasswordHash, u.PasswordPlain, u.Role, u.FullName, u.IsActive, u.Kelas, u.Jurusan, u.PhotoURL, u.Story, u.Mapel, u.Gender, u.Phone, u.UpdatedAt, u.ID,
 	)
 	if err != nil {
 		if isSQLiteConstraintError(err) {

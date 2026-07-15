@@ -64,3 +64,84 @@ func TestClassRepository_RenameCascades(t *testing.T) {
 	_, err = classRepo.Rename(ctx, clsID, "X TKR 1")
 	assert.ErrorIs(t, err, repository.ErrClassDuplicate)
 }
+
+// mkUser is a small helper for the cascade tests below.
+func mkUser(t *testing.T, userRepo repository.UserRepository, ctx context.Context, role, kelas string) *repository.User {
+	now := time.Now().UTC().Truncate(time.Second)
+	suffix := testutil.NewUserID()[:8]
+	u := &repository.User{ID: testutil.NewUserID(), Username: "cc_" + suffix, Email: suffix + "@cc.com",
+		PasswordHash: "x", Role: role, FullName: "U " + suffix, IsActive: true, Kelas: kelas, CreatedAt: now, UpdatedAt: now}
+	require.NoError(t, userRepo.Create(ctx, u))
+	return u
+}
+
+func classID(t *testing.T, classRepo repository.ClassRepository, ctx context.Context, name string) string {
+	list, _ := classRepo.List(ctx)
+	for _, c := range list {
+		if c.Name == name {
+			return c.ID
+		}
+	}
+	t.Fatalf("class %q not found", name)
+	return ""
+}
+
+// Deleting a class must clear it from students (→ "-") and drop just that class
+// from any teacher's comma-joined list, keeping the teacher's other classes.
+func TestClassRepository_DeleteCascades(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	ctx := context.Background()
+	classRepo := repository.NewClassRepository(db)
+	userRepo := repository.NewUserRepository(db)
+	now := time.Now().UTC().Truncate(time.Second)
+
+	require.NoError(t, classRepo.Create(ctx, &repository.Class{ID: testutil.NewUserID(), Name: "ZDEL-1", CreatedAt: now}))
+	require.NoError(t, classRepo.Create(ctx, &repository.Class{ID: testutil.NewUserID(), Name: "ZDEL-2", CreatedAt: now}))
+	del1 := classID(t, classRepo, ctx, "ZDEL-1")
+
+	sIn := mkUser(t, userRepo, ctx, "student", "ZDEL-1")  // in deleted class
+	sOut := mkUser(t, userRepo, ctx, "student", "ZDEL-2") // untouched
+	tMulti := mkUser(t, userRepo, ctx, "teacher", "ZDEL-1, ZDEL-2")
+	tOnly := mkUser(t, userRepo, ctx, "teacher", "ZDEL-1")
+
+	require.NoError(t, classRepo.Delete(ctx, del1))
+
+	gIn, _ := userRepo.GetByID(ctx, sIn.ID)
+	gOut, _ := userRepo.GetByID(ctx, sOut.ID)
+	assert.Equal(t, "", gIn.Kelas, "student in deleted class is cleared")
+	assert.Equal(t, "", gIn.Jurusan, "derived jurusan cleared too")
+	assert.Equal(t, "ZDEL-2", gOut.Kelas, "student in other class untouched")
+
+	gMulti, _ := userRepo.GetByID(ctx, tMulti.ID)
+	gOnly, _ := userRepo.GetByID(ctx, tOnly.ID)
+	assert.Equal(t, "ZDEL-2", gMulti.Kelas, "only the deleted class is dropped from the teacher")
+	assert.Equal(t, "", gOnly.Kelas, "teacher who only taught it now has none")
+
+	// Class is really gone.
+	list, _ := classRepo.List(ctx)
+	for _, c := range list {
+		assert.NotEqual(t, "ZDEL-1", c.Name)
+	}
+
+	// Deleting a missing class reports not-found.
+	assert.ErrorIs(t, classRepo.Delete(ctx, "no-such-id"), repository.ErrClassNotFound)
+}
+
+// Renaming a class also rewrites the token inside teachers' comma-joined lists.
+func TestClassRepository_RenameCascadesTeachers(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	ctx := context.Background()
+	classRepo := repository.NewClassRepository(db)
+	userRepo := repository.NewUserRepository(db)
+	now := time.Now().UTC().Truncate(time.Second)
+
+	require.NoError(t, classRepo.Create(ctx, &repository.Class{ID: testutil.NewUserID(), Name: "ZREN-1", CreatedAt: now}))
+	id := classID(t, classRepo, ctx, "ZREN-1")
+	tch := mkUser(t, userRepo, ctx, "teacher", "ZREN-1, ZKEEP-1")
+
+	_, err := classRepo.Rename(ctx, id, "ZREN-2")
+	require.NoError(t, err)
+
+	g, _ := userRepo.GetByID(ctx, tch.ID)
+	assert.Equal(t, "ZREN-2, ZKEEP-1", g.Kelas)
+}

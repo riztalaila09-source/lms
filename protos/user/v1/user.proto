@@ -26,6 +26,7 @@ message User {
   string photo_url = 11;
   string mapel = 14; // teacher's subject taught
   string gender = 15; // '' | 'L' (laki-laki) | 'P' (perempuan)
+  string phone = 16; // contact phone / WhatsApp
   google.protobuf.Timestamp created_at = 7;
   google.protobuf.Timestamp updated_at = 8;
   // Plaintext password, populated ONLY in manager-only ListUsers responses so
@@ -57,6 +58,7 @@ message CreateUserRequest {
   string jurusan = 7;
   string mapel = 8;
   string gender = 9;
+  string phone = 10;
 }
 
 message GetUserRequest {
@@ -75,6 +77,7 @@ message UpdateUserRequest {
   optional string password = 9;
   optional string mapel = 10;
   optional string gender = 11;
+  optional string phone = 12;
 }
 
 // Self-service profile update (any logged-in user updates their own account).
@@ -122,6 +125,9 @@ message ListActivityLogsResponse {
   repeated ActivityLogEntry entries = 1;
   common.v1.PaginationResponse pagination = 2;
 }
+
+message ResetActivityLogsRequest {}
+message ResetActivityLogsResponse {}
 
 message ListUsersRequestFilters {
   optional string kelas = 1;
@@ -180,5 +186,6 @@ service UserService {
   rpc UpdateProfile(UpdateProfileRequest) returns (User);
   rpc ChangePassword(ChangePasswordRequest) returns (ChangePasswordResponse);
   rpc ListActivityLogs(ListActivityLogsRequest) returns (ListActivityLogsResponse);
+  rpc ResetActivityLogs(ResetActivityLogsRequest) returns (ResetActivityLogsResponse);
   rpc ListStories(ListStoriesRequest) returns (ListStoriesResponse);
 }

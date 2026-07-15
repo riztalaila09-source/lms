@@ -10,6 +10,7 @@ import { SchoolService } from '@/gen/school/v1/school_pb'
 import { AttendanceService } from '@/gen/attendance/v1/attendance_pb'
 import { PklService } from '@/gen/pkl/v1/pkl_pb'
 import { ClassroomService } from '@/gen/classroom/v1/classroom_pb'
+import { ParentService } from '@/gen/parent/v1/parent_pb'
 import { transport } from './transport'
 
 export const userClient = createClient(UserService, transport)
@@ -23,3 +24,4 @@ export const schoolClient = createClient(SchoolService, transport)
 export const attendanceClient = createClient(AttendanceService, transport)
 export const pklClient = createClient(PklService, transport)
 export const classroomClient = createClient(ClassroomService, transport)
+export const parentClient = createClient(ParentService, transport)

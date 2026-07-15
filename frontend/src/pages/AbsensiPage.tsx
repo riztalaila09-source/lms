@@ -2,11 +2,11 @@ import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import {
   Badge, Box, Button, Card, Field, Flex, Heading, Icon, IconButton, Image, Input, Menu, NativeSelect, Portal, SimpleGrid, Spinner, Stack, Table, Text,
 } from '@chakra-ui/react'
-import { LuQrCode, LuRefreshCw, LuCamera, LuCircleCheck, LuClock, LuUsers, LuPlus, LuTrash2, LuDownload } from 'react-icons/lu'
+import { LuQrCode, LuRefreshCw, LuCamera, LuCircleCheck, LuClock, LuUsers, LuPlus, LuTrash2, LuDownload, LuMessageCircle } from 'react-icons/lu'
 import QRCode from 'qrcode'
 import { Html5Qrcode } from 'html5-qrcode'
 import { ConnectError } from '@connectrpc/connect'
-import { attendanceClient, courseClient, userClient, classClient, schoolClient, jurusanClient } from '@/lib/client'
+import { attendanceClient, courseClient, userClient, classClient, schoolClient, jurusanClient, parentClient } from '@/lib/client'
 import { Role } from '@/gen/user/v1/user_pb'
 import type { Session as AttSession, Record as AttRecord, TokenInfo, MyTodayResponse } from '@/gen/attendance/v1/attendance_pb'
 import type { Course } from '@/gen/course/v1/course_pb'
@@ -14,6 +14,7 @@ import type { User } from '@/gen/user/v1/user_pb'
 import { useAuth } from '@/hooks/useAuth'
 import AppLayout from '@/components/AppLayout'
 import ConfirmDialog, { type ConfirmState } from '@/components/ConfirmDialog'
+import NotifikasiAbsenDialog, { type NotifTarget } from '@/components/absensi/NotifikasiAbsenDialog'
 import { toaster } from '@/components/ui/toaster'
 import { COLORS } from '@/theme/tokens'
 
@@ -52,6 +53,48 @@ function StatusBadge({ s }: { s: string }) {
   return <Badge colorPalette={m?.color ?? 'gray'}>{m?.label ?? s}</Badge>
 }
 const errMsg = (e: unknown) => (e instanceof ConnectError ? e.rawMessage : e instanceof Error ? e.message : 'Terjadi kesalahan')
+
+// "Tidak masuk" = tidak hadir (alpa/sakit/izin); telat tetap dianggap hadir.
+const ABSENT = new Set(['alpa', 'sakit', 'izin'])
+const statusMeta = (v: string) => STATUSES.find((x) => x.v === v)
+// Normalisasi nomor Indonesia untuk WhatsApp (0→62, buang non-digit).
+const waNormalize = (no: string) => {
+  let n = (no || '').replace(/\D/g, '')
+  if (n.startsWith('0')) n = '62' + n.slice(1)
+  return n
+}
+// Susun teks pesan notifikasi ke orang tua.
+function composeAbsenNotif(o: { namaSiswa: string; kelas: string; tanggal: string; detail: string; namaSekolah: string }): string {
+  const tgl = `${hariOf(o.tanggal)}, ${o.tanggal}`
+  return [
+    `Yth. Bapak/Ibu Orang Tua/Wali dari ananda ${o.namaSiswa}${o.kelas ? ` (${o.kelas})` : ''},`,
+    `kami informasikan pada ${tgl} ananda ${o.detail}.`,
+    `Mohon perhatian dan konfirmasinya. Terima kasih.`,
+    o.namaSekolah ? `— ${o.namaSekolah}` : '',
+  ].filter(Boolean).join('\n')
+}
+
+// Data pendukung notifikasi: peta siswa→No. HP orang tua + nama sekolah.
+function useNotifData() {
+  const [parentMap, setParentMap] = useState<Map<string, { phone: string; nama: string }>>(new Map())
+  const [schoolName, setSchoolName] = useState('')
+  useEffect(() => {
+    parentClient.listParents({ pagination: { page: 1, pageSize: 500 } }).then((r) => {
+      const m = new Map<string, { phone: string; nama: string }>()
+      r.parents.forEach((p) => {
+        const nama = p.namaAyah || p.namaIbu || p.namaWali || 'Orang Tua/Wali'
+        p.children.forEach((c) => m.set(c.studentId, { phone: waNormalize(p.phone), nama }))
+      })
+      setParentMap(m)
+    }).catch(() => {})
+    schoolClient.getSchool({}).then((s) => setSchoolName(s.name)).catch(() => {})
+  }, [])
+  const parentOf = useCallback((studentId: string) => {
+    const v = parentMap.get(studentId)
+    return v && v.phone ? v : null
+  }, [parentMap])
+  return { parentOf, schoolName }
+}
 
 // Renders a QR from arbitrary text.
 function QRImage({ text, size = 220 }: { text: string; size?: number }) {
@@ -285,6 +328,8 @@ function PerHariAbsensi() {
   const [mode, setMode] = useState<'grid' | 'ringkas'>('grid')
   const [data, setData] = useState<DayGrid | null>(null)
   const [loading, setLoading] = useState(false)
+  const { parentOf, schoolName } = useNotifData()
+  const [notif, setNotif] = useState<{ open: boolean; targets: NotifTarget[]; judul: string }>({ open: false, targets: [], judul: '' })
 
   useEffect(() => { classClient.listClasses({}).then((r) => setClassNames(r.classes.map((c) => c.name))).catch(() => {}) }, [])
 
@@ -309,6 +354,38 @@ function PerHariAbsensi() {
     try { await attendanceClient.setRecordStatus({ sessionId, studentId, status }); await load() }
     catch (e) { toaster.create({ description: errMsg(e), type: 'error' }) }
   }
+
+  // Per-student daily absence: count non-hadir statuses across sessions.
+  const absentCounts = (studentId: string) => {
+    const c: Record<string, number> = { alpa: 0, sakit: 0, izin: 0 }
+    data?.sessions.forEach((s) => { const v = statusOf(s.id, studentId); if (ABSENT.has(v)) c[v]++ })
+    return c
+  }
+  const isAbsent = (studentId: string) => {
+    const c = absentCounts(studentId)
+    return c.alpa + c.sakit + c.izin > 0
+  }
+  const buildDayTarget = (st: { id: string; name: string }): NotifTarget => {
+    const c = absentCounts(st.id)
+    const rincian = STATUSES.filter((x) => ABSENT.has(x.v) && c[x.v] > 0).map((x) => `${x.label} ${c[x.v]}×`).join(', ')
+    const p = parentOf(st.id)
+    return {
+      studentId: st.id, nama: st.name, kelas,
+      statusLabel: 'Tidak Hadir', statusColor: 'red',
+      phone: p?.phone ?? '', namaOrtu: p?.nama ?? '',
+      message: composeAbsenNotif({
+        namaSiswa: st.name, kelas, tanggal,
+        detail: `tercatat tidak hadir: ${rincian}`,
+        namaSekolah: schoolName,
+      }),
+    }
+  }
+  const absentStudents = useMemo(
+    () => (data?.students ?? []).filter((st) => isAbsent(st.id)),
+    [data, cellMap], // eslint-disable-line react-hooks/exhaustive-deps
+  )
+  const notifyOneDay = (st: { id: string; name: string }) => setNotif({ open: true, targets: [buildDayTarget(st)], judul: 'Notifikasi ke Orang Tua' })
+  const notifyBulkDay = () => setNotif({ open: true, targets: absentStudents.map(buildDayTarget), judul: 'Notifikasi Siswa Tidak Hadir' })
 
   // Daily report: per student, status per session + summary counts.
   const download = () => {
@@ -364,6 +441,11 @@ function PerHariAbsensi() {
             <Icon as={LuDownload} /> Unduh Laporan CSV
           </Button>
         )}
+        {absentStudents.length > 0 && (
+          <Button size="sm" colorPalette="green" variant="outline" onClick={notifyBulkDay}>
+            <Icon as={LuMessageCircle} /> Notifikasi tidak hadir ({absentStudents.length})
+          </Button>
+        )}
       </Flex>
 
       {loading ? <Flex align="center" gap="8px" color={COLORS.muted} py="20px"><Spinner size="sm" /> Memuat…</Flex>
@@ -379,6 +461,7 @@ function PerHariAbsensi() {
                   <Text fontSize="11px" color={COLORS.muted}>{s.mapel || '—'}{s.ruang ? ` · ${s.ruang}` : ''}</Text>
                 </Table.ColumnHeader>
               ))}
+              <Table.ColumnHeader textAlign="center">Notif</Table.ColumnHeader>
             </Table.Row></Table.Header>
             <Table.Body>
               {data.students.map((st) => (
@@ -387,6 +470,15 @@ function PerHariAbsensi() {
                   {data.sessions.map((s) => (
                     <Table.Cell key={s.id}><CellStatus status={statusOf(s.id, st.id)} onSet={(v) => setStatus(s.id, st.id, v)} /></Table.Cell>
                   ))}
+                  <Table.Cell textAlign="center">
+                    {isAbsent(st.id) ? (
+                      <IconButton size="xs" variant="outline" colorPalette="green"
+                        aria-label="Notifikasi orang tua" title={parentOf(st.id) ? 'Notifikasi orang tua via WhatsApp' : 'No. HP orang tua belum ada'}
+                        disabled={!parentOf(st.id)} onClick={() => notifyOneDay(st)}>
+                        <Icon as={LuMessageCircle} />
+                      </IconButton>
+                    ) : null}
+                  </Table.Cell>
                 </Table.Row>
               ))}
             </Table.Body>
@@ -396,6 +488,7 @@ function PerHariAbsensi() {
             <Table.Header><Table.Row>
               <Table.ColumnHeader>Siswa</Table.ColumnHeader>
               {STATUSES.map((x) => <Table.ColumnHeader key={x.v}>{x.label}</Table.ColumnHeader>)}
+              <Table.ColumnHeader textAlign="center">Notif</Table.ColumnHeader>
             </Table.Row></Table.Header>
             <Table.Body>
               {data.students.map((st) => {
@@ -405,12 +498,22 @@ function PerHariAbsensi() {
                   <Table.Row key={st.id}>
                     <Table.Cell fontWeight="medium">{st.name}</Table.Cell>
                     {STATUSES.map((x) => <Table.Cell key={x.v}>{counts[x.v]}</Table.Cell>)}
+                    <Table.Cell textAlign="center">
+                      {isAbsent(st.id) ? (
+                        <IconButton size="xs" variant="outline" colorPalette="green"
+                          aria-label="Notifikasi orang tua" title={parentOf(st.id) ? 'Notifikasi orang tua via WhatsApp' : 'No. HP orang tua belum ada'}
+                          disabled={!parentOf(st.id)} onClick={() => notifyOneDay(st)}>
+                          <Icon as={LuMessageCircle} />
+                        </IconButton>
+                      ) : null}
+                    </Table.Cell>
                   </Table.Row>
                 )
               })}
             </Table.Body>
           </Table.Root></Box>
         )}
+      <NotifikasiAbsenDialog open={notif.open} onClose={() => setNotif((n) => ({ ...n, open: false }))} targets={notif.targets} judul={notif.judul} />
     </Card.Body></Card.Root>
   )
 }
@@ -555,6 +658,8 @@ function HasilAbsensi() {
   const [addStudent, setAddStudent] = useState('')
   const [addStatus, setAddStatus] = useState('izin')
   const [confirm, setConfirm] = useState<ConfirmState | null>(null)
+  const { parentOf, schoolName } = useNotifData()
+  const [notif, setNotif] = useState<{ open: boolean; targets: NotifTarget[]; judul: string }>({ open: false, targets: [], judul: '' })
 
   const load = useCallback(() => {
     attendanceClient.listSessions({ tanggal }).then((r) => setSessions(r.sessions)).catch(() => setSessions([]))
@@ -592,6 +697,26 @@ function HasilAbsensi() {
     },
   })
   const recordedIds = useMemo(() => new Set(records.map((r) => r.studentId)), [records])
+
+  // Build a notification target for a record in the current session.
+  const buildTarget = useCallback((r: AttRecord): NotifTarget => {
+    const p = parentOf(r.studentId)
+    const m = statusMeta(r.status)
+    const kelas = r.studentKelas || (sel?.kelas ?? '')
+    return {
+      studentId: r.studentId, nama: r.studentName, kelas,
+      statusLabel: m?.label ?? r.status, statusColor: m?.color ?? 'gray',
+      phone: p?.phone ?? '', namaOrtu: p?.nama ?? '',
+      message: composeAbsenNotif({
+        namaSiswa: r.studentName, kelas, tanggal: sel?.tanggal ?? todayStr(),
+        detail: `tercatat *${(m?.label ?? r.status).toUpperCase()}* pada mata pelajaran ${sel?.mapel || '—'}`,
+        namaSekolah: schoolName,
+      }),
+    }
+  }, [parentOf, schoolName, sel])
+  const absentRecords = useMemo(() => records.filter((r) => ABSENT.has(r.status)), [records])
+  const notifyOne = (r: AttRecord) => setNotif({ open: true, targets: [buildTarget(r)], judul: 'Notifikasi ke Orang Tua' })
+  const notifyBulk = () => setNotif({ open: true, targets: absentRecords.map(buildTarget), judul: 'Notifikasi Siswa Tidak Hadir' })
 
   return (
     <>
@@ -632,15 +757,24 @@ function HasilAbsensi() {
           <Flex align="center" justify="center" minH="200px" color={COLORS.muted}><Text fontSize="14px">Pilih sesi untuk melihat & mengatur status.</Text></Flex>
         ) : (
           <Stack gap="10px">
-            <Heading size="sm">{sel.mapel || '—'} · {sel.kelas}{sel.ruang ? ` · ${sel.ruang}` : ''}</Heading>
-            <Text fontSize="12px" color={COLORS.muted}>{hariOf(sel.tanggal)}, {sel.tanggal} · {jamLabel(sel)}</Text>
+            <Flex align="flex-start" gap="10px" wrap="wrap">
+              <Box flex="1" minW="200px">
+                <Heading size="sm">{sel.mapel || '—'} · {sel.kelas}{sel.ruang ? ` · ${sel.ruang}` : ''}</Heading>
+                <Text fontSize="12px" color={COLORS.muted}>{hariOf(sel.tanggal)}, {sel.tanggal} · {jamLabel(sel)}</Text>
+              </Box>
+              {absentRecords.length > 0 && (
+                <Button size="sm" colorPalette="green" variant="outline" onClick={notifyBulk}>
+                  <Icon as={LuMessageCircle} /> Notifikasi tidak hadir ({absentRecords.length})
+                </Button>
+              )}
+            </Flex>
             <Box overflowX="auto"><Table.Root size="sm">
               <Table.Header><Table.Row>
-                <Table.ColumnHeader>Siswa</Table.ColumnHeader><Table.ColumnHeader>Kelas</Table.ColumnHeader><Table.ColumnHeader>Status</Table.ColumnHeader>
+                <Table.ColumnHeader>Siswa</Table.ColumnHeader><Table.ColumnHeader>Kelas</Table.ColumnHeader><Table.ColumnHeader>Status</Table.ColumnHeader><Table.ColumnHeader textAlign="right">Notifikasi</Table.ColumnHeader>
               </Table.Row></Table.Header>
               <Table.Body>
                 {records.length === 0 ? (
-                  <Table.Row><Table.Cell colSpan={3} textAlign="center" color={COLORS.muted}>Belum ada</Table.Cell></Table.Row>
+                  <Table.Row><Table.Cell colSpan={4} textAlign="center" color={COLORS.muted}>Belum ada</Table.Cell></Table.Row>
                 ) : records.map((r) => (
                   <Table.Row key={r.studentId}>
                     <Table.Cell fontWeight="medium">{r.studentName}</Table.Cell>
@@ -652,6 +786,15 @@ function HasilAbsensi() {
                         </NativeSelect.Field>
                         <NativeSelect.Indicator />
                       </NativeSelect.Root>
+                    </Table.Cell>
+                    <Table.Cell textAlign="right">
+                      {ABSENT.has(r.status) ? (
+                        <IconButton size="xs" variant="outline" colorPalette="green"
+                          aria-label="Notifikasi orang tua" title={parentOf(r.studentId) ? 'Notifikasi orang tua via WhatsApp' : 'No. HP orang tua belum ada'}
+                          disabled={!parentOf(r.studentId)} onClick={() => notifyOne(r)}>
+                          <Icon as={LuMessageCircle} />
+                        </IconButton>
+                      ) : null}
                     </Table.Cell>
                   </Table.Row>
                 ))}
@@ -684,6 +827,7 @@ function HasilAbsensi() {
       </Card.Body></Card.Root>
     </SimpleGrid>
     <ConfirmDialog state={confirm} onClose={() => setConfirm(null)} />
+    <NotifikasiAbsenDialog open={notif.open} onClose={() => setNotif((n) => ({ ...n, open: false }))} targets={notif.targets} judul={notif.judul} />
     </>
   )
 }

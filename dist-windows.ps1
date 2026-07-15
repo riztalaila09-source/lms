@@ -28,7 +28,21 @@ if ($LASTEXITCODE -ne 0) { throw "Backend build failed." }
 
 Write-Host "==> Packaging archive..." -ForegroundColor Cyan
 Copy-Item "$root\config.yaml" "$root\dist\config.yaml" -Force
+
+# Launcher ramah-pengguna: set folder kerja ke lokasi file ini, jalankan server,
+# dan tahan jendela agar pesan (termasuk error) tetap terlihat.
+$launcher = @"
+@echo off
+cd /d "%~dp0"
+echo Menjalankan LMS... buka http://localhost:8080 di browser.
+lms.exe --config config.yaml
+echo.
+echo Server berhenti. Tekan tombol apa saja untuk menutup.
+pause >nul
+"@
+Set-Content -Path "$root\dist\Jalankan-LMS.bat" -Value $launcher -Encoding ASCII
+
 $zip = "$root\dist\lms-$Version-windows.zip"
-Compress-Archive -Path "$root\dist\lms.exe", "$root\dist\config.yaml" -DestinationPath $zip -Force
+Compress-Archive -Path "$root\dist\lms.exe", "$root\dist\config.yaml", "$root\dist\Jalankan-LMS.bat" -DestinationPath $zip -Force
 
 Write-Host ("Done -> " + $zip) -ForegroundColor Green

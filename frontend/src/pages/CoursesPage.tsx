@@ -198,8 +198,6 @@ export default function CoursesPage() {
     }
   }
 
-  const coursesPaged = usePaged(courses, 10)
-
   const filteredCourses = useMemo(() => {
     const q = catalogSearch.trim().toLowerCase()
     if (!q) return courses
@@ -209,6 +207,7 @@ export default function CoursesPage() {
       (c.teacher?.fullName || '').toLowerCase().includes(q))
   }, [courses, catalogSearch])
   const catalogPaged = usePaged(filteredCourses, 12)
+  const coursesPaged = usePaged(filteredCourses, 10)
 
   // ── Student catalog (Udemy-style cards) ──
   if (!canManage) {
@@ -252,6 +251,15 @@ export default function CoursesPage() {
       <Stack gap={6}>
         {error && <Text color="red.500" fontSize="sm">{error}</Text>}
 
+        <Flex align="center" gap="8px" maxW="420px"
+          border="1px solid" borderColor={UDEMY.border} borderRadius="8px" px="12px" py="2px">
+          <Icon as={LuSearch} color={UDEMY.inkMuted} />
+          <Input variant="subtle" border="none" _focus={{ boxShadow: 'none' }} px="0"
+            placeholder="Cari mapel, kode, atau guru…" value={catalogSearch}
+            onChange={(e) => setCatalogSearch(e.target.value)} />
+          {catalogSearch && <Icon as={LuX} color={UDEMY.inkMuted} cursor="pointer" onClick={() => setCatalogSearch('')} />}
+        </Flex>
+
         <Box overflowX="auto"><Table.Root>
           <Table.Header>
             <Table.Row>
@@ -266,8 +274,8 @@ export default function CoursesPage() {
           <Table.Body>
             {loading ? (
               <Table.Row><Table.Cell colSpan={6} textAlign="center" color="gray.500">Memuat...</Table.Cell></Table.Row>
-            ) : courses.length === 0 ? (
-              <Table.Row><Table.Cell colSpan={6} textAlign="center" color="gray.500">Belum ada mata pelajaran</Table.Cell></Table.Row>
+            ) : filteredCourses.length === 0 ? (
+              <Table.Row><Table.Cell colSpan={6} textAlign="center" color="gray.500">{catalogSearch ? 'Tidak ada mata pelajaran yang cocok' : 'Belum ada mata pelajaran'}</Table.Cell></Table.Row>
             ) : (
               coursesPaged.pageItems.map((course) => (
                 <Table.Row key={course.id} cursor="pointer" _hover={{ bg: 'gray.50' }}

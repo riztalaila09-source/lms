@@ -36,6 +36,7 @@ type UpdateUserInput struct {
 	Password *string
 	Mapel    *string
 	Gender   *string
+	Phone    *string
 }
 
 type UpdateProfileInput struct {
@@ -86,7 +87,7 @@ func (s *UserService) Login(ctx context.Context, email, password string) (*Login
 	return &LoginResult{Token: token, User: user}, nil
 }
 
-func (s *UserService) CreateUser(ctx context.Context, callerRole, username, email, password, fullName, role, kelas, jurusan, mapel, gender string) (*repository.User, error) {
+func (s *UserService) CreateUser(ctx context.Context, callerRole, username, email, password, fullName, role, kelas, jurusan, mapel, gender, phone string) (*repository.User, error) {
 	// Managers (teacher / legacy admin) may add students or other teachers, not admins.
 	switch callerRole {
 	case "admin":
@@ -128,6 +129,7 @@ func (s *UserService) CreateUser(ctx context.Context, callerRole, username, emai
 		Jurusan:       jurusan,
 		Mapel:         mapel,
 		Gender:        gender,
+		Phone:         phone,
 		CreatedAt:     now,
 		UpdatedAt:     now,
 	}
@@ -198,6 +200,9 @@ func (s *UserService) UpdateUser(ctx context.Context, callerRole, targetID strin
 	}
 	if input.Gender != nil {
 		u.Gender = *input.Gender
+	}
+	if input.Phone != nil {
+		u.Phone = *input.Phone
 	}
 	// Keep jurusan in sync with the combined class name for students.
 	if u.Role == "student" {
@@ -270,6 +275,17 @@ func (s *UserService) ListActivityLogs(ctx context.Context, callerRole, userID s
 		return nil, 0, nil
 	}
 	return s.activityRepo.Aggregate(ctx, userID, page, pageSize)
+}
+
+// ResetActivityLogs menghapus SELURUH log aktivitas (bukan per pengguna).
+func (s *UserService) ResetActivityLogs(ctx context.Context, callerRole string) error {
+	if callerRole != "admin" && callerRole != "teacher" {
+		return ErrPermissionDenied
+	}
+	if s.activityRepo == nil {
+		return nil
+	}
+	return s.activityRepo.ResetAll(ctx)
 }
 
 func (s *UserService) DeleteUser(ctx context.Context, callerRole, targetID string) error {

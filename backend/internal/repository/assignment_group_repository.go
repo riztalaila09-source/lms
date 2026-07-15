@@ -54,6 +54,9 @@ type AssignmentGroupRepository interface {
 	// PraktikumScores mengembalikan nilai kelompok untuk SETIAP anggota
 	// (nilai kelompok = nilai semua anggotanya) pada assignment praktikum.
 	PraktikumScores(ctx context.Context, assignmentIDs []string) ([]PraktikumScore, error)
+	// PraktikumKelasWithGroup mengembalikan himpunan assignment praktikum yang
+	// punya minimal satu anggota kelompok dari kelas tertentu.
+	PraktikumKelasWithGroup(ctx context.Context, assignmentIDs []string, kelas string) (map[string]bool, error)
 	UpsertGroupSubmission(ctx context.Context, groupID, content, fileURL, submittedBy string) error
 	ListGroupSubmissions(ctx context.Context, assignmentID string) ([]*GroupSubmission, error)
 	GroupSubmissionByGroup(ctx context.Context, groupID string) (*GroupSubmission, error)
@@ -202,6 +205,38 @@ func (r *sqliteAssignmentGroupRepository) PraktikumScores(ctx context.Context, a
 			return nil, fmt.Errorf("scan praktikum score: %w", err)
 		}
 		out = append(out, p)
+	}
+	return out, rows.Err()
+}
+
+func (r *sqliteAssignmentGroupRepository) PraktikumKelasWithGroup(ctx context.Context, assignmentIDs []string, kelas string) (map[string]bool, error) {
+	out := map[string]bool{}
+	if len(assignmentIDs) == 0 || kelas == "" {
+		return out, nil
+	}
+	ph := make([]string, len(assignmentIDs))
+	args := make([]interface{}, 0, len(assignmentIDs)+1)
+	for i, id := range assignmentIDs {
+		ph[i] = "?"
+		args = append(args, id)
+	}
+	args = append(args, kelas)
+	rows, err := r.db.QueryContext(ctx, `
+		SELECT DISTINCT g.assignment_id
+		FROM assignment_group_members m
+		JOIN assignment_groups g ON g.id = m.group_id
+		JOIN users u ON u.id = m.student_id
+		WHERE g.assignment_id IN (`+strings.Join(ph, ",")+`) AND u.kelas = ?`, args...)
+	if err != nil {
+		return nil, fmt.Errorf("praktikum kelas with group: %w", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, fmt.Errorf("scan: %w", err)
+		}
+		out[id] = true
 	}
 	return out, rows.Err()
 }

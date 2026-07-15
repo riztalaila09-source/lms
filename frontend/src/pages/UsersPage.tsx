@@ -4,14 +4,15 @@ import {
 } from '@chakra-ui/react'
 import {
   LuPlus, LuTrash2, LuPencil, LuSearch, LuUpload, LuDownload, LuFileText, LuCopy, LuArrowRightLeft,
-  LuSave, LuCircleCheck, LuBuilding,
+  LuSave, LuCircleCheck, LuBuilding, LuSquare, LuSquareCheck,
 } from 'react-icons/lu'
-import { userClient, classClient, jurusanClient, schoolClient } from '@/lib/client'
+import { userClient, classClient, jurusanClient, schoolClient, parentClient } from '@/lib/client'
 import type { User } from '@/gen/user/v1/user_pb'
 import { Role } from '@/gen/user/v1/user_pb'
 import type { Class } from '@/gen/class/v1/class_pb'
 import type { Jurusan } from '@/gen/jurusan/v1/jurusan_pb'
 import type { Semester } from '@/gen/school/v1/school_pb'
+import type { Parent } from '@/gen/parent/v1/parent_pb'
 import AppLayout from '@/components/AppLayout'
 import { Card } from '@/components/Card'
 import ConfirmDialog, { type ConfirmState } from '@/components/ConfirmDialog'
@@ -19,7 +20,47 @@ import Pagination, { usePaged } from '@/components/Pagination'
 import { COLORS, labelColor } from '@/theme/tokens'
 import { toaster } from '@/components/ui/toaster'
 
-type Tab = 'sekolah' | 'semester' | 'kelas' | 'jurusan' | 'guru' | 'siswa'
+// Chip pilih-kelas yang bisa dicentang banyak. Sengaja pakai onClick eksplisit
+// (bukan Chakra Checkbox.Root) agar toggle tetap andal di dalam Dialog/portal.
+function KelasChip({ name, on, onToggle }: { name: string; on: boolean; onToggle: () => void }) {
+  return (
+    <Flex align="center" gap="6px" onClick={onToggle} role="checkbox" aria-checked={on} userSelect="none"
+      px="10px" py="6px" borderRadius="7px" border="1px solid" cursor="pointer"
+      borderColor={on ? COLORS.primary : COLORS.border} bg={on ? COLORS.primaryTint : COLORS.surface}>
+      <Icon as={on ? LuSquareCheck : LuSquare} boxSize="16px" color={on ? COLORS.primary : COLORS.muted} />
+      <Text fontSize="13px">{name}</Text>
+    </Flex>
+  )
+}
+
+// Searchable multi-select of students, used to pick a parent's children.
+function StudentPicker({ students, selected, onToggle, search, onSearch }: {
+  students: User[]; selected: string[]; onToggle: (id: string) => void; search: string; onSearch: (v: string) => void
+}) {
+  const q = search.trim().toLowerCase()
+  const filtered = q
+    ? students.filter((s) => (s.fullName || s.username).toLowerCase().includes(q) || s.kelas.toLowerCase().includes(q))
+    : students
+  return (
+    <Box>
+      <Flex align="center" gap="8px" mb="6px" wrap="wrap">
+        <Flex align="center" gap="6px">
+          <Icon as={LuSearch} color={COLORS.muted} />
+          <Input size="sm" maxW="240px" value={search} onChange={(e) => onSearch(e.target.value)} placeholder="Cari nama / kelas siswa…" />
+        </Flex>
+        <Text fontSize="12px" color={COLORS.muted}>{selected.length} anak dipilih</Text>
+      </Flex>
+      <Flex gap="8px" wrap="wrap" maxH="180px" overflowY="auto">
+        {filtered.length === 0 ? <Text fontSize="12px" color={COLORS.muted}>Tidak ada siswa.</Text> : filtered.map((s) => (
+          <KelasChip key={s.id} name={`${s.fullName || s.username}${s.kelas ? ` (${s.kelas})` : ''}`}
+            on={selected.includes(s.id)} onToggle={() => onToggle(s.id)} />
+        ))}
+      </Flex>
+    </Box>
+  )
+}
+
+type Tab = 'sekolah' | 'semester' | 'kelas' | 'jurusan' | 'guru' | 'siswa' | 'ortu'
 
 interface EditForm {
   fullName: string
@@ -28,6 +69,7 @@ interface EditForm {
   kelas: string
   mapel: string
   gender: string
+  phone: string
   password: string
 }
 
@@ -83,7 +125,7 @@ export default function UsersPage() {
 
   // edit dialog
   const [editTarget, setEditTarget] = useState<{ user: User; role: 'guru' | 'siswa' } | null>(null)
-  const [editForm, setEditForm] = useState<EditForm>({ fullName: '', username: '', email: '', kelas: '', mapel: '', gender: '', password: '' })
+  const [editForm, setEditForm] = useState<EditForm>({ fullName: '', username: '', email: '', kelas: '', mapel: '', gender: '', phone: '', password: '' })
   const [editGuruKelas, setEditGuruKelas] = useState<string[]>([])
   const [editSaving, setEditSaving] = useState(false)
   const [editError, setEditError] = useState('')
@@ -218,7 +260,7 @@ export default function UsersPage() {
     onConfirm: async () => { try { await schoolClient.deleteSemester({ id: s.id }); await loadSemesters() } catch (e: unknown) { toaster.create({ description: e instanceof Error ? e.message : 'Gagal', type: 'error' }) } },
   })
 
-  const emptyGuru = { fullName: '', username: '', email: '', password: '', mapel: '', gender: '' }
+  const emptyGuru = { fullName: '', username: '', email: '', password: '', mapel: '', gender: '', phone: '' }
   const [guruForm, setGuruForm] = useState(emptyGuru)
   const [guruKelas, setGuruKelas] = useState<string[]>([])
   const [guruErr, setGuruErr] = useState('')
@@ -241,7 +283,7 @@ export default function UsersPage() {
   })
 
   // ── Siswa ──
-  const emptySiswa = { fullName: '', username: '', email: '', password: '', kelas: '', gender: '' }
+  const emptySiswa = { fullName: '', username: '', email: '', password: '', kelas: '', gender: '', phone: '' }
   const [siswaForm, setSiswaForm] = useState(emptySiswa)
   const [siswaErr, setSiswaErr] = useState('')
   const [siswaSaving, setSiswaSaving] = useState(false)
@@ -291,7 +333,7 @@ export default function UsersPage() {
   // ── Edit ──
   const startEdit = (user: User, role: 'guru' | 'siswa') => {
     setEditTarget({ user, role })
-    setEditForm({ fullName: user.fullName, username: user.username, email: user.email, kelas: user.kelas, mapel: user.mapel, gender: user.gender, password: '' })
+    setEditForm({ fullName: user.fullName, username: user.username, email: user.email, kelas: user.kelas, mapel: user.mapel, gender: user.gender, phone: user.phone, password: '' })
     setEditGuruKelas(role === 'guru' && user.kelas ? user.kelas.split(',').map((k) => k.trim()).filter(Boolean) : [])
     setEditError('')
   }
@@ -308,6 +350,7 @@ export default function UsersPage() {
         kelas: editTarget.role === 'siswa' ? editForm.kelas : editGuruKelas.join(', '),
         mapel: editTarget.role === 'guru' ? editForm.mapel : undefined,
         gender: editForm.gender || undefined,
+        phone: editForm.phone || undefined,
         password: editForm.password || undefined,
       })
       if (editForm.password) setPasswords(p => ({ ...p, [editTarget.user.id]: editForm.password }))
@@ -398,6 +441,71 @@ export default function UsersPage() {
     downloadCSV(rows.join('\n'), 'data-siswa.csv')
   }
 
+  // ── Orang Tua ──
+  const emptyOrtu = { namaAyah: '', namaIbu: '', namaWali: '', hubunganWali: '', phone: '', pekerjaan: '', alamat: '' }
+  const [parents, setParents] = useState<Parent[]>([])
+  const [ortuForm, setOrtuForm] = useState(emptyOrtu)
+  const [ortuChildren, setOrtuChildren] = useState<string[]>([])
+  const [ortuSearch, setOrtuSearch] = useState('')
+  const [ortuErr, setOrtuErr] = useState('')
+  const [ortuSaving, setOrtuSaving] = useState(false)
+  // All students, for the child picker (independent of the Siswa-tab filters).
+  const [allStudents, setAllStudents] = useState<User[]>([])
+  // edit ortu
+  const [editOrtu, setEditOrtu] = useState<Parent | null>(null)
+  const [editOrtuForm, setEditOrtuForm] = useState(emptyOrtu)
+  const [editOrtuChildren, setEditOrtuChildren] = useState<string[]>([])
+  const [editOrtuSearch, setEditOrtuSearch] = useState('')
+  const [editOrtuErr, setEditOrtuErr] = useState('')
+  const [editOrtuSaving, setEditOrtuSaving] = useState(false)
+
+  const loadParents = useCallback(async () => {
+    try {
+      const res = await parentClient.listParents({ pagination: { page: 1, pageSize: 200 } })
+      setParents(res.parents)
+    } catch (e: unknown) { toaster.create({ description: e instanceof Error ? e.message : 'Gagal memuat data orang tua', type: 'error' }) }
+  }, [])
+  const loadAllStudents = useCallback(async () => {
+    try {
+      const r = await userClient.listUsers({ roleFilter: Role.STUDENT, pagination: { page: 1, pageSize: 1000 } })
+      setAllStudents(r.users)
+    } catch { setAllStudents([]) }
+  }, [])
+
+  const toggleId = (arr: string[], id: string) => (arr.includes(id) ? arr.filter((x) => x !== id) : [...arr, id])
+  const ortuFromForm = (p: Parent) => ({
+    namaAyah: p.namaAyah, namaIbu: p.namaIbu, namaWali: p.namaWali,
+    hubunganWali: p.hubunganWali, phone: p.phone, pekerjaan: p.pekerjaan, alamat: p.alamat,
+  })
+
+  const addOrtu = async (e: React.FormEvent) => {
+    e.preventDefault(); setOrtuErr(''); setOrtuSaving(true)
+    try {
+      await parentClient.createParent({ ...ortuForm, studentIds: ortuChildren })
+      setOrtuForm(emptyOrtu); setOrtuChildren([]); setOrtuSearch(''); await loadParents()
+    } catch (err: unknown) { setOrtuErr(err instanceof Error ? err.message : 'Gagal menyimpan orang tua') }
+    finally { setOrtuSaving(false) }
+  }
+  const startEditOrtu = (p: Parent) => {
+    setEditOrtu(p); setEditOrtuForm(ortuFromForm(p))
+    setEditOrtuChildren(p.children.map((c) => c.studentId)); setEditOrtuSearch(''); setEditOrtuErr('')
+  }
+  const saveEditOrtu = async () => {
+    if (!editOrtu) return
+    setEditOrtuSaving(true); setEditOrtuErr('')
+    try {
+      await parentClient.updateParent({ id: editOrtu.id, ...editOrtuForm, studentIds: editOrtuChildren })
+      setEditOrtu(null); await loadParents()
+    } catch (err: unknown) { setEditOrtuErr(err instanceof Error ? err.message : 'Gagal menyimpan') }
+    finally { setEditOrtuSaving(false) }
+  }
+  const delOrtu = (p: Parent) => setConfirm({
+    title: 'Hapus Orang Tua',
+    message: 'Hapus data orang tua ini? Anak yang tertaut akan dilepas (siswa tetap ada).',
+    variant: 'danger', confirmLabel: 'Ya, Hapus',
+    onConfirm: async () => { try { await parentClient.deleteParent({ id: p.id }); await loadParents() } catch (e: unknown) { toaster.create({ description: e instanceof Error ? e.message : 'Gagal', type: 'error' }) } },
+  })
+
   // ── Load per tab ──
   useEffect(() => { loadClasses(); loadJurusans(); loadSchool(); loadSemesters() }, [loadClasses, loadJurusans, loadSchool, loadSemesters])
   useEffect(() => { if (tab === 'guru') loadTeachers() }, [tab, loadTeachers])
@@ -406,6 +514,7 @@ export default function UsersPage() {
     const t = setTimeout(loadStudents, 250)
     return () => clearTimeout(t)
   }, [tab, loadStudents])
+  useEffect(() => { if (tab === 'ortu') { loadParents(); loadAllStudents() } }, [tab, loadParents, loadAllStudents])
 
   // ── Password cell (shown in plaintext, with a copy button) ──
   const PwdCell = ({ user }: { user: User }) => {
@@ -424,6 +533,7 @@ export default function UsersPage() {
 
   const teachersPaged = usePaged(teachers, 10)
   const studentsPaged = usePaged(students, 10)
+  const parentsPaged = usePaged(parents, 10)
 
   const TabBtn = ({ id, label }: { id: Tab; label: string }) => (
     <Button variant="ghost" borderRadius={0} borderBottom="2px solid"
@@ -443,6 +553,7 @@ export default function UsersPage() {
           <TabBtn id="jurusan" label={`Jurusan (${jurusans.length})`} />
           <TabBtn id="guru" label="Guru" />
           <TabBtn id="siswa" label="Siswa" />
+          <TabBtn id="ortu" label="Orang Tua" />
         </Flex>
 
         {/* ── DATA SEKOLAH ── */}
@@ -652,6 +763,8 @@ export default function UsersPage() {
                     <Input type="text" value={guruForm.password} onChange={(e) => setGuruForm({ ...guruForm, password: e.target.value })} required minLength={6} /></Field.Root>
                   <Field.Root maxW="170px"><Field.Label>Mata Pelajaran</Field.Label>
                     <Input value={guruForm.mapel} onChange={(e) => setGuruForm({ ...guruForm, mapel: e.target.value })} placeholder="mis. Matematika" /></Field.Root>
+                  <Field.Root maxW="150px"><Field.Label>No. HP</Field.Label>
+                    <Input value={guruForm.phone} onChange={(e) => setGuruForm({ ...guruForm, phone: e.target.value })} placeholder="08…" /></Field.Root>
                   <Field.Root maxW="150px"><Field.Label>Jenis Kelamin</Field.Label>
                     <NativeSelect.Root>
                       <NativeSelect.Field value={guruForm.gender} onChange={(e) => setGuruForm({ ...guruForm, gender: e.target.value })}>
@@ -664,23 +777,25 @@ export default function UsersPage() {
                   <Button type="submit" bg={COLORS.primary} color="white" _hover={{ bg: COLORS.primaryDark }} loading={guruSaving}>Tambah Guru</Button>
                 </Flex>
                 <Box mt="10px">
-                  <Text fontSize="12px" fontWeight="500" mb="6px">Kelas yang diajar</Text>
+                  <Flex align="center" justify="space-between" mb="6px" gap="8px" wrap="wrap">
+                    <Text fontSize="12px" fontWeight="500">
+                      Kelas yang diajar{' '}
+                      <Text as="span" fontSize="11px" fontWeight="400" color={COLORS.muted}>(bisa pilih lebih dari satu)</Text>
+                    </Text>
+                    {classes.length > 0 && (
+                      <Flex gap="6px">
+                        <Button size="2xs" variant="ghost" type="button" onClick={() => setGuruKelas(classes.map((c) => c.name))}>Pilih semua</Button>
+                        <Button size="2xs" variant="ghost" type="button" onClick={() => setGuruKelas([])}>Kosongkan</Button>
+                      </Flex>
+                    )}
+                  </Flex>
                   {classes.length === 0 ? (
                     <Text fontSize="12px" color={COLORS.muted}>Belum ada kelas. Buat di tab "Kelas".</Text>
                   ) : (
                     <Flex gap="8px" wrap="wrap">
-                      {classes.map((c) => {
-                        const on = guruKelas.includes(c.name)
-                        return (
-                          <Checkbox.Root key={c.id} checked={on} onCheckedChange={() => toggleGuruKelas(c.name)}
-                            px="10px" py="6px" borderRadius="7px" border="1px solid" cursor="pointer"
-                            borderColor={on ? COLORS.primary : COLORS.border} bg={on ? COLORS.primaryTint : COLORS.surface}>
-                            <Checkbox.HiddenInput />
-                            <Checkbox.Control />
-                            <Checkbox.Label fontSize="13px">{c.name}</Checkbox.Label>
-                          </Checkbox.Root>
-                        )
-                      })}
+                      {classes.map((c) => (
+                        <KelasChip key={c.id} name={c.name} on={guruKelas.includes(c.name)} onToggle={() => toggleGuruKelas(c.name)} />
+                      ))}
                     </Flex>
                   )}
                 </Box>
@@ -691,10 +806,12 @@ export default function UsersPage() {
               <Box overflowX="auto"><Table.Root size="sm">
                 <Table.Header>
                   <Table.Row>
+                    <Table.ColumnHeader>#</Table.ColumnHeader>
                     <Table.ColumnHeader>Nama</Table.ColumnHeader>
                     <Table.ColumnHeader>JK</Table.ColumnHeader>
                     <Table.ColumnHeader>Username</Table.ColumnHeader>
                     <Table.ColumnHeader>Email</Table.ColumnHeader>
+                    <Table.ColumnHeader>No. HP</Table.ColumnHeader>
                     <Table.ColumnHeader>Mapel</Table.ColumnHeader>
                     <Table.ColumnHeader>Kelas</Table.ColumnHeader>
                     <Table.ColumnHeader>Password</Table.ColumnHeader>
@@ -703,13 +820,15 @@ export default function UsersPage() {
                 </Table.Header>
                 <Table.Body>
                   {teachers.length === 0 ? (
-                    <Table.Row><Table.Cell colSpan={8} textAlign="center" color={COLORS.muted}>Belum ada guru</Table.Cell></Table.Row>
-                  ) : teachersPaged.pageItems.map((u) => (
+                    <Table.Row><Table.Cell colSpan={10} textAlign="center" color={COLORS.muted}>Belum ada guru</Table.Cell></Table.Row>
+                  ) : teachersPaged.pageItems.map((u, i) => (
                     <Table.Row key={u.id}>
+                      <Table.Cell fontWeight="bold" color={COLORS.primary}>{(teachersPaged.page - 1) * teachersPaged.pageSize + i + 1}</Table.Cell>
                       <Table.Cell fontWeight="medium">{u.fullName || '-'}</Table.Cell>
                       <Table.Cell><GenderBadge g={u.gender} /></Table.Cell>
                       <Table.Cell>{u.username}</Table.Cell>
                       <Table.Cell>{u.email}</Table.Cell>
+                      <Table.Cell>{u.phone || '-'}</Table.Cell>
                       <Table.Cell>{u.mapel || '-'}</Table.Cell>
                       <Table.Cell>
                         <Flex gap="4px" wrap="wrap">
@@ -765,6 +884,8 @@ export default function UsersPage() {
                       <NativeSelect.Indicator />
                     </NativeSelect.Root>
                   </Field.Root>
+                  <Field.Root maxW="150px"><Field.Label>No. HP</Field.Label>
+                    <Input value={siswaForm.phone} onChange={(e) => setSiswaForm({ ...siswaForm, phone: e.target.value })} placeholder="08…" /></Field.Root>
                   <Button type="submit" bg={COLORS.primary} color="white" _hover={{ bg: COLORS.primaryDark }} loading={siswaSaving}>Tambah Siswa</Button>
                 </Flex>
                 {siswaErr && <Text color={COLORS.danger} fontSize="12px" mt="6px">{siswaErr}</Text>}
@@ -859,10 +980,12 @@ export default function UsersPage() {
                         <Checkbox.Control />
                       </Checkbox.Root>
                     </Table.ColumnHeader>
+                    <Table.ColumnHeader>#</Table.ColumnHeader>
                     <Table.ColumnHeader>Nama</Table.ColumnHeader>
                     <Table.ColumnHeader>JK</Table.ColumnHeader>
                     <Table.ColumnHeader>Username</Table.ColumnHeader>
                     <Table.ColumnHeader>Email</Table.ColumnHeader>
+                    <Table.ColumnHeader>No. HP</Table.ColumnHeader>
                     <Table.ColumnHeader>Kelas</Table.ColumnHeader>
                     <Table.ColumnHeader>Password</Table.ColumnHeader>
                     <Table.ColumnHeader textAlign="right">Aksi</Table.ColumnHeader>
@@ -870,8 +993,8 @@ export default function UsersPage() {
                 </Table.Header>
                 <Table.Body>
                   {students.length === 0 ? (
-                    <Table.Row><Table.Cell colSpan={8} textAlign="center" color={COLORS.muted}>Tidak ada siswa</Table.Cell></Table.Row>
-                  ) : studentsPaged.pageItems.map((u) => (
+                    <Table.Row><Table.Cell colSpan={10} textAlign="center" color={COLORS.muted}>Tidak ada siswa</Table.Cell></Table.Row>
+                  ) : studentsPaged.pageItems.map((u, i) => (
                     <Table.Row key={u.id} bg={selected[u.id] ? COLORS.primaryTint : undefined}>
                       <Table.Cell>
                         <Checkbox.Root aria-label={`pilih ${u.fullName}`}
@@ -881,10 +1004,12 @@ export default function UsersPage() {
                           <Checkbox.Control />
                         </Checkbox.Root>
                       </Table.Cell>
+                      <Table.Cell fontWeight="bold" color={COLORS.primary}>{(studentsPaged.page - 1) * studentsPaged.pageSize + i + 1}</Table.Cell>
                       <Table.Cell fontWeight="medium">{u.fullName || '-'}</Table.Cell>
                       <Table.Cell><GenderBadge g={u.gender} /></Table.Cell>
                       <Table.Cell>{u.username}</Table.Cell>
                       <Table.Cell>{u.email}</Table.Cell>
+                      <Table.Cell>{u.phone || '-'}</Table.Cell>
                       <Table.Cell>{u.kelas ? <Badge {...labelColor(u.kelas)}>{u.kelas}</Badge> : '-'}</Table.Cell>
                       <Table.Cell><PwdCell user={u} /></Table.Cell>
                       <Table.Cell textAlign="right">
@@ -898,6 +1023,84 @@ export default function UsersPage() {
                 </Table.Body>
               </Table.Root></Box>
               <Pagination page={studentsPaged.page} pageSize={studentsPaged.pageSize} total={studentsPaged.total} onPageChange={studentsPaged.setPage} />
+            </Card>
+          </Stack>
+        )}
+
+        {/* ── ORANG TUA ── */}
+        {tab === 'ortu' && (
+          <Stack gap="14px">
+            <Card title={<><Icon as={LuPlus} /> Tambah Orang Tua</>}>
+              <form onSubmit={addOrtu}>
+                <Flex gap="10px" flexWrap="wrap" align="flex-end">
+                  <Field.Root maxW="180px"><Field.Label>Nama Ayah</Field.Label>
+                    <Input value={ortuForm.namaAyah} onChange={(e) => setOrtuForm({ ...ortuForm, namaAyah: e.target.value })} /></Field.Root>
+                  <Field.Root maxW="180px"><Field.Label>Nama Ibu</Field.Label>
+                    <Input value={ortuForm.namaIbu} onChange={(e) => setOrtuForm({ ...ortuForm, namaIbu: e.target.value })} /></Field.Root>
+                  <Field.Root maxW="170px"><Field.Label>Nama Wali</Field.Label>
+                    <Input value={ortuForm.namaWali} onChange={(e) => setOrtuForm({ ...ortuForm, namaWali: e.target.value })} placeholder="jika ada" /></Field.Root>
+                  <Field.Root maxW="140px"><Field.Label>Hubungan Wali</Field.Label>
+                    <Input value={ortuForm.hubunganWali} onChange={(e) => setOrtuForm({ ...ortuForm, hubunganWali: e.target.value })} placeholder="mis. Paman" /></Field.Root>
+                  <Field.Root maxW="150px"><Field.Label>No. HP / WA</Field.Label>
+                    <Input value={ortuForm.phone} onChange={(e) => setOrtuForm({ ...ortuForm, phone: e.target.value })} placeholder="08…" /></Field.Root>
+                  <Field.Root maxW="160px"><Field.Label>Pekerjaan</Field.Label>
+                    <Input value={ortuForm.pekerjaan} onChange={(e) => setOrtuForm({ ...ortuForm, pekerjaan: e.target.value })} /></Field.Root>
+                  <Field.Root flex={1} minW="220px"><Field.Label>Alamat</Field.Label>
+                    <Input value={ortuForm.alamat} onChange={(e) => setOrtuForm({ ...ortuForm, alamat: e.target.value })} /></Field.Root>
+                </Flex>
+                <Box mt="12px">
+                  <Text fontSize="12px" fontWeight="500" mb="6px">Anak (siswa) — bisa pilih lebih dari satu</Text>
+                  <StudentPicker students={allStudents} selected={ortuChildren} search={ortuSearch}
+                    onSearch={setOrtuSearch} onToggle={(id) => setOrtuChildren((arr) => toggleId(arr, id))} />
+                </Box>
+                <Flex mt="12px" align="center" gap="10px">
+                  <Button type="submit" bg={COLORS.primary} color="white" _hover={{ bg: COLORS.primaryDark }} loading={ortuSaving}>Tambah Orang Tua</Button>
+                  {ortuErr && <Text color={COLORS.danger} fontSize="12px">{ortuErr}</Text>}
+                </Flex>
+              </form>
+            </Card>
+
+            <Card>
+              <Box overflowX="auto"><Table.Root size="sm">
+                <Table.Header>
+                  <Table.Row>
+                    <Table.ColumnHeader>#</Table.ColumnHeader>
+                    <Table.ColumnHeader>Ayah</Table.ColumnHeader>
+                    <Table.ColumnHeader>Ibu</Table.ColumnHeader>
+                    <Table.ColumnHeader>Wali</Table.ColumnHeader>
+                    <Table.ColumnHeader>No. HP</Table.ColumnHeader>
+                    <Table.ColumnHeader>Pekerjaan</Table.ColumnHeader>
+                    <Table.ColumnHeader>Anak</Table.ColumnHeader>
+                    <Table.ColumnHeader textAlign="right">Aksi</Table.ColumnHeader>
+                  </Table.Row>
+                </Table.Header>
+                <Table.Body>
+                  {parents.length === 0 ? (
+                    <Table.Row><Table.Cell colSpan={8} textAlign="center" color={COLORS.muted}>Belum ada data orang tua</Table.Cell></Table.Row>
+                  ) : parentsPaged.pageItems.map((p, i) => (
+                    <Table.Row key={p.id}>
+                      <Table.Cell fontWeight="bold" color={COLORS.primary}>{(parentsPaged.page - 1) * parentsPaged.pageSize + i + 1}</Table.Cell>
+                      <Table.Cell>{p.namaAyah || '-'}</Table.Cell>
+                      <Table.Cell>{p.namaIbu || '-'}</Table.Cell>
+                      <Table.Cell>{p.namaWali ? `${p.namaWali}${p.hubunganWali ? ` (${p.hubunganWali})` : ''}` : '-'}</Table.Cell>
+                      <Table.Cell>{p.phone || '-'}</Table.Cell>
+                      <Table.Cell>{p.pekerjaan || '-'}</Table.Cell>
+                      <Table.Cell>
+                        <Flex gap="4px" wrap="wrap">
+                          {p.children.length === 0 ? <Text color={COLORS.muted}>-</Text> : p.children.map((c) => <Badge key={c.studentId} {...labelColor(c.kelas || c.fullName)}>{c.fullName}</Badge>)}
+                        </Flex>
+                      </Table.Cell>
+                      <Table.Cell textAlign="right">
+                        <Flex gap="6px" justify="flex-end">
+                          <IconButton size="xs" colorPalette="blue" variant="outline" aria-label="Edit" title="Edit" onClick={() => startEditOrtu(p)}><Icon as={LuPencil} /></IconButton>
+                          <IconButton size="xs" colorPalette="red" variant="outline" aria-label="Hapus" title="Hapus" onClick={() => delOrtu(p)}><Icon as={LuTrash2} /></IconButton>
+                        </Flex>
+                      </Table.Cell>
+                    </Table.Row>
+                  ))}
+                </Table.Body>
+              </Table.Root></Box>
+              <Pagination page={parentsPaged.page} pageSize={parentsPaged.pageSize} total={parentsPaged.total} onPageChange={parentsPaged.setPage} />
             </Card>
           </Stack>
         )}
@@ -936,6 +1139,10 @@ export default function UsersPage() {
                     <NativeSelect.Indicator />
                   </NativeSelect.Root>
                 </Field.Root>
+                <Field.Root>
+                  <Field.Label>No. HP</Field.Label>
+                  <Input value={editForm.phone} onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })} placeholder="08…" />
+                </Field.Root>
                 {editTarget?.role === 'siswa' && (
                   <Field.Root>
                     <Field.Label>Kelas</Field.Label>
@@ -955,21 +1162,23 @@ export default function UsersPage() {
                       <Input value={editForm.mapel} onChange={(e) => setEditForm({ ...editForm, mapel: e.target.value })} placeholder="mis. Matematika" />
                     </Field.Root>
                     <Field.Root>
-                      <Field.Label>Kelas yang diajar</Field.Label>
+                      <Flex align="center" justify="space-between" w="100%" gap="8px" wrap="wrap" mb="4px">
+                        <Field.Label mb="0">
+                          Kelas yang diajar{' '}
+                          <Text as="span" fontSize="11px" fontWeight="400" color={COLORS.muted}>(bisa pilih lebih dari satu)</Text>
+                        </Field.Label>
+                        {classes.length > 0 && (
+                          <Flex gap="6px">
+                            <Button size="2xs" variant="ghost" type="button" onClick={() => setEditGuruKelas(classes.map((c) => c.name))}>Pilih semua</Button>
+                            <Button size="2xs" variant="ghost" type="button" onClick={() => setEditGuruKelas([])}>Kosongkan</Button>
+                          </Flex>
+                        )}
+                      </Flex>
                       <Flex gap="8px" wrap="wrap">
-                        {classes.length === 0 ? <Text fontSize="12px" color={COLORS.muted}>Belum ada kelas.</Text> : classes.map((c) => {
-                          const on = editGuruKelas.includes(c.name)
-                          return (
-                            <Checkbox.Root key={c.id} checked={on}
-                              onCheckedChange={() => setEditGuruKelas((arr) => arr.includes(c.name) ? arr.filter((x) => x !== c.name) : [...arr, c.name])}
-                              px="10px" py="6px" borderRadius="7px" border="1px solid" cursor="pointer"
-                              borderColor={on ? COLORS.primary : COLORS.border} bg={on ? COLORS.primaryTint : COLORS.surface}>
-                              <Checkbox.HiddenInput />
-                              <Checkbox.Control />
-                              <Checkbox.Label fontSize="13px">{c.name}</Checkbox.Label>
-                            </Checkbox.Root>
-                          )
-                        })}
+                        {classes.length === 0 ? <Text fontSize="12px" color={COLORS.muted}>Belum ada kelas.</Text> : classes.map((c) => (
+                          <KelasChip key={c.id} name={c.name} on={editGuruKelas.includes(c.name)}
+                            onToggle={() => setEditGuruKelas((arr) => arr.includes(c.name) ? arr.filter((x) => x !== c.name) : [...arr, c.name])} />
+                        ))}
                       </Flex>
                     </Field.Root>
                   </>
@@ -993,6 +1202,54 @@ export default function UsersPage() {
                   loading={editSaving} onClick={saveEdit}>
                   Simpan
                 </Button>
+              </Flex>
+            </Dialog.Footer>
+          </Dialog.Content>
+        </Dialog.Positioner>
+      </Dialog.Root>
+
+      {/* Edit Orang Tua */}
+      <Dialog.Root open={!!editOrtu} onOpenChange={(e) => { if (!e.open) setEditOrtu(null) }}>
+        <Dialog.Backdrop />
+        <Dialog.Positioner>
+          <Dialog.Content maxW="560px">
+            <Dialog.Header>
+              <Dialog.Title>Edit Orang Tua</Dialog.Title>
+            </Dialog.Header>
+            <Dialog.Body>
+              <Stack gap="12px">
+                <Flex gap="10px" wrap="wrap">
+                  <Field.Root flex={1} minW="160px"><Field.Label>Nama Ayah</Field.Label>
+                    <Input value={editOrtuForm.namaAyah} onChange={(e) => setEditOrtuForm({ ...editOrtuForm, namaAyah: e.target.value })} /></Field.Root>
+                  <Field.Root flex={1} minW="160px"><Field.Label>Nama Ibu</Field.Label>
+                    <Input value={editOrtuForm.namaIbu} onChange={(e) => setEditOrtuForm({ ...editOrtuForm, namaIbu: e.target.value })} /></Field.Root>
+                </Flex>
+                <Flex gap="10px" wrap="wrap">
+                  <Field.Root flex={1} minW="160px"><Field.Label>Nama Wali</Field.Label>
+                    <Input value={editOrtuForm.namaWali} onChange={(e) => setEditOrtuForm({ ...editOrtuForm, namaWali: e.target.value })} /></Field.Root>
+                  <Field.Root flex={1} minW="140px"><Field.Label>Hubungan Wali</Field.Label>
+                    <Input value={editOrtuForm.hubunganWali} onChange={(e) => setEditOrtuForm({ ...editOrtuForm, hubunganWali: e.target.value })} /></Field.Root>
+                </Flex>
+                <Flex gap="10px" wrap="wrap">
+                  <Field.Root flex={1} minW="150px"><Field.Label>No. HP / WA</Field.Label>
+                    <Input value={editOrtuForm.phone} onChange={(e) => setEditOrtuForm({ ...editOrtuForm, phone: e.target.value })} /></Field.Root>
+                  <Field.Root flex={1} minW="150px"><Field.Label>Pekerjaan</Field.Label>
+                    <Input value={editOrtuForm.pekerjaan} onChange={(e) => setEditOrtuForm({ ...editOrtuForm, pekerjaan: e.target.value })} /></Field.Root>
+                </Flex>
+                <Field.Root><Field.Label>Alamat</Field.Label>
+                  <Input value={editOrtuForm.alamat} onChange={(e) => setEditOrtuForm({ ...editOrtuForm, alamat: e.target.value })} /></Field.Root>
+                <Box>
+                  <Text fontSize="12px" fontWeight="500" mb="6px">Anak (siswa)</Text>
+                  <StudentPicker students={allStudents} selected={editOrtuChildren} search={editOrtuSearch}
+                    onSearch={setEditOrtuSearch} onToggle={(id) => setEditOrtuChildren((arr) => toggleId(arr, id))} />
+                </Box>
+                {editOrtuErr && <Text color={COLORS.danger} fontSize="12px">{editOrtuErr}</Text>}
+              </Stack>
+            </Dialog.Body>
+            <Dialog.Footer>
+              <Flex gap="8px" justify="flex-end">
+                <Button variant="outline" onClick={() => setEditOrtu(null)}>Batal</Button>
+                <Button bg={COLORS.primary} color="white" _hover={{ bg: COLORS.primaryDark }} loading={editOrtuSaving} onClick={saveEditOrtu}>Simpan</Button>
               </Flex>
             </Dialog.Footer>
           </Dialog.Content>

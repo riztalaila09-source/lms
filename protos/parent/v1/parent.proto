@@ -1,0 +1,82 @@
+syntax = "proto3";
+
+package parent.v1;
+
+option go_package = "lms/backend/gen/parent/v1;parentv1";
+
+import "common/v1/common.proto";
+import "google/protobuf/timestamp.proto";
+
+// A student linked to a parent household.
+message ChildRef {
+  string student_id = 1;
+  string full_name = 2;
+  string kelas = 3;
+}
+
+// Parent / guardian household. Contact data now; may gain a login account later.
+message Parent {
+  string id = 1;
+  string nama_ayah = 2;
+  string nama_ibu = 3;
+  string nama_wali = 4;
+  string hubungan_wali = 5;
+  string phone = 6;
+  string pekerjaan = 7;
+  string alamat = 8;
+  repeated ChildRef children = 9;
+  google.protobuf.Timestamp created_at = 10;
+  google.protobuf.Timestamp updated_at = 11;
+}
+
+message CreateParentRequest {
+  string nama_ayah = 1;
+  string nama_ibu = 2;
+  string nama_wali = 3;
+  string hubungan_wali = 4;
+  string phone = 5;
+  string pekerjaan = 6;
+  string alamat = 7;
+  repeated string student_ids = 8;
+}
+
+message UpdateParentRequest {
+  string id = 1;
+  string nama_ayah = 2;
+  string nama_ibu = 3;
+  string nama_wali = 4;
+  string hubungan_wali = 5;
+  string phone = 6;
+  string pekerjaan = 7;
+  string alamat = 8;
+  // Final set of children; students not listed are detached.
+  repeated string student_ids = 9;
+}
+
+message GetParentRequest {
+  string id = 1;
+}
+
+message ListParentsRequest {
+  common.v1.PaginationRequest pagination = 1;
+  optional string search = 2;
+}
+
+message ListParentsResponse {
+  repeated Parent parents = 1;
+  common.v1.PaginationResponse pagination = 2;
+}
+
+message DeleteParentRequest {
+  string id = 1;
+}
+
+message DeleteParentResponse {}
+
+service ParentService {
+  rpc CreateParent(CreateParentRequest) returns (Parent);
+  rpc GetParent(GetParentRequest) returns (Parent);
+  rpc UpdateParent(UpdateParentRequest) returns (Parent);
+  rpc ListParents(ListParentsRequest) returns (ListParentsResponse);
+  rpc DeleteParent(DeleteParentRequest) returns (DeleteParentResponse);
+}

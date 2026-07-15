@@ -1,13 +1,15 @@
 import { useEffect, useState, useCallback } from 'react'
 import { Badge, Box, Button, Flex, Icon, Table, Text } from '@chakra-ui/react'
-import { LuActivity, LuRefreshCw } from 'react-icons/lu'
+import { LuActivity, LuRefreshCw, LuTrash2 } from 'react-icons/lu'
 import { timestampDate } from '@bufbuild/protobuf/wkt'
 import { userClient } from '@/lib/client'
 import type { ActivityLogEntry } from '@/gen/user/v1/user_pb'
 import AppLayout from '@/components/AppLayout'
 import { Card } from '@/components/Card'
 import Pagination, { usePaged } from '@/components/Pagination'
+import ConfirmDialog, { type ConfirmState } from '@/components/ConfirmDialog'
 import { COLORS } from '@/theme/tokens'
+import { toaster } from '@/components/ui/toaster'
 
 const ROLE_LABEL: Record<string, string> = {
   admin: 'Admin', teacher: 'Guru', student: 'Siswa',
@@ -17,6 +19,7 @@ export default function LogAktivitasPage() {
   const [entries, setEntries] = useState<ActivityLogEntry[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [confirm, setConfirm] = useState<ConfirmState | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -33,6 +36,22 @@ export default function LogAktivitasPage() {
 
   useEffect(() => { load() }, [load])
 
+  const askResetAll = () => setConfirm({
+    title: 'Reset Semua Log Aktivitas',
+    message: 'Seluruh catatan login (semua siswa & guru) akan dihapus dan tidak bisa dikembalikan. Lanjutkan?',
+    variant: 'danger',
+    confirmLabel: 'Ya, Reset Semua',
+    onConfirm: async () => {
+      try {
+        await userClient.resetActivityLogs({})
+        toaster.create({ description: 'Semua log aktivitas telah direset.', type: 'success' })
+        await load()
+      } catch (err: unknown) {
+        toaster.create({ description: err instanceof Error ? err.message : 'Gagal mereset log', type: 'error' })
+      }
+    },
+  })
+
   const maxCount = Math.max(1, ...entries.map((e) => e.loginCount))
   const fmt = (d?: Date) => (d ? d.toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' }) : '-')
   const entriesPaged = usePaged(entries, 15)
@@ -41,7 +60,14 @@ export default function LogAktivitasPage() {
     <AppLayout
       title={<><Icon as={LuActivity} /> Log Aktivitas</>}
       subtitle="Jumlah login & waktu kunjungan pengguna"
-      actions={<Button size="sm" variant="outline" onClick={load}><Icon as={LuRefreshCw} /> Refresh</Button>}
+      actions={
+        <Flex gap="8px">
+          <Button size="sm" variant="outline" colorPalette="red" onClick={askResetAll} disabled={entries.length === 0}>
+            <Icon as={LuTrash2} /> Reset Semua
+          </Button>
+          <Button size="sm" variant="outline" onClick={load}><Icon as={LuRefreshCw} /> Refresh</Button>
+        </Flex>
+      }
     >
       {error && <Text color={COLORS.danger} mb="10px">{error}</Text>}
       <Card>
@@ -86,6 +112,7 @@ export default function LogAktivitasPage() {
         </Box>
         <Pagination page={entriesPaged.page} pageSize={entriesPaged.pageSize} total={entriesPaged.total} onPageChange={entriesPaged.setPage} />
       </Card>
+      <ConfirmDialog state={confirm} onClose={() => setConfirm(null)} />
     </AppLayout>
   )
 }

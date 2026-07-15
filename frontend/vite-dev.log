@@ -1,0 +1,89 @@
+
+> lms-frontend@0.1.0 dev
+> vite
+
+
+  [32m[1mVITE[22m v5.4.21[39m  [2mready in [0m[1m3238[22m[2m[0m ms[22m
+
+  [32m➜[39m  [1mLocal[22m:   [36mhttp://localhost:[1m5173[22m/[39m
+[2m  [32m➜[39m  [1mNetwork[22m[2m: use [22m[1m--host[22m[2m to expose[22m
+[2m3:51:53 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/CoursesPage.tsx[22m
+[2m3:51:55 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/CoursesPage.tsx[22m
+[2m3:52:07 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/CoursesPage.tsx[22m
+[2m3:52:15 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/CoursesPage.tsx[22m
+[2m3:57:01 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/NilaiPage.tsx[22m
+[2m3:57:16 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/NilaiPage.tsx[22m
+[2m4:10:04 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/NilaiPage.tsx[22m
+[2m4:10:06 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/NilaiPage.tsx[22m
+[2m4:10:07 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/NilaiPage.tsx[22m
+[2m4:21:03 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/App.tsx, /src/pages/DashboardPage.tsx, /src/pages/AbsensiPage.tsx, /src/pages/NilaiPage.tsx, /src/pages/CoursesPage.tsx, /src/pages/MitraPklPage.tsx, /src/pages/TugasPage.tsx, /src/pages/UsersPage.tsx, /src/pages/CourseDetailPage.tsx, /src/hooks/useAuth.tsx, /src/pages/PengaturanPage.tsx, /src/pages/LogAktivitasPage.tsx, /src/pages/PengumpulanPage.tsx, /src/components/MaterialFormDialog.tsx, /src/components/MaterialViewer.tsx, /src/components/tugas/GroupSubmitDialog.tsx, /src/components/tugas/KuisRunner.tsx, /src/components/tugas/PraktikumManager.tsx, /src/components/classroom/ScheduleTab.tsx, /src/components/classroom/LessonCalendarTab.tsx, /src/components/classroom/ActivityLeaderboard.tsx, /src/components/classroom/ActivityScoringPanel.tsx, /src/components/MaterialComments.tsx, /src/components/TopNav.tsx, /src/components/PhaseNode.tsx, /src/components/AppLayout.tsx, /src/components/Sidebar.tsx[22m
+[2m4:21:05 PM[22m [36m[1m[vite][22m[39m [33mhmr invalidate [39m[2m/src/hooks/useAuth.tsx[22m Could not Fast Refresh ("useAuth" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+[2m4:21:05 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/App.tsx, /src/pages/PengaturanPage.tsx, /src/pages/LoginPage.tsx, /src/pages/DashboardPage.tsx, /src/pages/AbsensiPage.tsx, /src/pages/NilaiPage.tsx, /src/pages/CoursesPage.tsx, /src/pages/MitraPklPage.tsx, /src/pages/TugasPage.tsx, /src/pages/CourseDetailPage.tsx, /src/components/AppLayout.tsx, /src/components/MaterialViewer.tsx, /src/components/tugas/GroupSubmitDialog.tsx, /src/components/classroom/ActivityLeaderboard.tsx, /src/components/Sidebar.tsx, /src/components/TopNav.tsx[22m
+[2m4:21:05 PM[22m [36m[1m[vite][22m[39m [33mhmr invalidate [39m[2m/src/components/MaterialFormDialog.tsx[22m Could not Fast Refresh ("decodeLinks" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+[2m4:21:05 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/PengumpulanPage.tsx, /src/pages/TugasPage.tsx, /src/pages/CourseDetailPage.tsx, /src/components/MaterialViewer.tsx, /src/components/tugas/GroupSubmitDialog.tsx, /src/components/tugas/PraktikumManager.tsx[22m
+[2m4:21:05 PM[22m [36m[1m[vite][22m[39m [33mhmr invalidate [39m[2m/src/components/PhaseNode.tsx[22m Could not Fast Refresh ("PHASES" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+[2m4:21:05 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/MaterialFormDialog.tsx, /src/components/MaterialViewer.tsx, /src/components/RichTextEditor.tsx[22m
+[2m4:21:05 PM[22m [36m[1m[vite][22m[39m [33mhmr invalidate [39m[2m/src/components/MaterialFormDialog.tsx[22m Could not Fast Refresh ("decodeLinks" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+[2m4:21:05 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/PengumpulanPage.tsx, /src/pages/TugasPage.tsx, /src/pages/CourseDetailPage.tsx, /src/components/MaterialViewer.tsx, /src/components/tugas/GroupSubmitDialog.tsx, /src/components/tugas/PraktikumManager.tsx[22m
+[2m4:22:23 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/LogAktivitasPage.tsx[22m
+[2m4:22:33 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/LogAktivitasPage.tsx[22m
+[2m4:22:47 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/LogAktivitasPage.tsx[22m
+[2m4:22:59 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/LogAktivitasPage.tsx[22m
+[2m4:23:10 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/LogAktivitasPage.tsx[22m
+[2m8:46:40 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/UsersPage.tsx[22m
+[2m8:46:50 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/UsersPage.tsx[22m
+[2m8:59:03 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/UsersPage.tsx[22m
+[2m8:59:23 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/UsersPage.tsx[22m
+[2m8:59:32 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/UsersPage.tsx[22m
+[2m8:59:44 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/UsersPage.tsx[22m
+[2m9:48:51 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/App.tsx, /src/pages/DashboardPage.tsx, /src/pages/AbsensiPage.tsx, /src/pages/NilaiPage.tsx, /src/pages/CoursesPage.tsx, /src/pages/MitraPklPage.tsx, /src/pages/TugasPage.tsx, /src/pages/UsersPage.tsx, /src/pages/CourseDetailPage.tsx, /src/hooks/useAuth.tsx, /src/pages/PengaturanPage.tsx, /src/pages/LogAktivitasPage.tsx, /src/pages/PengumpulanPage.tsx, /src/components/MaterialFormDialog.tsx, /src/components/MaterialViewer.tsx, /src/components/tugas/GroupSubmitDialog.tsx, /src/components/tugas/KuisRunner.tsx, /src/components/tugas/PraktikumManager.tsx, /src/components/classroom/ScheduleTab.tsx, /src/components/classroom/LessonCalendarTab.tsx, /src/components/classroom/ActivityLeaderboard.tsx, /src/components/classroom/ActivityScoringPanel.tsx, /src/components/MaterialComments.tsx, /src/components/TopNav.tsx, /src/components/PhaseNode.tsx, /src/components/AppLayout.tsx, /src/components/Sidebar.tsx[22m
+[2m9:48:52 PM[22m [36m[1m[vite][22m[39m [33mhmr invalidate [39m[2m/src/hooks/useAuth.tsx[22m Could not Fast Refresh ("useAuth" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+[2m9:48:52 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/App.tsx, /src/pages/PengaturanPage.tsx, /src/pages/LoginPage.tsx, /src/pages/DashboardPage.tsx, /src/pages/AbsensiPage.tsx, /src/pages/NilaiPage.tsx, /src/pages/CoursesPage.tsx, /src/pages/MitraPklPage.tsx, /src/pages/TugasPage.tsx, /src/pages/CourseDetailPage.tsx, /src/components/AppLayout.tsx, /src/components/MaterialViewer.tsx, /src/components/tugas/GroupSubmitDialog.tsx, /src/components/classroom/ActivityLeaderboard.tsx, /src/components/Sidebar.tsx, /src/components/TopNav.tsx[22m
+[2m9:48:52 PM[22m [36m[1m[vite][22m[39m [33mhmr invalidate [39m[2m/src/components/MaterialFormDialog.tsx[22m Could not Fast Refresh ("decodeLinks" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+[2m9:48:52 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/PengumpulanPage.tsx, /src/pages/TugasPage.tsx, /src/pages/CourseDetailPage.tsx, /src/components/MaterialViewer.tsx, /src/components/tugas/GroupSubmitDialog.tsx, /src/components/tugas/PraktikumManager.tsx[22m
+[2m9:48:52 PM[22m [36m[1m[vite][22m[39m [33mhmr invalidate [39m[2m/src/components/PhaseNode.tsx[22m Could not Fast Refresh ("PHASES" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+[2m9:48:52 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/MaterialFormDialog.tsx, /src/components/MaterialViewer.tsx, /src/components/RichTextEditor.tsx[22m
+[2m9:54:11 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/hooks/useAuth.tsx, /src/pages/PengaturanPage.tsx, /src/pages/LogAktivitasPage.tsx, /src/pages/PengumpulanPage.tsx, /src/pages/DashboardPage.tsx, /src/pages/AbsensiPage.tsx, /src/pages/NilaiPage.tsx, /src/pages/CoursesPage.tsx, /src/pages/MitraPklPage.tsx, /src/pages/TugasPage.tsx, /src/pages/UsersPage.tsx, /src/pages/CourseDetailPage.tsx, /src/components/MaterialFormDialog.tsx, /src/components/MaterialViewer.tsx, /src/components/tugas/GroupSubmitDialog.tsx, /src/components/tugas/KuisRunner.tsx, /src/components/tugas/PraktikumManager.tsx, /src/components/classroom/ScheduleTab.tsx, /src/components/classroom/LessonCalendarTab.tsx, /src/components/classroom/ActivityLeaderboard.tsx, /src/components/classroom/ActivityScoringPanel.tsx, /src/components/MaterialComments.tsx, /src/components/TopNav.tsx, /src/components/PhaseNode.tsx[22m
+[2m9:54:11 PM[22m [36m[1m[vite][22m[39m [33mhmr invalidate [39m[2m/src/hooks/useAuth.tsx[22m Could not Fast Refresh ("useAuth" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+[2m9:54:11 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/App.tsx, /src/pages/PengaturanPage.tsx, /src/pages/LoginPage.tsx, /src/pages/DashboardPage.tsx, /src/pages/AbsensiPage.tsx, /src/pages/NilaiPage.tsx, /src/pages/CoursesPage.tsx, /src/pages/MitraPklPage.tsx, /src/pages/TugasPage.tsx, /src/pages/CourseDetailPage.tsx, /src/components/AppLayout.tsx, /src/components/MaterialViewer.tsx, /src/components/tugas/GroupSubmitDialog.tsx, /src/components/classroom/ActivityLeaderboard.tsx, /src/components/Sidebar.tsx, /src/components/TopNav.tsx[22m
+[2m9:54:11 PM[22m [36m[1m[vite][22m[39m [33mhmr invalidate [39m[2m/src/components/MaterialFormDialog.tsx[22m Could not Fast Refresh ("decodeLinks" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+[2m9:54:11 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/PengumpulanPage.tsx, /src/pages/TugasPage.tsx, /src/pages/CourseDetailPage.tsx, /src/components/MaterialViewer.tsx, /src/components/tugas/GroupSubmitDialog.tsx, /src/components/tugas/PraktikumManager.tsx[22m
+[2m9:54:11 PM[22m [36m[1m[vite][22m[39m [33mhmr invalidate [39m[2m/src/components/PhaseNode.tsx[22m Could not Fast Refresh ("PHASES" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+[2m9:54:11 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/MaterialFormDialog.tsx, /src/components/MaterialViewer.tsx, /src/components/RichTextEditor.tsx[22m
+[2m9:54:21 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/hooks/useAuth.tsx, /src/pages/PengaturanPage.tsx, /src/pages/LogAktivitasPage.tsx, /src/pages/PengumpulanPage.tsx, /src/pages/DashboardPage.tsx, /src/pages/AbsensiPage.tsx, /src/pages/NilaiPage.tsx, /src/pages/CoursesPage.tsx, /src/pages/MitraPklPage.tsx, /src/pages/TugasPage.tsx, /src/pages/UsersPage.tsx, /src/pages/CourseDetailPage.tsx, /src/components/MaterialFormDialog.tsx, /src/components/MaterialViewer.tsx, /src/components/tugas/GroupSubmitDialog.tsx, /src/components/tugas/KuisRunner.tsx, /src/components/tugas/PraktikumManager.tsx, /src/components/classroom/ScheduleTab.tsx, /src/components/classroom/LessonCalendarTab.tsx, /src/components/classroom/ActivityLeaderboard.tsx, /src/components/classroom/ActivityScoringPanel.tsx, /src/components/MaterialComments.tsx, /src/components/TopNav.tsx, /src/components/PhaseNode.tsx[22m
+[2m9:54:21 PM[22m [36m[1m[vite][22m[39m [33mhmr invalidate [39m[2m/src/hooks/useAuth.tsx[22m Could not Fast Refresh ("useAuth" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+[2m9:54:21 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/App.tsx, /src/pages/PengaturanPage.tsx, /src/pages/LoginPage.tsx, /src/pages/DashboardPage.tsx, /src/pages/AbsensiPage.tsx, /src/pages/NilaiPage.tsx, /src/pages/CoursesPage.tsx, /src/pages/MitraPklPage.tsx, /src/pages/TugasPage.tsx, /src/pages/CourseDetailPage.tsx, /src/components/AppLayout.tsx, /src/components/MaterialViewer.tsx, /src/components/tugas/GroupSubmitDialog.tsx, /src/components/classroom/ActivityLeaderboard.tsx, /src/components/Sidebar.tsx, /src/components/TopNav.tsx[22m
+[2m9:54:21 PM[22m [36m[1m[vite][22m[39m [33mhmr invalidate [39m[2m/src/components/MaterialFormDialog.tsx[22m Could not Fast Refresh ("decodeLinks" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+[2m9:54:21 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/PengumpulanPage.tsx, /src/pages/TugasPage.tsx, /src/pages/CourseDetailPage.tsx, /src/components/MaterialViewer.tsx, /src/components/tugas/GroupSubmitDialog.tsx, /src/components/tugas/PraktikumManager.tsx[22m
+[2m9:54:21 PM[22m [36m[1m[vite][22m[39m [33mhmr invalidate [39m[2m/src/components/PhaseNode.tsx[22m Could not Fast Refresh ("PHASES" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+[2m9:54:21 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/MaterialFormDialog.tsx, /src/components/MaterialViewer.tsx, /src/components/RichTextEditor.tsx[22m
+[2m9:57:42 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/UsersPage.tsx[22m
+[2m9:57:48 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/UsersPage.tsx[22m
+[2m9:57:59 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/UsersPage.tsx[22m
+[2m9:58:06 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/UsersPage.tsx[22m
+[2m9:58:25 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/UsersPage.tsx[22m
+[2m9:58:39 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/UsersPage.tsx[22m
+[2m9:59:09 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/UsersPage.tsx[22m
+[2m9:59:24 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/UsersPage.tsx[22m
+[2m9:59:33 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/UsersPage.tsx[22m
+[2m9:59:54 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/UsersPage.tsx[22m
+[2m10:00:21 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/UsersPage.tsx[22m
+[2m10:00:40 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/UsersPage.tsx[22m
+[2m10:00:47 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/UsersPage.tsx[22m
+[2m10:01:38 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/UsersPage.tsx[22m
+[2m10:02:19 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/UsersPage.tsx[22m
+[2m10:02:26 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/UsersPage.tsx[22m
+[2m10:02:52 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/UsersPage.tsx[22m
+[2m10:03:38 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/UsersPage.tsx[22m
+[2m10:04:23 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/UsersPage.tsx[22m
+[2m10:29:44 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/AbsensiPage.tsx[22m
+[2m10:30:20 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/AbsensiPage.tsx[22m
+[2m10:30:55 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/AbsensiPage.tsx[22m
+[2m10:31:11 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/AbsensiPage.tsx[22m
+[2m10:31:48 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/AbsensiPage.tsx[22m
+[2m10:32:06 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/AbsensiPage.tsx[22m
+[2m10:32:37 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/AbsensiPage.tsx[22m
+[2m10:32:55 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/AbsensiPage.tsx[22m
+[2m10:33:24 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/AbsensiPage.tsx[22m
+[2m10:33:42 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/AbsensiPage.tsx[22m
+[2m10:34:07 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/AbsensiPage.tsx[22m
