@@ -110,6 +110,20 @@ func (s *ParentService) UpdateParent(ctx context.Context, callerRole, id string,
 	return s.repo.GetByID(ctx, id)
 }
 
+// GetMyParent returns the calling student's own guardian (read-only). Returns
+// nil (no error) when the caller has no linked parent, so callers/handlers can
+// render an "empty" result rather than an error.
+func (s *ParentService) GetMyParent(ctx context.Context, callerID string) (*repository.Parent, error) {
+	p, err := s.repo.GetByStudentID(ctx, callerID)
+	if err != nil {
+		if errors.Is(err, repository.ErrParentNotFound) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("get my parent: %w", err)
+	}
+	return p, nil
+}
+
 func (s *ParentService) GetParent(ctx context.Context, callerRole, id string) (*repository.Parent, error) {
 	if !isManager(callerRole) {
 		return nil, ErrPermissionDenied

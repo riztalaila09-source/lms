@@ -164,6 +164,8 @@ func (h *UserHandler) UpdateProfile(
 		Email:    req.Msg.Email,
 		PhotoURL: req.Msg.PhotoUrl,
 		Story:    req.Msg.Story,
+		Phone:    req.Msg.Phone,
+		Gender:   req.Msg.Gender,
 	}
 	u, err := h.userSvc.UpdateProfile(ctx, claims.UserID, input)
 	if err != nil {

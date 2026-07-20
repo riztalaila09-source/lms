@@ -42,6 +42,31 @@ func TestParentService_CreateLinksChildren(t *testing.T) {
 	assert.Len(t, p.Children, 2)
 }
 
+func TestParentService_GetMyParent(t *testing.T) {
+	svc, ur, ctx := setupParentSvc(t)
+	child := mkStudentSvc(t, ur, ctx, "Anak", "student")
+	orphan := mkStudentSvc(t, ur, ctx, "Yatim", "student")
+
+	// No linked parent yet -> nil, no error (so callers render an empty result).
+	got, err := svc.GetMyParent(ctx, child.ID)
+	require.NoError(t, err)
+	assert.Nil(t, got)
+
+	// After linking, the child sees their guardian (read-only).
+	_, err = svc.CreateParent(ctx, "admin", service.ParentInput{NamaOrtu: "Bunda", Phone: "0812", StudentIDs: []string{child.ID}})
+	require.NoError(t, err)
+	got, err = svc.GetMyParent(ctx, child.ID)
+	require.NoError(t, err)
+	require.NotNil(t, got)
+	assert.Equal(t, "Bunda", got.NamaOrtu)
+	assert.Equal(t, "0812", got.Phone)
+
+	// A student not linked to that parent still gets nil.
+	got, err = svc.GetMyParent(ctx, orphan.ID)
+	require.NoError(t, err)
+	assert.Nil(t, got)
+}
+
 func TestParentService_ManagerGate(t *testing.T) {
 	svc, ur, ctx := setupParentSvc(t)
 	a := mkStudentSvc(t, ur, ctx, "Anak", "student")

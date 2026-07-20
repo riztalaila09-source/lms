@@ -34,6 +34,8 @@ type Parent struct {
 type ParentRepository interface {
 	Create(ctx context.Context, p *Parent) error
 	GetByID(ctx context.Context, id string) (*Parent, error)
+	// GetByStudentID returns the guardian linked to a student (via users.parent_id).
+	GetByStudentID(ctx context.Context, studentID string) (*Parent, error)
 	Update(ctx context.Context, p *Parent) error
 	Delete(ctx context.Context, id string) error
 	List(ctx context.Context, search string, page, pageSize int) ([]*Parent, int, error)
@@ -95,6 +97,24 @@ func (r *sqliteParentRepository) GetByID(ctx context.Context, id string) (*Paren
 		return nil, fmt.Errorf("get parent: %w", err)
 	}
 	children, err := r.loadChildren(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	p.Children = children
+	return p, nil
+}
+
+func (r *sqliteParentRepository) GetByStudentID(ctx context.Context, studentID string) (*Parent, error) {
+	p := &Parent{}
+	err := scanParent(r.db.QueryRowContext(ctx,
+		`SELECT `+parentColumns+` FROM parents WHERE id = (SELECT parent_id FROM users WHERE id = ? AND role = 'student')`, studentID), p)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, ErrParentNotFound
+	}
+	if err != nil {
+		return nil, fmt.Errorf("get parent by student: %w", err)
+	}
+	children, err := r.loadChildren(ctx, p.ID)
 	if err != nil {
 		return nil, err
 	}

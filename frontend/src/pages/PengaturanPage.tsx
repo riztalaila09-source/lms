@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
-import { Box, Button, Field, Flex, Icon, Image, Input, SimpleGrid, Stack, Tabs, Text, Textarea } from '@chakra-ui/react'
-import { LuUser, LuSave, LuKeyRound, LuLock, LuQuote, LuShieldCheck, LuDatabase, LuCheck, LuX, LuDownload } from 'react-icons/lu'
-import { userClient, schoolClient } from '@/lib/client'
+import { Box, Button, Field, Flex, Icon, Image, Input, NativeSelect, SimpleGrid, Stack, Tabs, Text, Textarea } from '@chakra-ui/react'
+import { LuUser, LuSave, LuKeyRound, LuLock, LuQuote, LuShieldCheck, LuDatabase, LuCheck, LuX, LuDownload, LuContact } from 'react-icons/lu'
+import { userClient, schoolClient, parentClient } from '@/lib/client'
+import type { Parent } from '@/gen/parent/v1/parent_pb'
+import { Role } from '@/gen/user/v1/user_pb'
 import { useAuth } from '@/hooks/useAuth'
 import { isAdmin } from '@/lib/permissions'
 import AppLayout from '@/components/AppLayout'
@@ -17,19 +19,26 @@ const ACCESS_RESOURCES: { key: string; label: string; edit: boolean; del: boolea
   { key: 'nilai', label: 'Nilai (penilaian)', edit: true, del: false },
   { key: 'absensi', label: 'Absensi', edit: true, del: true },
   { key: 'pkl', label: 'Mitra PKL', edit: true, del: true },
+  { key: 'pengguna', label: 'Data Pengguna (Murid / Guru / Orang Tua)', edit: false, del: true },
 ]
 
 export default function PengaturanPage() {
   const { user, loadProfile } = useAuth()
   const admin = isAdmin(user)
 
+  const isTeacher = user?.role === Role.TEACHER
+  const isStudent = user?.role === Role.STUDENT
+
   const [fullName, setFullName] = useState('')
   const [username, setUsername] = useState('')
   const [email, setEmail] = useState('')
+  const [phone, setPhone] = useState('')
+  const [gender, setGender] = useState('')
   const [photoUrl, setPhotoUrl] = useState('')
   const [profileMsg, setProfileMsg] = useState('')
   const [profileErr, setProfileErr] = useState('')
   const [savingProfile, setSavingProfile] = useState(false)
+  const [myParent, setMyParent] = useState<Parent | null>(null)
 
   const [story, setStory] = useState('')
   const [storyMsg, setStoryMsg] = useState('')
@@ -56,10 +65,18 @@ export default function PengaturanPage() {
       setFullName(user.fullName)
       setUsername(user.username)
       setEmail(user.email)
+      setPhone(user.phone || '')
+      setGender(user.gender || '')
       setPhotoUrl(user.photoUrl)
       setStory(user.story || '')
     }
   }, [user])
+
+  // Murid: tampilkan data orang tua (read-only).
+  useEffect(() => {
+    if (!isStudent) return
+    parentClient.getMyParent({}).then((p) => setMyParent(p.id ? p : null)).catch(() => setMyParent(null))
+  }, [isStudent])
 
   useEffect(() => {
     if (!admin) return
@@ -87,7 +104,7 @@ export default function PengaturanPage() {
     setProfileErr('')
     setSavingProfile(true)
     try {
-      await userClient.updateProfile({ fullName, username, email, photoUrl })
+      await userClient.updateProfile({ fullName, username, email, photoUrl, phone, gender })
       await loadProfile()
       setProfileMsg('Profil berhasil disimpan.')
     } catch (err: unknown) {
@@ -201,9 +218,10 @@ export default function PengaturanPage() {
 
         {/* Profil */}
         <Tabs.Content value="profil">
+          <Stack gap="16px" maxW="720px">
           <Card title={<><Icon as={LuUser} /> Profil & Foto</>}>
             <form onSubmit={saveProfile}>
-              <Stack gap="12px" maxW="480px">
+              <Stack gap="14px">
                 <Flex align="center" gap="14px">
                   {photoUrl ? (
                     <Image src={photoUrl} alt="foto" w="64px" h="64px" borderRadius="full" objectFit="cover" border="2px solid" borderColor={COLORS.border} />
@@ -217,15 +235,43 @@ export default function PengaturanPage() {
                     </Field.Root>
                   </Box>
                 </Flex>
-                <Field.Root><Field.Label fontSize="12px">Nama Lengkap</Field.Label><Input value={fullName} onChange={(e) => setFullName(e.target.value)} /></Field.Root>
-                <Field.Root><Field.Label fontSize="12px">Username (untuk login)</Field.Label><Input value={username} onChange={(e) => setUsername(e.target.value)} /></Field.Root>
-                <Field.Root><Field.Label fontSize="12px">Email</Field.Label><Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} /></Field.Root>
+                <SimpleGrid columns={{ base: 1, md: 2 }} gap="12px">
+                  <Field.Root><Field.Label fontSize="12px">Nama Lengkap</Field.Label><Input value={fullName} onChange={(e) => setFullName(e.target.value)} /></Field.Root>
+                  <Field.Root><Field.Label fontSize="12px">Username (untuk login)</Field.Label><Input value={username} onChange={(e) => setUsername(e.target.value)} /></Field.Root>
+                  <Field.Root><Field.Label fontSize="12px">Email</Field.Label><Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} /></Field.Root>
+                  <Field.Root><Field.Label fontSize="12px">No. HP / WhatsApp</Field.Label><Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="08…" /></Field.Root>
+                  <Field.Root><Field.Label fontSize="12px">Jenis Kelamin</Field.Label>
+                    <NativeSelect.Root><NativeSelect.Field value={gender} onChange={(e) => setGender(e.target.value)}>
+                      <option value="">—</option><option value="L">Laki-laki</option><option value="P">Perempuan</option>
+                    </NativeSelect.Field><NativeSelect.Indicator /></NativeSelect.Root></Field.Root>
+                  {isStudent && <Field.Root><Field.Label fontSize="12px">Kelas <Text as="span" color={COLORS.muted} fontSize="10px">(diatur admin)</Text></Field.Label><Input value={user?.kelas || '-'} readOnly bg={COLORS.bg} /></Field.Root>}
+                  {isStudent && <Field.Root><Field.Label fontSize="12px">Jurusan <Text as="span" color={COLORS.muted} fontSize="10px">(diatur admin)</Text></Field.Label><Input value={user?.jurusan || '-'} readOnly bg={COLORS.bg} /></Field.Root>}
+                  {isTeacher && <Field.Root><Field.Label fontSize="12px">Mapel <Text as="span" color={COLORS.muted} fontSize="10px">(diatur admin)</Text></Field.Label><Input value={user?.mapel || '-'} readOnly bg={COLORS.bg} /></Field.Root>}
+                </SimpleGrid>
                 {profileErr && <Text color={COLORS.danger} fontSize="12px">{profileErr}</Text>}
                 {profileMsg && <Text color={COLORS.success} fontSize="12px">{profileMsg}</Text>}
                 <Button type="submit" alignSelf="flex-start" loading={savingProfile} bg={COLORS.primary} color="white" _hover={{ bg: COLORS.primaryDark }}><Icon as={LuSave} /> Simpan Profil</Button>
               </Stack>
             </form>
           </Card>
+
+          {/* Data Orang Tua (murid) — read-only */}
+          {isStudent && (
+            <Card title={<><Icon as={LuContact} /> Data Orang Tua / Wali</>}>
+              {myParent ? (
+                <SimpleGrid columns={{ base: 1, md: 2 }} gap="12px">
+                  <Field.Root><Field.Label fontSize="12px">Nama Orang Tua / Wali</Field.Label><Input value={myParent.namaOrtu || '-'} readOnly bg={COLORS.bg} /></Field.Root>
+                  <Field.Root><Field.Label fontSize="12px">Hubungan</Field.Label><Input value={myParent.hubungan || '-'} readOnly bg={COLORS.bg} /></Field.Root>
+                  <Field.Root><Field.Label fontSize="12px">No. HP / WhatsApp</Field.Label><Input value={myParent.phone || '-'} readOnly bg={COLORS.bg} /></Field.Root>
+                  <Field.Root><Field.Label fontSize="12px">Alamat</Field.Label><Input value={myParent.alamat || '-'} readOnly bg={COLORS.bg} /></Field.Root>
+                </SimpleGrid>
+              ) : (
+                <Text fontSize="13px" color={COLORS.muted}>Belum ada data orang tua yang tertaut. Hubungi admin / guru untuk menautkan.</Text>
+              )}
+              <Text fontSize="11px" color={COLORS.muted} mt="10px">Data orang tua hanya bisa diubah oleh admin/guru (di menu Pengguna → Orang Tua).</Text>
+            </Card>
+          )}
+          </Stack>
         </Tabs.Content>
 
         {/* Password */}

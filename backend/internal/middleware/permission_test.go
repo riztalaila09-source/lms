@@ -36,3 +36,18 @@ func TestPermitProcedure_Capabilities(t *testing.T) {
 	// A procedure with no permission/capability mapping is always allowed.
 	assert.True(t, permitProcedure("/dashboard.v1.DashboardService/GetStudentHome", "teacher", nil, caps))
 }
+
+func TestPermitProcedure_PenggunaDelete(t *testing.T) {
+	const delUser = "/user.v1.UserService/DeleteUser"
+	const delParent = "/parent.v1.ParentService/DeleteParent"
+	denied := fakeCaps{denied: map[string]bool{"pengguna.delete": true}}
+
+	// Teacher blocked from deleting accounts/parents when the admin denies it.
+	assert.False(t, permitProcedure(delUser, "teacher", nil, denied))
+	assert.False(t, permitProcedure(delParent, "teacher", nil, denied))
+
+	// Admin is never blocked; default (nil / not denied) allows the teacher.
+	assert.True(t, permitProcedure(delUser, "admin", nil, denied))
+	assert.True(t, permitProcedure(delUser, "teacher", nil, nil))
+	assert.True(t, permitProcedure(delUser, "teacher", nil, fakeCaps{denied: map[string]bool{}}))
+}

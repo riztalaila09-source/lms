@@ -142,6 +142,29 @@ func TestUserService_MutateClass(t *testing.T) {
 	})
 }
 
+func TestUserService_UpdateProfile_PhoneGender(t *testing.T) {
+	ctx := context.Background()
+	repo := &mockUserRepository{}
+	svc := service.NewUserService(repo, newTestJWTService(), nil)
+
+	u := makeTestUser("u1", "student")
+	repo.On("GetByID", ctx, u.ID).Return(u, nil)
+	repo.On("Update", ctx, mock.AnythingOfType("*repository.User")).Return(nil)
+
+	phone := "08123456789"
+	gender := "l" // lowercase -> normalized to 'L'
+	out, err := svc.UpdateProfile(ctx, u.ID, service.UpdateProfileInput{Phone: &phone, Gender: &gender})
+	require.NoError(t, err)
+	assert.Equal(t, "08123456789", out.Phone)
+	assert.Equal(t, "L", out.Gender)
+
+	// An invalid gender value is ignored (kept as-is).
+	bad := "X"
+	out, err = svc.UpdateProfile(ctx, u.ID, service.UpdateProfileInput{Gender: &bad})
+	require.NoError(t, err)
+	assert.Equal(t, "L", out.Gender, "invalid gender ignored")
+}
+
 func TestUserService_Login(t *testing.T) {
 	ctx := context.Background()
 

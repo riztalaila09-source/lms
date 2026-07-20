@@ -57,6 +57,22 @@ func (h *ParentHandler) GetParent(ctx context.Context, req *connect.Request[pare
 	return connect.NewResponse(parentToProto(p)), nil
 }
 
+// GetMyParent returns the calling student's own guardian (read-only, self-service).
+func (h *ParentHandler) GetMyParent(ctx context.Context, _ *connect.Request[parentv1.GetMyParentRequest]) (*connect.Response[parentv1.Parent], error) {
+	claims, ok := middleware.ClaimsFromContext(ctx)
+	if !ok {
+		return nil, connect.NewError(connect.CodeUnauthenticated, nil)
+	}
+	p, err := h.svc.GetMyParent(ctx, claims.UserID)
+	if err != nil {
+		return nil, mapParentError(err)
+	}
+	if p == nil {
+		return connect.NewResponse(&parentv1.Parent{}), nil
+	}
+	return connect.NewResponse(parentToProto(p)), nil
+}
+
 func (h *ParentHandler) UpdateParent(ctx context.Context, req *connect.Request[parentv1.UpdateParentRequest]) (*connect.Response[parentv1.Parent], error) {
 	claims, ok := middleware.ClaimsFromContext(ctx)
 	if !ok {

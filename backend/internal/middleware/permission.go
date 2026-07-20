@@ -95,6 +95,10 @@ var procedureCapabilities = map[string]string{
 	"/attendance.v1.AttendanceService/DeleteSession":         "absensi.delete",
 	"/pkl.v1.PklService/UpdatePartner":                       "pkl.edit",
 	"/pkl.v1.PklService/DeletePartner":                       "pkl.delete",
+	// Deleting accounts in the Pengguna menu (murid/guru) and parents (ortu).
+	// Admins can always restrict whether teachers may delete via Hak Akses.
+	"/user.v1.UserService/DeleteUser":                        "pengguna.delete",
+	"/parent.v1.ParentService/DeleteParent":                  "pengguna.delete",
 }
 
 // CapabilityChecker reports whether a capability key is globally denied to teachers.

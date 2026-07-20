@@ -23,6 +23,14 @@ interface RichTextEditorProps {
 
 const FONT_SIZES = ['12px', '14px', '16px', '18px', '24px', '32px']
 
+// Beberapa emoji yang relevan dengan pembelajaran (disisipkan sebagai teks).
+const EDU_EMOJIS: [string, string][] = [
+  ['📚', 'Buku'], ['📖', 'Baca'], ['✏️', 'Pensil'], ['📝', 'Catatan'], ['💡', 'Ide'],
+  ['🎯', 'Target'], ['✅', 'Benar'], ['❌', 'Salah'], ['⭐', 'Bintang'], ['🏆', 'Juara'],
+  ['❓', 'Tanya'], ['⚠️', 'Penting'], ['🧠', 'Berpikir'], ['🔬', 'Riset'], ['🧮', 'Hitung'],
+  ['👍', 'Bagus'],
+]
+
 /**
  * TipTap-based rich editor. Sticky toolbar (headings, font size, B/I/U, colour,
  * align, lists, table, image, link, undo/redo) + a button to insert an inline
@@ -201,6 +209,15 @@ export default function RichTextEditor({ value, onChange }: RichTextEditorProps)
         </NativeSelect.Root>
         <Tool label={<><Icon as={LuLayoutList} /> Kerangka</>}
           title="Sisip kerangka lengkap 20 fase pembelajaran" onClick={insertAllPhases} />
+        {/* Emoji pembelajaran — disisipkan sebagai teks di posisi kursor */}
+        <NativeSelect.Root size="xs" width="auto" title="Sisip emoji pembelajaran">
+          <NativeSelect.Field fontSize="11px" value=""
+            onChange={(e) => { const v = e.target.value; if (v) editor.chain().focus().insertContent(v).run(); e.currentTarget.value = '' }}>
+            <option value="">＋ Emoji</option>
+            {EDU_EMOJIS.map(([em, label]) => <option key={em} value={em}>{em} {label}</option>)}
+          </NativeSelect.Field>
+          <NativeSelect.Indicator />
+        </NativeSelect.Root>
         <Tool label={<Icon as={LuUndo2} />} title="Undo" onClick={() => editor.chain().focus().undo().run()} />
         <Tool label={<Icon as={LuRedo2} />} title="Redo" onClick={() => editor.chain().focus().redo().run()} />
         <input ref={imgInput} type="file" accept="image/*" style={{ display: 'none' }}

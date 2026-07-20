@@ -64,9 +64,14 @@ message DeleteParentRequest {
 
 message DeleteParentResponse {}
 
+// The calling student's own guardian (read-only). Returns an empty Parent (id="")
+// when the student has no linked parent.
+message GetMyParentRequest {}
+
 service ParentService {
   rpc CreateParent(CreateParentRequest) returns (Parent);
   rpc GetParent(GetParentRequest) returns (Parent);
+  rpc GetMyParent(GetMyParentRequest) returns (Parent);
   rpc UpdateParent(UpdateParentRequest) returns (Parent);
   rpc ListParents(ListParentsRequest) returns (ListParentsResponse);
   rpc DeleteParent(DeleteParentRequest) returns (DeleteParentResponse);

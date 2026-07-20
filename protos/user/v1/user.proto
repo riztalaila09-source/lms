@@ -94,6 +94,8 @@ message UpdateProfileRequest {
   optional string email = 3;
   optional string photo_url = 4;
   optional string story = 5;
+  optional string phone = 6;
+  optional string gender = 7; // '' | 'L' | 'P'
 }
 
 // A user's testimonial/story for the home page.

@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useRef } from 'react'
+import { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import {
   Badge, Box, Button, Checkbox, Dialog, Field, Flex, Icon, IconButton, Input, NativeSelect, Stack, Table, Text, Textarea,
 } from '@chakra-ui/react'
@@ -446,6 +446,10 @@ export default function UsersPage({ section = 'guru' }: { section?: Section } = 
   const [siswaSaving, setSiswaSaving] = useState(false)
   const [search, setSearch] = useState('')
   const [filterKelas, setFilterKelas] = useState('')
+  // Quick client-side search for the Guru / Admin / Orang Tua tabs (fully loaded lists).
+  const [guruSearch, setGuruSearch] = useState('')
+  const [adminSearch, setAdminSearch] = useState('')
+  const [parentSearch, setParentSearch] = useState('')
 
   const importRef = useRef<HTMLInputElement>(null)
   const [importResult, setImportResult] = useState<{ success: number; failed: number; errors: string[] } | null>(null)
@@ -563,6 +567,31 @@ export default function UsersPage({ section = 'guru' }: { section?: Section } = 
       },
     })
   }
+  // Bulk-delete the selected murid (respects the central "Hapus Pengguna" access policy on the backend).
+  const [bulkDeleting, setBulkDeleting] = useState(false)
+  const delSelectedMurid = () => {
+    if (selectedIds.length === 0) return
+    setConfirm({
+      title: 'Hapus Murid Terpilih',
+      message: `Hapus ${selectedIds.length} akun murid terpilih? Tindakan ini tidak bisa dibatalkan.`,
+      variant: 'danger', confirmLabel: 'Ya, Hapus',
+      onConfirm: async () => {
+        setBulkDeleting(true)
+        let ok = 0; const errs: string[] = []
+        for (const id of selectedIds) {
+          try { await userClient.deleteUser({ id }); ok++ }
+          catch (e: unknown) { errs.push(e instanceof Error ? e.message : 'gagal') }
+        }
+        setSelected({})
+        await loadStudents()
+        setBulkDeleting(false)
+        toaster.create({
+          description: `${ok} murid dihapus${errs.length ? `, ${errs.length} gagal (mis. tak berizin)` : ''}.`,
+          type: errs.length ? 'warning' : 'success',
+        })
+      },
+    })
+  }
 
   // ── Import CSV ──
   const handleImport = async (file: File) => {
@@ -623,6 +652,15 @@ export default function UsersPage({ section = 'guru' }: { section?: Section } = 
   const [editOrtuSearch, setEditOrtuSearch] = useState('')
   const [editOrtuErr, setEditOrtuErr] = useState('')
   const [editOrtuSaving, setEditOrtuSaving] = useState(false)
+  // Murid yang SUDAH punya orang tua (satu murid hanya boleh satu orang tua).
+  const assignedChildIds = useMemo(() => new Set(parents.flatMap((p) => p.children.map((c) => c.studentId))), [parents])
+  // Picker "Tambah": hanya tampilkan murid yang belum punya orang tua.
+  const unassignedStudents = useMemo(() => allStudents.filter((s) => !assignedChildIds.has(s.id)), [allStudents, assignedChildIds])
+  // Picker "Edit": murid belum punya ortu + anak milik ortu yang sedang diedit.
+  const editableStudents = useMemo(() => {
+    const own = new Set(editOrtu?.children.map((c) => c.studentId) ?? [])
+    return allStudents.filter((s) => !assignedChildIds.has(s.id) || own.has(s.id))
+  }, [allStudents, assignedChildIds, editOrtu])
 
   const loadParents = useCallback(async () => {
     try {
@@ -723,6 +761,34 @@ export default function UsersPage({ section = 'guru' }: { section?: Section } = 
     variant: 'danger', confirmLabel: 'Ya, Hapus',
     onConfirm: async () => { try { await parentClient.deleteParent({ id: p.id }); await loadParents() } catch (e: unknown) { toaster.create({ description: e instanceof Error ? e.message : 'Gagal', type: 'error' }) } },
   })
+  // Bulk select + delete for Orang Tua (mirrors the Murid tab). Respects the
+  // central "Hapus Pengguna" access policy on the backend.
+  const [ortuSelected, setOrtuSelected] = useState<Record<string, boolean>>({})
+  const ortuSelectedIds = Object.keys(ortuSelected).filter((id) => ortuSelected[id])
+  const [ortuBulkDeleting, setOrtuBulkDeleting] = useState(false)
+  const delSelectedOrtu = () => {
+    if (ortuSelectedIds.length === 0) return
+    setConfirm({
+      title: 'Hapus Orang Tua Terpilih',
+      message: `Hapus ${ortuSelectedIds.length} data orang tua terpilih? Anak yang tertaut akan dilepas (murid tetap ada).`,
+      variant: 'danger', confirmLabel: 'Ya, Hapus',
+      onConfirm: async () => {
+        setOrtuBulkDeleting(true)
+        let ok = 0; const errs: string[] = []
+        for (const id of ortuSelectedIds) {
+          try { await parentClient.deleteParent({ id }); ok++ }
+          catch (e: unknown) { errs.push(e instanceof Error ? e.message : 'gagal') }
+        }
+        setOrtuSelected({})
+        await loadParents()
+        setOrtuBulkDeleting(false)
+        toaster.create({
+          description: `${ok} orang tua dihapus${errs.length ? `, ${errs.length} gagal (mis. tak berizin)` : ''}.`,
+          type: errs.length ? 'warning' : 'success',
+        })
+      },
+    })
+  }
 
   // ── Load per tab ──
   useEffect(() => { loadClasses(); loadJurusans(); loadSchool(); loadSemesters() }, [loadClasses, loadJurusans, loadSchool, loadSemesters])
@@ -759,14 +825,21 @@ export default function UsersPage({ section = 'guru' }: { section?: Section } = 
     )
   }
 
-  const teachersPaged = usePaged(teachers, 10)
+  const inc = (v: string | undefined, q: string) => (v || '').toLowerCase().includes(q)
+  const qGuru = guruSearch.trim().toLowerCase()
+  const filteredTeachers = teachers.filter((u) => !qGuru || [u.fullName, u.username, u.email, u.mapel].some((v) => inc(v, qGuru)))
+  const teachersPaged = usePaged(filteredTeachers, 10)
   const studentsPaged = usePaged(students, 10)
-  // Filter parents by a child's class so their data is easy to find.
-  const filteredParents = ortuFilterKelas
-    ? parents.filter((p) => p.children.some((c) => c.kelas === ortuFilterKelas))
-    : parents
+  // Filter parents by a child's class and/or a name/phone/child search.
+  const qParent = parentSearch.trim().toLowerCase()
+  const filteredParents = parents.filter((p) =>
+    (!ortuFilterKelas || p.children.some((c) => c.kelas === ortuFilterKelas)) &&
+    (!qParent || inc(p.namaOrtu, qParent) || inc(p.phone, qParent) || p.children.some((c) => inc(c.fullName, qParent))),
+  )
   const parentsPaged = usePaged(filteredParents, 10)
-  const adminsPaged = usePaged(admins, 10)
+  const qAdmin = adminSearch.trim().toLowerCase()
+  const filteredAdmins = admins.filter((u) => !qAdmin || [u.fullName, u.username, u.email].some((v) => inc(v, qAdmin)))
+  const adminsPaged = usePaged(filteredAdmins, 10)
 
   const TabBtn = ({ id, label }: { id: Tab; label: string }) => (
     inSection(id) && canTab(id) ? (
@@ -1105,6 +1178,13 @@ export default function UsersPage({ section = 'guru' }: { section?: Section } = 
               </form>
             </Card>
             <Card>
+              <Flex mb="10px" align="center" gap="8px" wrap="wrap">
+                <Flex align="center" gap="6px" flex={1} minW="220px" maxW="360px">
+                  <Icon as={LuSearch} color={COLORS.muted} />
+                  <Input size="sm" value={guruSearch} onChange={(e) => setGuruSearch(e.target.value)} placeholder="Cari nama / username / email / mapel…" />
+                </Flex>
+                {guruSearch && <Text fontSize="12px" color={COLORS.muted}>{filteredTeachers.length} hasil</Text>}
+              </Flex>
               <Box overflowX="auto"><Table.Root size="sm">
                 <Table.Header>
                   <Table.Row>
@@ -1121,8 +1201,8 @@ export default function UsersPage({ section = 'guru' }: { section?: Section } = 
                   </Table.Row>
                 </Table.Header>
                 <Table.Body>
-                  {teachers.length === 0 ? (
-                    <Table.Row><Table.Cell colSpan={10} textAlign="center" color={COLORS.muted}>Belum ada guru</Table.Cell></Table.Row>
+                  {filteredTeachers.length === 0 ? (
+                    <Table.Row><Table.Cell colSpan={10} textAlign="center" color={COLORS.muted}>{guruSearch ? 'Tidak ada guru yang cocok' : 'Belum ada guru'}</Table.Cell></Table.Row>
                   ) : teachersPaged.pageItems.map((u, i) => (
                     <Table.Row key={u.id}>
                       <Table.Cell fontWeight="bold" color={COLORS.primary}>{(teachersPaged.page - 1) * teachersPaged.pageSize + i + 1}</Table.Cell>
@@ -1251,6 +1331,9 @@ export default function UsersPage({ section = 'guru' }: { section?: Section } = 
                     disabled={!bulkTo} loading={mutSaving} onClick={doMutasiSelected}>
                     <Icon as={LuArrowRightLeft} /> Mutasi Terpilih
                   </Button>
+                  <Button size="sm" colorPalette="red" variant="solid" loading={bulkDeleting} onClick={delSelectedMurid}>
+                    <Icon as={LuTrash2} /> Hapus Terpilih
+                  </Button>
                   <Button size="sm" variant="ghost" onClick={() => setSelected({})}>Batal</Button>
                 </Flex>
               )}
@@ -1354,8 +1437,8 @@ export default function UsersPage({ section = 'guru' }: { section?: Section } = 
                     <Input value={ortuForm.alamat} onChange={(e) => setOrtuForm({ ...ortuForm, alamat: e.target.value })} /></Field.Root>
                 </Flex>
                 <Box mt="12px">
-                  <Text fontSize="12px" fontWeight="500" mb="6px">Anak (murid) — bisa pilih lebih dari satu</Text>
-                  <StudentPicker students={allStudents} selected={ortuChildren} search={ortuSearch} kelasOptions={classes.map((c) => c.name)}
+                  <Text fontSize="12px" fontWeight="500" mb="6px">Anak (murid) — bisa pilih lebih dari satu <Text as="span" fontWeight="400" color={COLORS.muted}>(hanya murid yang belum punya orang tua)</Text></Text>
+                  <StudentPicker students={unassignedStudents} selected={ortuChildren} search={ortuSearch} kelasOptions={classes.map((c) => c.name)}
                     onSearch={setOrtuSearch} onToggle={(id) => setOrtuChildren((arr) => toggleId(arr, id))} />
                 </Box>
                 <Flex mt="12px" align="center" gap="10px">
@@ -1367,6 +1450,10 @@ export default function UsersPage({ section = 'guru' }: { section?: Section } = 
 
             <Card>
               <Flex gap="8px" mb="12px" align="flex-end" wrap="wrap">
+                <Box minW="220px">
+                  <Text fontSize="12px" fontWeight="500" mb="4px" display="flex" alignItems="center" gap="4px"><Icon as={LuSearch} /> Cari Orang Tua</Text>
+                  <Input size="sm" value={parentSearch} onChange={(e) => setParentSearch(e.target.value)} placeholder="Nama ortu / No. HP / nama anak…" />
+                </Box>
                 <Box minW="180px">
                   <Text fontSize="12px" fontWeight="500" mb="4px">Filter Kelas (anak)</Text>
                   <NativeSelect.Root size="sm">
@@ -1377,7 +1464,7 @@ export default function UsersPage({ section = 'guru' }: { section?: Section } = 
                     <NativeSelect.Indicator />
                   </NativeSelect.Root>
                 </Box>
-                {ortuFilterKelas && <Text fontSize="12px" color={COLORS.muted}>{filteredParents.length} orang tua di kelas {ortuFilterKelas}</Text>}
+                {(ortuFilterKelas || parentSearch) && <Text fontSize="12px" color={COLORS.muted}>{filteredParents.length} hasil</Text>}
                 <Flex gap="6px" align="flex-end" flexWrap="wrap" ml="auto">
                   <Button size="sm" variant="outline" colorPalette="teal" onClick={() => ortuImportRef.current?.click()} loading={ortuImporting}>
                     <Icon as={LuUpload} /> Import CSV
@@ -1400,9 +1487,30 @@ export default function UsersPage({ section = 'guru' }: { section?: Section } = 
                   ))}
                 </Box>
               )}
+              {/* Selection action bar (bulk delete) */}
+              {ortuSelectedIds.length > 0 && (
+                <Flex mb="10px" p="10px" borderRadius="8px" bg={COLORS.primaryTint} align="center" gap="10px" flexWrap="wrap">
+                  <Text fontSize="13px" fontWeight="600">{ortuSelectedIds.length} orang tua dipilih</Text>
+                  <Button size="sm" colorPalette="red" variant="solid" loading={ortuBulkDeleting} onClick={delSelectedOrtu}>
+                    <Icon as={LuTrash2} /> Hapus Terpilih
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => setOrtuSelected({})}>Batal</Button>
+                </Flex>
+              )}
               <Box overflowX="auto"><Table.Root size="sm">
                 <Table.Header>
                   <Table.Row>
+                    <Table.ColumnHeader w="32px">
+                      <Checkbox.Root aria-label="pilih semua di halaman ini"
+                        checked={parentsPaged.pageItems.length > 0 && parentsPaged.pageItems.every((p) => ortuSelected[p.id])}
+                        onCheckedChange={(e) => {
+                          const on = !!e.checked
+                          setOrtuSelected((s) => { const n = { ...s }; parentsPaged.pageItems.forEach((p) => { n[p.id] = on }); return n })
+                        }}>
+                        <Checkbox.HiddenInput />
+                        <Checkbox.Control />
+                      </Checkbox.Root>
+                    </Table.ColumnHeader>
                     <Table.ColumnHeader>#</Table.ColumnHeader>
                     <Table.ColumnHeader>Nama Orang Tua</Table.ColumnHeader>
                     <Table.ColumnHeader>Hubungan</Table.ColumnHeader>
@@ -1415,11 +1523,19 @@ export default function UsersPage({ section = 'guru' }: { section?: Section } = 
                 </Table.Header>
                 <Table.Body>
                   {filteredParents.length === 0 ? (
-                    <Table.Row><Table.Cell colSpan={8} textAlign="center" color={COLORS.muted}>{ortuFilterKelas ? 'Tidak ada orang tua untuk kelas ini' : 'Belum ada data orang tua'}</Table.Cell></Table.Row>
+                    <Table.Row><Table.Cell colSpan={9} textAlign="center" color={COLORS.muted}>{(ortuFilterKelas || parentSearch) ? 'Tidak ada orang tua yang cocok' : 'Belum ada data orang tua'}</Table.Cell></Table.Row>
                   ) : parentsPaged.pageItems.map((p, i) => {
                     const kelasAnak = Array.from(new Set(p.children.map((c) => c.kelas).filter(Boolean)))
                     return (
-                    <Table.Row key={p.id}>
+                    <Table.Row key={p.id} bg={ortuSelected[p.id] ? COLORS.primaryTint : undefined}>
+                      <Table.Cell>
+                        <Checkbox.Root aria-label={`pilih ${p.namaOrtu}`}
+                          checked={!!ortuSelected[p.id]}
+                          onCheckedChange={(e) => setOrtuSelected((s) => ({ ...s, [p.id]: !!e.checked }))}>
+                          <Checkbox.HiddenInput />
+                          <Checkbox.Control />
+                        </Checkbox.Root>
+                      </Table.Cell>
                       <Table.Cell fontWeight="bold" color={COLORS.primary}>{(parentsPaged.page - 1) * parentsPaged.pageSize + i + 1}</Table.Cell>
                       <Table.Cell fontWeight="medium">{p.namaOrtu || '-'}</Table.Cell>
                       <Table.Cell>{p.hubungan || '-'}</Table.Cell>
@@ -1474,6 +1590,13 @@ export default function UsersPage({ section = 'guru' }: { section?: Section } = 
             </Card>
 
             <Card>
+              <Flex mb="10px" align="center" gap="8px" wrap="wrap">
+                <Flex align="center" gap="6px" flex={1} minW="220px" maxW="360px">
+                  <Icon as={LuSearch} color={COLORS.muted} />
+                  <Input size="sm" value={adminSearch} onChange={(e) => setAdminSearch(e.target.value)} placeholder="Cari nama / username / email…" />
+                </Flex>
+                {adminSearch && <Text fontSize="12px" color={COLORS.muted}>{filteredAdmins.length} hasil</Text>}
+              </Flex>
               <Box overflowX="auto"><Table.Root size="sm">
                 <Table.Header>
                   <Table.Row>
@@ -1487,8 +1610,8 @@ export default function UsersPage({ section = 'guru' }: { section?: Section } = 
                   </Table.Row>
                 </Table.Header>
                 <Table.Body>
-                  {admins.length === 0 ? (
-                    <Table.Row><Table.Cell colSpan={7} textAlign="center" color={COLORS.muted}>Belum ada admin</Table.Cell></Table.Row>
+                  {filteredAdmins.length === 0 ? (
+                    <Table.Row><Table.Cell colSpan={7} textAlign="center" color={COLORS.muted}>{adminSearch ? 'Tidak ada admin yang cocok' : 'Belum ada admin'}</Table.Cell></Table.Row>
                   ) : adminsPaged.pageItems.map((u, i) => (
                     <Table.Row key={u.id}>
                       <Table.Cell fontWeight="bold" color={COLORS.primary}>{(adminsPaged.page - 1) * adminsPaged.pageSize + i + 1}</Table.Cell>
@@ -1666,7 +1789,7 @@ export default function UsersPage({ section = 'guru' }: { section?: Section } = 
                 </Flex>
                 <Box>
                   <Text fontSize="12px" fontWeight="500" mb="6px">Anak (murid)</Text>
-                  <StudentPicker students={allStudents} selected={editOrtuChildren} search={editOrtuSearch} kelasOptions={classes.map((c) => c.name)}
+                  <StudentPicker students={editableStudents} selected={editOrtuChildren} search={editOrtuSearch} kelasOptions={classes.map((c) => c.name)}
                     onSearch={setEditOrtuSearch} onToggle={(id) => setEditOrtuChildren((arr) => toggleId(arr, id))} />
                 </Box>
                 {editOrtuErr && <Text color={COLORS.danger} fontSize="12px">{editOrtuErr}</Text>}

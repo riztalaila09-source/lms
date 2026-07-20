@@ -103,7 +103,9 @@ func (r *sqliteDashboardRepository) TeacherStats(ctx context.Context) (*TeacherD
 	}
 
 	var err error
-	if d.TotalKelas, err = scalar(`SELECT COUNT(*) FROM courses`); err != nil {
+	// Exclude the sentinel "Materi Umum" (general) course — it is not a real
+	// subject and must not inflate the "Total Mata Pelajaran" stat.
+	if d.TotalKelas, err = scalar(`SELECT COUNT(*) FROM courses WHERE id <> '` + GeneralCourseID + `'`); err != nil {
 		return nil, fmt.Errorf("count courses: %w", err)
 	}
 	if d.TotalSiswa, err = scalar(`SELECT COUNT(*) FROM users WHERE role='student'`); err != nil {

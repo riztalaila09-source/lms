@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -112,6 +113,8 @@ type UpdateProfileInput struct {
 	Email    *string
 	PhotoURL *string
 	Story    *string
+	Phone    *string
+	Gender   *string
 }
 
 type UserService struct {
@@ -360,6 +363,15 @@ func (s *UserService) UpdateProfile(ctx context.Context, callerID string, input 
 	}
 	if input.Story != nil {
 		u.Story = *input.Story
+	}
+	if input.Phone != nil {
+		u.Phone = strings.TrimSpace(*input.Phone)
+	}
+	if input.Gender != nil {
+		g := strings.ToUpper(strings.TrimSpace(*input.Gender))
+		if g == "" || g == "L" || g == "P" {
+			u.Gender = g
+		}
 	}
 	if err := s.repo.Update(ctx, u); err != nil {
 		if errors.Is(err, repository.ErrDuplicate) {
