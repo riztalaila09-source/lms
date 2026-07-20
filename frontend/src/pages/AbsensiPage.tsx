@@ -74,7 +74,7 @@ function composeAbsenNotif(o: { namaSiswa: string; kelas: string; tanggal: strin
   ].filter(Boolean).join('\n')
 }
 
-// Data pendukung notifikasi: peta siswa→No. HP orang tua + nama sekolah.
+// Data pendukung notifikasi: peta murid→No. HP orang tua + nama sekolah.
 function useNotifData() {
   const [parentMap, setParentMap] = useState<Map<string, { phone: string; nama: string }>>(new Map())
   const [schoolName, setSchoolName] = useState('')
@@ -82,7 +82,7 @@ function useNotifData() {
     parentClient.listParents({ pagination: { page: 1, pageSize: 500 } }).then((r) => {
       const m = new Map<string, { phone: string; nama: string }>()
       r.parents.forEach((p) => {
-        const nama = p.namaAyah || p.namaIbu || p.namaWali || 'Orang Tua/Wali'
+        const nama = p.namaOrtu || 'Orang Tua/Wali'
         p.children.forEach((c) => m.set(c.studentId, { phone: waNormalize(p.phone), nama }))
       })
       setParentMap(m)
@@ -385,7 +385,7 @@ function PerHariAbsensi() {
     [data, cellMap], // eslint-disable-line react-hooks/exhaustive-deps
   )
   const notifyOneDay = (st: { id: string; name: string }) => setNotif({ open: true, targets: [buildDayTarget(st)], judul: 'Notifikasi ke Orang Tua' })
-  const notifyBulkDay = () => setNotif({ open: true, targets: absentStudents.map(buildDayTarget), judul: 'Notifikasi Siswa Tidak Hadir' })
+  const notifyBulkDay = () => setNotif({ open: true, targets: absentStudents.map(buildDayTarget), judul: 'Notifikasi Murid Tidak Hadir' })
 
   // Daily report: per student, status per session + summary counts.
   const download = () => {
@@ -450,11 +450,11 @@ function PerHariAbsensi() {
 
       {loading ? <Flex align="center" gap="8px" color={COLORS.muted} py="20px"><Spinner size="sm" /> Memuat…</Flex>
         : !kelas ? <Text fontSize="13px" color={COLORS.muted}>Pilih kelas untuk melihat rekap harian.</Text>
-        : !data || data.students.length === 0 ? <Text fontSize="13px" color={COLORS.muted}>Tidak ada siswa/sesi untuk filter ini.</Text>
+        : !data || data.students.length === 0 ? <Text fontSize="13px" color={COLORS.muted}>Tidak ada murid/sesi untuk filter ini.</Text>
         : mode === 'grid' ? (
           <Box overflowX="auto"><Table.Root size="sm">
             <Table.Header><Table.Row>
-              <Table.ColumnHeader position="sticky" left={0} bg={COLORS.surface}>Siswa</Table.ColumnHeader>
+              <Table.ColumnHeader position="sticky" left={0} bg={COLORS.surface}>Murid</Table.ColumnHeader>
               {data.sessions.map((s) => (
                 <Table.ColumnHeader key={s.id} whiteSpace="nowrap">
                   <Text fontSize="11px">{jamLabel({ jamKe: s.jamKe, jamKeAkhir: s.jamKeAkhir, startTime: s.startTime, endTime: s.endTime })}</Text>
@@ -486,7 +486,7 @@ function PerHariAbsensi() {
         ) : (
           <Box overflowX="auto"><Table.Root size="sm">
             <Table.Header><Table.Row>
-              <Table.ColumnHeader>Siswa</Table.ColumnHeader>
+              <Table.ColumnHeader>Murid</Table.ColumnHeader>
               {STATUSES.map((x) => <Table.ColumnHeader key={x.v}>{x.label}</Table.ColumnHeader>)}
               <Table.ColumnHeader textAlign="center">Notif</Table.ColumnHeader>
             </Table.Row></Table.Header>
@@ -716,7 +716,7 @@ function HasilAbsensi() {
   }, [parentOf, schoolName, sel])
   const absentRecords = useMemo(() => records.filter((r) => ABSENT.has(r.status)), [records])
   const notifyOne = (r: AttRecord) => setNotif({ open: true, targets: [buildTarget(r)], judul: 'Notifikasi ke Orang Tua' })
-  const notifyBulk = () => setNotif({ open: true, targets: absentRecords.map(buildTarget), judul: 'Notifikasi Siswa Tidak Hadir' })
+  const notifyBulk = () => setNotif({ open: true, targets: absentRecords.map(buildTarget), judul: 'Notifikasi Murid Tidak Hadir' })
 
   return (
     <>
@@ -770,7 +770,7 @@ function HasilAbsensi() {
             </Flex>
             <Box overflowX="auto"><Table.Root size="sm">
               <Table.Header><Table.Row>
-                <Table.ColumnHeader>Siswa</Table.ColumnHeader><Table.ColumnHeader>Kelas</Table.ColumnHeader><Table.ColumnHeader>Status</Table.ColumnHeader><Table.ColumnHeader textAlign="right">Notifikasi</Table.ColumnHeader>
+                <Table.ColumnHeader>Murid</Table.ColumnHeader><Table.ColumnHeader>Kelas</Table.ColumnHeader><Table.ColumnHeader>Status</Table.ColumnHeader><Table.ColumnHeader textAlign="right">Notifikasi</Table.ColumnHeader>
               </Table.Row></Table.Header>
               <Table.Body>
                 {records.length === 0 ? (
@@ -802,11 +802,11 @@ function HasilAbsensi() {
             </Table.Root></Box>
 
             <Box borderTop="1px solid" borderColor={COLORS.border} pt="10px">
-              <Text fontSize="12px" fontWeight="700" mb="6px">Tandai siswa lain (Sakit/Izin/Alpa)</Text>
+              <Text fontSize="12px" fontWeight="700" mb="6px">Tandai murid lain (Sakit/Izin/Alpa)</Text>
               <Flex gap="6px" wrap="wrap" align="flex-end">
                 <NativeSelect.Root size="sm" maxW="220px">
                   <NativeSelect.Field value={addStudent} onChange={(e) => setAddStudent(e.target.value)}>
-                    <option value="">— Pilih siswa —</option>
+                    <option value="">— Pilih murid —</option>
                     {students.filter((u) => u.kelas === sel.kelas && !recordedIds.has(u.id)).map((u) => (
                       <option key={u.id} value={u.id}>{u.fullName || u.username}</option>
                     ))}

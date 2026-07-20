@@ -20,7 +20,7 @@ const DICT: Record<string, { id: string; en: string }> = {
   'home.popular': { id: 'Materi Populer', en: 'Popular Materials' },
   'home.readMaterial': { id: 'Baca Materi', en: 'Read Material' },
   'home.storiesTitle': { id: 'Bergabung dengan yang lain mengubah cara belajar mereka', en: 'Join others transforming the way they learn' },
-  'home.storiesSub': { id: 'Cerita dari siswa & guru', en: 'Stories from students & teachers' },
+  'home.storiesSub': { id: 'Cerita dari murid & guru', en: 'Stories from students & teachers' },
   'home.seeAllStories': { id: 'Lihat semua cerita', en: 'See all stories' },
   'home.hide': { id: 'Sembunyikan', en: 'Hide' },
   'home.showAll': { id: 'Tampilkan semua materi', en: 'Show all materials' },

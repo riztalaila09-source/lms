@@ -18,13 +18,22 @@ func TestSchoolRepository_SchoolAndSemesters(t *testing.T) {
 	repo := repository.NewSchoolRepository(db)
 	now := time.Now().UTC().Truncate(time.Second)
 
-	// School round-trips.
-	_, err := repo.UpdateSchool(ctx, "SMK ISLAM 2 WLINGI", "Jl. Contoh No. 1")
+	// School round-trips all fields.
+	_, err := repo.UpdateSchool(ctx, &repository.School{
+		Name: "SMK ISLAM 2 WLINGI", Address: "Jl. Contoh No. 1", AppName: "e-SMK", Logo: "data:image/png;base64,AAAA",
+		Profil: "Profil sekolah", Visi: "Visi hebat", Misi: "Misi 1\nMisi 2", KepalaSekolah: "Pak Kepala",
+		TahunBerdiri: "1998", Email: "info@smk.sch.id", Whatsapp: "0812", Npsn: "12345678", Status: "Swasta",
+		Akreditasi: "A", Jenjang: "SMK",
+	})
 	require.NoError(t, err)
 	s, err := repo.GetSchool(ctx)
 	require.NoError(t, err)
 	assert.Equal(t, "SMK ISLAM 2 WLINGI", s.Name)
 	assert.Equal(t, "Jl. Contoh No. 1", s.Address)
+	assert.Equal(t, "e-SMK", s.AppName)
+	assert.Equal(t, "Visi hebat", s.Visi)
+	assert.Equal(t, "A", s.Akreditasi)
+	assert.Equal(t, "data:image/png;base64,AAAA", s.Logo)
 
 	// Create two semesters.
 	a := &repository.Semester{ID: testutil.NewUserID(), Semester: "ganjil", TahunAjaran: "2026/2027", IsActive: true, CreatedAt: now}

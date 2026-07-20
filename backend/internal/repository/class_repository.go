@@ -13,10 +13,13 @@ var ErrClassNotFound = errors.New("class not found")
 var ErrClassDuplicate = errors.New("class already exists")
 
 type Class struct {
-	ID           string
-	Name         string
-	StudentCount int
-	CreatedAt    time.Time
+	ID            string
+	Name          string
+	StudentCount  int
+	CreatedAt     time.Time
+	WaliTeacherID string // homeroom teacher id ('' = none)
+	WaliName      string // teacher full name (from join)
+	WaliPhone     string // teacher phone (from join)
 }
 
 type ClassRepository interface {
@@ -25,6 +28,8 @@ type ClassRepository interface {
 	Delete(ctx context.Context, id string) error
 	// Rename renames a class and cascades the new name onto students' kelas.
 	Rename(ctx context.Context, id, newName string) (*Class, error)
+	// SetWali assigns (or clears, when teacherID is "") the homeroom teacher.
+	SetWali(ctx context.Context, classID, teacherID string) (*Class, error)
 }
 
 type sqliteClassRepository struct{ db *sql.DB }
@@ -45,12 +50,20 @@ func (r *sqliteClassRepository) Create(ctx context.Context, c *Class) error {
 	return nil
 }
 
+const classSelect = `
+	SELECT c.id, c.name,
+	       (SELECT COUNT(*) FROM users u WHERE u.role='student' AND u.kelas = c.name) AS student_count,
+	       c.created_at,
+	       COALESCE(c.wali_teacher_id, ''), COALESCE(w.full_name, ''), COALESCE(w.phone, '')
+	FROM classes c
+	LEFT JOIN users w ON w.id = c.wali_teacher_id`
+
+func scanClass(s interface{ Scan(dest ...any) error }, c *Class) error {
+	return s.Scan(&c.ID, &c.Name, &c.StudentCount, &c.CreatedAt, &c.WaliTeacherID, &c.WaliName, &c.WaliPhone)
+}
+
 func (r *sqliteClassRepository) List(ctx context.Context) ([]*Class, error) {
-	rows, err := r.db.QueryContext(ctx, `
-		SELECT c.id, c.name,
-		       (SELECT COUNT(*) FROM users u WHERE u.role='student' AND u.kelas = c.name) AS student_count,
-		       c.created_at
-		FROM classes c ORDER BY c.name ASC`)
+	rows, err := r.db.QueryContext(ctx, classSelect+` ORDER BY c.name ASC`)
 	if err != nil {
 		return nil, fmt.Errorf("list classes: %w", err)
 	}
@@ -59,12 +72,35 @@ func (r *sqliteClassRepository) List(ctx context.Context) ([]*Class, error) {
 	var out []*Class
 	for rows.Next() {
 		c := &Class{}
-		if err := rows.Scan(&c.ID, &c.Name, &c.StudentCount, &c.CreatedAt); err != nil {
+		if err := scanClass(rows, c); err != nil {
 			return nil, fmt.Errorf("scan class: %w", err)
 		}
 		out = append(out, c)
 	}
 	return out, rows.Err()
+}
+
+func (r *sqliteClassRepository) getByID(ctx context.Context, id string) (*Class, error) {
+	c := &Class{}
+	err := scanClass(r.db.QueryRowContext(ctx, classSelect+` WHERE c.id = ?`, id), c)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, ErrClassNotFound
+	}
+	if err != nil {
+		return nil, fmt.Errorf("get class: %w", err)
+	}
+	return c, nil
+}
+
+func (r *sqliteClassRepository) SetWali(ctx context.Context, classID, teacherID string) (*Class, error) {
+	res, err := r.db.ExecContext(ctx, `UPDATE classes SET wali_teacher_id = NULLIF(?, '') WHERE id = ?`, teacherID, classID)
+	if err != nil {
+		return nil, fmt.Errorf("set wali: %w", err)
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return nil, ErrClassNotFound
+	}
+	return r.getByID(ctx, classID)
 }
 
 func (r *sqliteClassRepository) Rename(ctx context.Context, id, newName string) (*Class, error) {

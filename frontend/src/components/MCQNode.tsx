@@ -12,12 +12,12 @@ import { COLORS } from '@/theme/tokens'
  */
 export interface MCQContextValue {
   interactive: boolean
-  /** 'answer' = siswa memilih (belum ada centang); 'pass' = sudah lulus periksa (tampil hijau, terkunci). */
+  /** 'answer' = murid memilih (belum ada centang); 'pass' = sudah lulus periksa (tampil hijau, terkunci). */
   phase: 'answer' | 'pass'
   /** Naik nilainya untuk memaksa acak ulang + hapus pilihan (saat reset karena >10% salah). */
   resetNonce: number
   onRegister: (key: string) => void
-  /** Lapor pilihan siswa + benar/salah ke viewer (untuk grading gabungan). */
+  /** Lapor pilihan murid + benar/salah ke viewer (untuk grading gabungan). */
   onReport: (key: string, picked: number | null, correct: boolean) => void
 }
 export const MCQContext = createContext<MCQContextValue | null>(null)
@@ -82,7 +82,7 @@ function MCQEdit({ node, updateAttributes, deleteNode }: NodeViewProps) {
 }
 
 // ── Student interactive UI ──
-// Tidak ada centang instan. Siswa memilih; grading dilakukan lewat tombol
+// Tidak ada centang instan. Murid memilih; grading dilakukan lewat tombol
 // "Periksa Jawaban" di viewer. Saat phase 'pass' baru tampil hijau/merah & terkunci.
 function MCQPlay({ node, ctx }: { node: NodeViewProps['node']; ctx: MCQContextValue }) {
   const { question, options, correct } = node.attrs as MCQAttrs

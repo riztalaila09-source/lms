@@ -16,7 +16,12 @@ type contextKey struct{}
 func NewAuthInterceptor(jwtSvc *service.JWTService) connect.UnaryInterceptorFunc {
 	return func(next connect.UnaryFunc) connect.UnaryFunc {
 		return func(ctx context.Context, req connect.AnyRequest) (connect.AnyResponse, error) {
-			if req.Spec().Procedure == "/user.v1.UserService/Login" {
+			// Public procedures — no token required.
+			switch req.Spec().Procedure {
+			case "/user.v1.UserService/Login",
+				"/school.v1.SchoolService/GetSchool", // landing page reads these pre-login
+				"/school.v1.SchoolService/ListStaff",
+				"/school.v1.SchoolService/ListContent":
 				return next(ctx, req)
 			}
 

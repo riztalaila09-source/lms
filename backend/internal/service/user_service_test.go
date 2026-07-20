@@ -102,14 +102,14 @@ func TestUserService_MutateClass(t *testing.T) {
 	t.Run("student caller is denied", func(t *testing.T) {
 		repo := &mockUserRepository{}
 		svc := service.NewUserService(repo, newTestJWTService(), nil)
-		_, err := svc.MutateClass(ctx, "student", "XI-1", "X-1", nil)
+		_, err := svc.MutateClass(ctx, "student", nil, "XI-1", "X-1", nil)
 		assert.ErrorIs(t, err, service.ErrPermissionDenied)
 	})
 
 	t.Run("empty target kelas is rejected", func(t *testing.T) {
 		repo := &mockUserRepository{}
 		svc := service.NewUserService(repo, newTestJWTService(), nil)
-		_, err := svc.MutateClass(ctx, "teacher", "", "X-1", nil)
+		_, err := svc.MutateClass(ctx, "teacher", []string{service.PermKelolaSiswa}, "", "X-1", nil)
 		assert.Error(t, err)
 	})
 
@@ -117,7 +117,7 @@ func TestUserService_MutateClass(t *testing.T) {
 		repo := &mockUserRepository{}
 		svc := service.NewUserService(repo, newTestJWTService(), nil)
 		repo.On("MoveStudentsByClass", ctx, "X-1", "XI-1").Return(30, nil)
-		moved, err := svc.MutateClass(ctx, "teacher", "XI-1", "X-1", nil)
+		moved, err := svc.MutateClass(ctx, "teacher", []string{service.PermKelolaSiswa}, "XI-1", "X-1", nil)
 		require.NoError(t, err)
 		assert.Equal(t, 30, moved)
 		repo.AssertCalled(t, "MoveStudentsByClass", ctx, "X-1", "XI-1")
@@ -128,7 +128,7 @@ func TestUserService_MutateClass(t *testing.T) {
 		svc := service.NewUserService(repo, newTestJWTService(), nil)
 		ids := []string{"a", "b"}
 		repo.On("MoveStudentsByIDs", ctx, ids, "XI-1").Return(2, nil)
-		moved, err := svc.MutateClass(ctx, "teacher", "XI-1", "X-1", ids)
+		moved, err := svc.MutateClass(ctx, "teacher", []string{service.PermKelolaSiswa}, "XI-1", "X-1", ids)
 		require.NoError(t, err)
 		assert.Equal(t, 2, moved)
 		repo.AssertNotCalled(t, "MoveStudentsByClass")
@@ -137,7 +137,7 @@ func TestUserService_MutateClass(t *testing.T) {
 	t.Run("same from/to class is rejected", func(t *testing.T) {
 		repo := &mockUserRepository{}
 		svc := service.NewUserService(repo, newTestJWTService(), nil)
-		_, err := svc.MutateClass(ctx, "teacher", "X-1", "X-1", nil)
+		_, err := svc.MutateClass(ctx, "teacher", []string{service.PermKelolaSiswa}, "X-1", "X-1", nil)
 		assert.Error(t, err)
 	})
 }
@@ -201,7 +201,7 @@ func TestUserService_CreateUser(t *testing.T) {
 
 		repo.On("Create", ctx, mock.AnythingOfType("*repository.User")).Return(nil)
 
-		u, err := svc.CreateUser(ctx, "admin", "newuser", "new@test.com", "pass123", "New User", "student", "", "", "", "L", "0812-3456-7890")
+		u, err := svc.CreateUser(ctx, "admin", nil, "newuser", "new@test.com", "pass123", "New User", "student", "", "", "", "L", "0812-3456-7890", nil)
 		require.NoError(t, err)
 		assert.Equal(t, "student", u.Role)
 		assert.Equal(t, "L", u.Gender)
@@ -213,7 +213,7 @@ func TestUserService_CreateUser(t *testing.T) {
 		repo := &mockUserRepository{}
 		svc := service.NewUserService(repo, newTestJWTService(), nil)
 
-		_, err := svc.CreateUser(ctx, "student", "newuser", "new@test.com", "pass123", "New User", "student", "", "", "", "", "")
+		_, err := svc.CreateUser(ctx, "student", nil, "newuser", "new@test.com", "pass123", "New User", "student", "", "", "", "", "", nil)
 		assert.ErrorIs(t, err, service.ErrPermissionDenied)
 	})
 }
@@ -261,27 +261,41 @@ func TestUserService_DeleteUser(t *testing.T) {
 		repo := &mockUserRepository{}
 		svc := service.NewUserService(repo, newTestJWTService(), nil)
 
+		repo.On("GetByID", ctx, "target-id").Return(makeTestUser("target-id", "student"), nil)
 		repo.On("Delete", ctx, "target-id").Return(nil)
 
-		err := svc.DeleteUser(ctx, "admin", "target-id")
+		err := svc.DeleteUser(ctx, "admin", nil, "target-id")
 		assert.NoError(t, err)
 	})
 
-	t.Run("teacher (manager) can delete", func(t *testing.T) {
+	t.Run("teacher with kelola_siswa can delete a student", func(t *testing.T) {
 		repo := &mockUserRepository{}
 		svc := service.NewUserService(repo, newTestJWTService(), nil)
 
+		repo.On("GetByID", ctx, "target-id").Return(makeTestUser("target-id", "student"), nil)
 		repo.On("Delete", ctx, "target-id").Return(nil)
 
-		err := svc.DeleteUser(ctx, "teacher", "target-id")
+		err := svc.DeleteUser(ctx, "teacher", []string{service.PermKelolaSiswa}, "target-id")
 		assert.NoError(t, err)
+	})
+
+	t.Run("teacher without kelola_siswa is denied", func(t *testing.T) {
+		repo := &mockUserRepository{}
+		svc := service.NewUserService(repo, newTestJWTService(), nil)
+
+		repo.On("GetByID", ctx, "target-id").Return(makeTestUser("target-id", "student"), nil)
+
+		err := svc.DeleteUser(ctx, "teacher", nil, "target-id")
+		assert.ErrorIs(t, err, service.ErrPermissionDenied)
 	})
 
 	t.Run("student is denied", func(t *testing.T) {
 		repo := &mockUserRepository{}
 		svc := service.NewUserService(repo, newTestJWTService(), nil)
 
-		err := svc.DeleteUser(ctx, "student", "target-id")
+		repo.On("GetByID", ctx, "target-id").Return(makeTestUser("target-id", "student"), nil)
+
+		err := svc.DeleteUser(ctx, "student", nil, "target-id")
 		assert.ErrorIs(t, err, service.ErrPermissionDenied)
 	})
 }
@@ -290,7 +304,7 @@ func TestJWTService(t *testing.T) {
 	jwtSvc := newTestJWTService()
 
 	t.Run("generate and validate token", func(t *testing.T) {
-		token, err := jwtSvc.GenerateToken("user-123", "admin")
+		token, err := jwtSvc.GenerateToken("user-123", "admin", nil)
 		require.NoError(t, err)
 		assert.NotEmpty(t, token)
 

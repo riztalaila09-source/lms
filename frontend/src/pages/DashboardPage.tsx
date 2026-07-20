@@ -250,7 +250,7 @@ export default function DashboardPage() {
     return (
       <AppLayout title="">
         <Stack gap="22px">
-          {/* Greeting hero — beranda siswa */}
+          {/* Greeting hero — beranda murid */}
           <Box bg={COLORS.primary} color="white" borderRadius="12px" p={{ base: '20px', md: '26px' }}>
             <Heading fontSize={{ base: '20px', md: '26px' }} fontWeight="800">
               Selamat datang, {user.fullName || user.username}!
@@ -259,8 +259,8 @@ export default function DashboardPage() {
             <SimpleGrid columns={{ base: 2, md: 4 }} gap="10px" mt="16px">
               <HeroStat label="Kelas" value={stud?.kelas || user.kelas || '–'} />
               <HeroStat label="Nilai rata-rata" value={stud && stud.gradedCount > 0 ? stud.rataRataNilai.toFixed(1) : '–'} />
-              <HeroStat label="Peringkat kelas" value={stud && stud.totalKelas > 0 ? `${stud.peringkatKelas}` : '–'} sub={stud && stud.totalKelas > 0 ? `dari ${stud.totalKelas} siswa` : undefined} />
-              <HeroStat label="Peringkat jurusan" value={stud && stud.totalJurusan > 0 ? `${stud.peringkatJurusan}` : '–'} sub={stud && stud.totalJurusan > 0 ? `${stud.jurusan || 'jurusan'} · ${stud.totalJurusan} siswa` : undefined} />
+              <HeroStat label="Peringkat kelas" value={stud && stud.totalKelas > 0 ? `${stud.peringkatKelas}` : '–'} sub={stud && stud.totalKelas > 0 ? `dari ${stud.totalKelas} murid` : undefined} />
+              <HeroStat label="Peringkat jurusan" value={stud && stud.totalJurusan > 0 ? `${stud.peringkatJurusan}` : '–'} sub={stud && stud.totalJurusan > 0 ? `${stud.jurusan || 'jurusan'} · ${stud.totalJurusan} murid` : undefined} />
             </SimpleGrid>
             <Flex gap="10px" mt="14px" fontSize="12px" color="whiteAlpha.800" wrap="wrap">
               <Text>{today}</Text>
@@ -407,7 +407,7 @@ export default function DashboardPage() {
                       <Box minW={0}>
                         <Text fontSize="13px" fontWeight="700" color={UDEMY.ink} lineClamp={1}>{s.fullName}</Text>
                         <Text fontSize="11px" color={UDEMY.inkMuted} lineClamp={1}>
-                          {s.role === 'teacher' ? 'Guru' : s.role === 'admin' ? 'Admin' : 'Siswa'}{s.kelas ? ` · ${s.kelas}` : ''}
+                          {s.role === 'teacher' ? 'Guru' : s.role === 'admin' ? 'Admin' : 'Murid'}{s.kelas ? ` · ${s.kelas}` : ''}
                         </Text>
                       </Box>
                     </Flex>
@@ -515,9 +515,9 @@ export default function DashboardPage() {
           <Stack gap="16px">
             {/* Stats — single color */}
             <SimpleGrid columns={{ base: 2, sm: 3, lg: 5 }} gap="12px">
-              <Stat num={d.totalSiswa} label="Total Siswa" />
-              <Stat num={d.siswaLaki} label="Siswa Laki-laki" />
-              <Stat num={d.siswaPerempuan} label="Siswa Perempuan" />
+              <Stat num={d.totalSiswa} label="Total Murid" />
+              <Stat num={d.siswaLaki} label="Murid Laki-laki" />
+              <Stat num={d.siswaPerempuan} label="Murid Perempuan" />
               <Stat num={d.totalGuru} label="Total Guru" />
               <Stat num={d.totalKelas} label="Total Mata Pelajaran" />
               <Stat num={d.totalMateri} label="Total Materi" />
@@ -529,8 +529,8 @@ export default function DashboardPage() {
             </SimpleGrid>
 
             <SimpleGrid columns={{ base: 1, lg: 2 }} gap="16px">
-              {/* Siswa per Kelas */}
-              <Card title={<><Icon as={LuGraduationCap} /> Siswa per Kelas</>}>
+              {/* Murid per Kelas */}
+              <Card title={<><Icon as={LuGraduationCap} /> Murid per Kelas</>}>
                 {d.siswaPerKelas.length === 0 ? (
                   <Text fontSize="13px" color={COLORS.muted}>Belum ada data.</Text>
                 ) : (
@@ -541,7 +541,7 @@ export default function DashboardPage() {
                         <Box key={k.kelas}>
                           <Flex justify="space-between" fontSize="12px" mb="2px">
                             <Text fontWeight="medium">{k.kelas}</Text>
-                            <Text color={COLORS.muted}>{k.count} siswa</Text>
+                            <Text color={COLORS.muted}>{k.count} murid</Text>
                           </Flex>
                           <Box h="8px" bg={COLORS.bg} borderRadius="99px" overflow="hidden">
                             <Box h="100%" bg={COLORS.primary} w={`${pct}%`} />
@@ -553,8 +553,8 @@ export default function DashboardPage() {
                 )}
               </Card>
 
-              {/* Siswa per Jurusan */}
-              <Card title={<><Icon as={LuGraduationCap} /> Siswa per Jurusan</>}>
+              {/* Murid per Jurusan */}
+              <Card title={<><Icon as={LuGraduationCap} /> Murid per Jurusan</>}>
                 {d.siswaPerJurusan.length === 0 ? (
                   <Text fontSize="13px" color={COLORS.muted}>Belum ada data.</Text>
                 ) : (
@@ -565,7 +565,7 @@ export default function DashboardPage() {
                         <Box key={j.jurusan}>
                           <Flex justify="space-between" fontSize="12px" mb="2px">
                             <Text fontWeight="medium">{j.jurusan}</Text>
-                            <Text color={COLORS.muted}>{j.count} siswa</Text>
+                            <Text color={COLORS.muted}>{j.count} murid</Text>
                           </Flex>
                           <Box h="8px" bg={COLORS.bg} borderRadius="99px" overflow="hidden">
                             <Box h="100%" bg={COLORS.primary} w={`${pct}%`} />

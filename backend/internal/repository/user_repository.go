@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -28,9 +29,33 @@ type User struct {
 	Mapel         string
 	Gender        string // '' | 'L' | 'P'
 	Phone         string
-	ParentID      string // '' when no parent linked (students only)
+	Permissions   []string // access-right keys (teachers); admins ignore
+	ParentID      string   // '' when no parent linked (students only)
 	CreatedAt     time.Time
 	UpdatedAt     time.Time
+}
+
+// permissions are stored as a JSON array string in the users.permissions column.
+func marshalPerms(perms []string) string {
+	if len(perms) == 0 {
+		return ""
+	}
+	b, err := json.Marshal(perms)
+	if err != nil {
+		return ""
+	}
+	return string(b)
+}
+
+func unmarshalPerms(s string) []string {
+	if strings.TrimSpace(s) == "" {
+		return nil
+	}
+	var out []string
+	if err := json.Unmarshal([]byte(s), &out); err != nil {
+		return nil
+	}
+	return out
 }
 
 // StoryEntry is a user's testimonial shown on the home page.
@@ -76,20 +101,25 @@ func NewUserRepository(db *sql.DB) UserRepository {
 	return &sqliteUserRepository{db: db}
 }
 
-const userColumns = `id, username, email, password_hash, password_plain, role, full_name, is_active, kelas, jurusan, photo_url, story, mapel, gender, phone, COALESCE(parent_id, '') AS parent_id, created_at, updated_at`
+const userColumns = `id, username, email, password_hash, password_plain, role, full_name, is_active, kelas, jurusan, photo_url, story, mapel, gender, phone, permissions, COALESCE(parent_id, '') AS parent_id, created_at, updated_at`
 
 func scanUser(s interface {
 	Scan(dest ...any) error
 }, u *User) error {
-	return s.Scan(&u.ID, &u.Username, &u.Email, &u.PasswordHash, &u.PasswordPlain, &u.Role, &u.FullName,
-		&u.IsActive, &u.Kelas, &u.Jurusan, &u.PhotoURL, &u.Story, &u.Mapel, &u.Gender, &u.Phone, &u.ParentID, &u.CreatedAt, &u.UpdatedAt)
+	var permsJSON string
+	if err := s.Scan(&u.ID, &u.Username, &u.Email, &u.PasswordHash, &u.PasswordPlain, &u.Role, &u.FullName,
+		&u.IsActive, &u.Kelas, &u.Jurusan, &u.PhotoURL, &u.Story, &u.Mapel, &u.Gender, &u.Phone, &permsJSON, &u.ParentID, &u.CreatedAt, &u.UpdatedAt); err != nil {
+		return err
+	}
+	u.Permissions = unmarshalPerms(permsJSON)
+	return nil
 }
 
 func (r *sqliteUserRepository) Create(ctx context.Context, u *User) error {
 	_, err := r.db.ExecContext(ctx, `
-		INSERT INTO users (id, username, email, password_hash, password_plain, role, full_name, is_active, kelas, jurusan, photo_url, story, mapel, gender, phone, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		u.ID, u.Username, u.Email, u.PasswordHash, u.PasswordPlain, u.Role, u.FullName, u.IsActive, u.Kelas, u.Jurusan, u.PhotoURL, u.Story, u.Mapel, u.Gender, u.Phone, u.CreatedAt, u.UpdatedAt,
+		INSERT INTO users (id, username, email, password_hash, password_plain, role, full_name, is_active, kelas, jurusan, photo_url, story, mapel, gender, phone, permissions, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		u.ID, u.Username, u.Email, u.PasswordHash, u.PasswordPlain, u.Role, u.FullName, u.IsActive, u.Kelas, u.Jurusan, u.PhotoURL, u.Story, u.Mapel, u.Gender, u.Phone, marshalPerms(u.Permissions), u.CreatedAt, u.UpdatedAt,
 	)
 	if err != nil {
 		if isSQLiteConstraintError(err) {
@@ -128,9 +158,9 @@ func (r *sqliteUserRepository) Update(ctx context.Context, u *User) error {
 	u.UpdatedAt = time.Now()
 	res, err := r.db.ExecContext(ctx, `
 		UPDATE users
-		SET username=?, email=?, password_hash=?, password_plain=?, role=?, full_name=?, is_active=?, kelas=?, jurusan=?, photo_url=?, story=?, mapel=?, gender=?, phone=?, updated_at=?
+		SET username=?, email=?, password_hash=?, password_plain=?, role=?, full_name=?, is_active=?, kelas=?, jurusan=?, photo_url=?, story=?, mapel=?, gender=?, phone=?, permissions=?, updated_at=?
 		WHERE id=?`,
-		u.Username, u.Email, u.PasswordHash, u.PasswordPlain, u.Role, u.FullName, u.IsActive, u.Kelas, u.Jurusan, u.PhotoURL, u.Story, u.Mapel, u.Gender, u.Phone, u.UpdatedAt, u.ID,
+		u.Username, u.Email, u.PasswordHash, u.PasswordPlain, u.Role, u.FullName, u.IsActive, u.Kelas, u.Jurusan, u.PhotoURL, u.Story, u.Mapel, u.Gender, u.Phone, marshalPerms(u.Permissions), u.UpdatedAt, u.ID,
 	)
 	if err != nil {
 		if isSQLiteConstraintError(err) {

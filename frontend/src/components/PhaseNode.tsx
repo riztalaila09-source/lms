@@ -15,7 +15,7 @@ import CommentAvatar from './CommentAvatar'
 
 /**
  * Katalog fase pembelajaran (Kurikulum Merdeka). Urutan = urutan sintaks
- * pembelajaran; `interactive` menandai fase yang punya kotak diskusi (siswa
+ * pembelajaran; `interactive` menandai fase yang punya kotak diskusi (murid
  * posting, guru membalas).
  */
 export interface PhaseMeta {
@@ -38,14 +38,14 @@ export const PHASES: PhaseMeta[] = [
   { key: 'pretest', no: 7, label: 'Pretest', hint: 'Ukur pengetahuan awal peserta didik', icon: LuClipboardCheck, color: '#7C3AED' },
   { key: 'inti', no: 8, label: 'Materi Inti', hint: 'Isi utama materi', icon: LuBookText, color: '#16A34A' },
   { key: 'demonstrasi', no: 9, label: 'Demonstrasi', hint: 'Langkah-langkah yang terlihat jelas & langsung', icon: LuMonitorPlay, color: '#059669' },
-  { key: 'tanyajawab', no: 10, label: 'Tanya Jawab', hint: 'Siswa bertanya / menjawab di sini', icon: LuMessagesSquare, color: '#0EA5E9', interactive: true },
+  { key: 'tanyajawab', no: 10, label: 'Tanya Jawab', hint: 'Murid bertanya / menjawab di sini', icon: LuMessagesSquare, color: '#0EA5E9', interactive: true },
   { key: 'diskusi', no: 11, label: 'Diskusi', hint: 'Diskusi kelompok / kelas', icon: LuUsers, color: '#2563EB', interactive: true },
   { key: 'praktek', no: 12, label: 'Praktek', hint: 'Kegiatan praktik peserta didik', icon: LuWrench, color: '#EA580C' },
-  { key: 'presentasi', no: 13, label: 'Presentasi', hint: 'Siswa menyampaikan materi yang dipelajari', icon: LuPresentation, color: '#DB2777', interactive: true },
+  { key: 'presentasi', no: 13, label: 'Presentasi', hint: 'Murid menyampaikan materi yang dipelajari', icon: LuPresentation, color: '#DB2777', interactive: true },
   { key: 'evaluasi', no: 14, label: 'Evaluasi', hint: 'Sikap, pengetahuan, keterampilan / umpan balik', icon: LuClipboardList, color: '#65A30D' },
   { key: 'postest', no: 15, label: 'Postest', hint: 'Ukur pengetahuan pasca pembelajaran', icon: LuFileCheck, color: '#9333EA' },
   { key: 'penutup', no: 16, label: 'Penutup', hint: 'Bagian penutup pembelajaran', icon: LuFlagTriangleRight, color: '#7C3AED' },
-  { key: 'simpulan', no: 17, label: 'Simpulan', hint: 'Siswa memberikan simpulan / berkomentar', icon: LuListChecks, color: '#0891B2', interactive: true },
+  { key: 'simpulan', no: 17, label: 'Simpulan', hint: 'Murid memberikan simpulan / berkomentar', icon: LuListChecks, color: '#0891B2', interactive: true },
   { key: 'refleksi_akhir', no: 18, label: 'Refleksi', hint: 'Rangkuman materi', icon: LuNotebookPen, color: '#4F46E5' },
   { key: 'tindaklanjut', no: 19, label: 'Tindak Lanjut', hint: 'Pembahasan, latihan/tugas, referensi materi', icon: LuCircleArrowRight, color: '#DB2777' },
   { key: 'doa', no: 20, label: 'Doa', hint: 'Doa penutup', icon: LuHeartHandshake, color: '#DC2626' },
@@ -117,7 +117,7 @@ function PhaseDiscussion({ materialId, blockId, accent }: { materialId: string; 
                   <Flex align="center" gap="5px">
                     <Text fontSize="12px" fontWeight="600" color={COLORS.text}>{c.authorName}</Text>
                     <Badge colorPalette={isGuru ? 'purple' : 'blue'} variant="subtle" fontSize="10px" flexShrink={0}>
-                      {isGuru ? 'Guru' : 'Siswa'}
+                      {isGuru ? 'Guru' : 'Murid'}
                     </Badge>
                   </Flex>
                   <Text fontSize="13px" color={COLORS.text} mt="1px">{c.content}</Text>

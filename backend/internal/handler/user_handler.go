@@ -57,7 +57,7 @@ func (h *UserHandler) CreateUser(
 	}
 
 	role := protoRoleToString(req.Msg.Role)
-	u, err := h.userSvc.CreateUser(ctx, claims.Role, req.Msg.Username, req.Msg.Email, req.Msg.Password, req.Msg.FullName, role, req.Msg.Kelas, req.Msg.Jurusan, req.Msg.Mapel, req.Msg.Gender, req.Msg.Phone)
+	u, err := h.userSvc.CreateUser(ctx, claims.Role, claims.Permissions, req.Msg.Username, req.Msg.Email, req.Msg.Password, req.Msg.FullName, role, req.Msg.Kelas, req.Msg.Jurusan, req.Msg.Mapel, req.Msg.Gender, req.Msg.Phone, req.Msg.Permissions)
 	if err != nil {
 		return nil, mapServiceError(err)
 	}
@@ -131,8 +131,13 @@ func (h *UserHandler) UpdateUser(
 	if req.Msg.Phone != nil {
 		input.Phone = req.Msg.Phone
 	}
+	// Access rights are only touched when the caller explicitly submits them.
+	if req.Msg.SetPermissions {
+		perms := req.Msg.Permissions
+		input.Permissions = &perms
+	}
 
-	u, err := h.userSvc.UpdateUser(ctx, claims.Role, req.Msg.Id, input)
+	u, err := h.userSvc.UpdateUser(ctx, claims.Role, claims.Permissions, req.Msg.Id, input)
 	if err != nil {
 		return nil, mapServiceError(err)
 	}
@@ -214,7 +219,7 @@ func (h *UserHandler) ListActivityLogs(
 	if req.Msg.UserId != nil {
 		userID = *req.Msg.UserId
 	}
-	entries, total, err := h.userSvc.ListActivityLogs(ctx, claims.Role, userID, page, pageSize)
+	entries, total, err := h.userSvc.ListActivityLogs(ctx, claims.Role, claims.Permissions, userID, page, pageSize)
 	if err != nil {
 		return nil, mapServiceError(err)
 	}
@@ -251,7 +256,7 @@ func (h *UserHandler) ResetActivityLogs(
 	if !ok {
 		return nil, connect.NewError(connect.CodeUnauthenticated, nil)
 	}
-	if err := h.userSvc.ResetActivityLogs(ctx, claims.Role); err != nil {
+	if err := h.userSvc.ResetActivityLogs(ctx, claims.Role, claims.Permissions); err != nil {
 		return nil, mapServiceError(err)
 	}
 	return connect.NewResponse(&userv1.ResetActivityLogsResponse{}), nil
@@ -266,7 +271,7 @@ func (h *UserHandler) DeleteUser(
 		return nil, connect.NewError(connect.CodeUnauthenticated, nil)
 	}
 
-	if err := h.userSvc.DeleteUser(ctx, claims.Role, req.Msg.Id); err != nil {
+	if err := h.userSvc.DeleteUser(ctx, claims.Role, claims.Permissions, req.Msg.Id); err != nil {
 		return nil, mapServiceError(err)
 	}
 
@@ -285,7 +290,7 @@ func (h *UserHandler) MutateClass(
 	if req.Msg.FromKelas != nil {
 		fromKelas = *req.Msg.FromKelas
 	}
-	moved, err := h.userSvc.MutateClass(ctx, claims.Role, req.Msg.ToKelas, fromKelas, req.Msg.StudentIds)
+	moved, err := h.userSvc.MutateClass(ctx, claims.Role, claims.Permissions, req.Msg.ToKelas, fromKelas, req.Msg.StudentIds)
 	if err != nil {
 		return nil, mapServiceError(err)
 	}
@@ -395,10 +400,11 @@ func domainToProto(u *repository.User) *userv1.User {
 		Jurusan:   u.Jurusan,
 		PhotoUrl:  u.PhotoURL,
 		Story:     u.Story,
-		Mapel:     u.Mapel,
-		Gender:    u.Gender,
-		Phone:     u.Phone,
-		CreatedAt: timestamppb.New(u.CreatedAt),
+		Mapel:       u.Mapel,
+		Gender:      u.Gender,
+		Phone:       u.Phone,
+		Permissions: u.Permissions,
+		CreatedAt:   timestamppb.New(u.CreatedAt),
 		UpdatedAt: timestamppb.New(u.UpdatedAt),
 	}
 }

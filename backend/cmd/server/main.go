@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/base64"
 	"flag"
 	"fmt"
@@ -124,7 +125,7 @@ func main() {
 	essaySvc := service.NewEssayService(essayRepo, materialRepo)
 	assignmentSvc := service.NewAssignmentService(assignmentRepo, submissionRepo, enrollmentRepo, courseRepo, assignmentQuestionRepo, assignmentGroupRepo)
 	dashboardSvc := service.NewDashboardService(dashboardRepo)
-	classSvc := service.NewClassService(classRepo)
+	classSvc := service.NewClassService(classRepo, userRepo)
 	jurusanSvc := service.NewJurusanService(jurusanRepo)
 	schoolSvc := service.NewSchoolService(schoolRepo)
 	attendanceSvc := service.NewAttendanceService(attendanceRepo, courseRepo)
@@ -146,9 +147,15 @@ func main() {
 	classroomHandler := handler.NewClassroomHandler(classroomSvc)
 	parentHandler := handler.NewParentHandler(parentSvc)
 
-	// Auth interceptor applied to all handlers
+	// Load the central access policy (teacher edit/delete capabilities) into cache.
+	if err := schoolSvc.LoadAccessPolicy(context.Background()); err != nil {
+		log.Printf("warning: load access policy: %v", err)
+	}
+
+	// Auth first (populates claims), then per-procedure access-right enforcement.
 	authInterceptor := middleware.NewAuthInterceptor(jwtSvc)
-	interceptors := connect.WithInterceptors(authInterceptor)
+	permInterceptor := middleware.NewPermissionInterceptor(schoolSvc)
+	interceptors := connect.WithInterceptors(authInterceptor, permInterceptor)
 
 	mux := http.NewServeMux()
 

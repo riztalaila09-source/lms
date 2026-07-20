@@ -87,3 +87,462 @@
 [2m10:33:24 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/AbsensiPage.tsx[22m
 [2m10:33:42 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/AbsensiPage.tsx[22m
 [2m10:34:07 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/AbsensiPage.tsx[22m
+[2m5:00:10 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/App.tsx, /src/pages/DashboardPage.tsx, /src/pages/AbsensiPage.tsx, /src/pages/NilaiPage.tsx, /src/pages/CoursesPage.tsx, /src/pages/MitraPklPage.tsx, /src/pages/TugasPage.tsx, /src/pages/UsersPage.tsx, /src/pages/CourseDetailPage.tsx, /src/hooks/useAuth.tsx, /src/pages/PengaturanPage.tsx, /src/pages/LogAktivitasPage.tsx, /src/pages/PengumpulanPage.tsx, /src/components/MaterialFormDialog.tsx, /src/components/MaterialViewer.tsx, /src/components/tugas/GroupSubmitDialog.tsx, /src/components/tugas/KuisRunner.tsx, /src/components/tugas/PraktikumManager.tsx, /src/components/classroom/ScheduleTab.tsx, /src/components/classroom/LessonCalendarTab.tsx, /src/components/classroom/ActivityLeaderboard.tsx, /src/components/classroom/ActivityScoringPanel.tsx, /src/components/MaterialComments.tsx, /src/components/TopNav.tsx, /src/components/PhaseNode.tsx, /src/components/AppLayout.tsx, /src/components/Sidebar.tsx[22m
+[2m5:00:11 PM[22m [36m[1m[vite][22m[39m [33mhmr invalidate [39m[2m/src/hooks/useAuth.tsx[22m Could not Fast Refresh ("useAuth" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+[2m5:00:11 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/App.tsx, /src/pages/PengaturanPage.tsx, /src/pages/LoginPage.tsx, /src/pages/DashboardPage.tsx, /src/pages/AbsensiPage.tsx, /src/pages/NilaiPage.tsx, /src/pages/CoursesPage.tsx, /src/pages/MitraPklPage.tsx, /src/pages/TugasPage.tsx, /src/pages/CourseDetailPage.tsx, /src/components/AppLayout.tsx, /src/components/MaterialViewer.tsx, /src/components/tugas/GroupSubmitDialog.tsx, /src/components/classroom/ActivityLeaderboard.tsx, /src/components/Sidebar.tsx, /src/components/TopNav.tsx[22m
+[2m5:00:11 PM[22m [36m[1m[vite][22m[39m [33mhmr invalidate [39m[2m/src/components/MaterialFormDialog.tsx[22m Could not Fast Refresh ("decodeLinks" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+[2m5:00:11 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/PengumpulanPage.tsx, /src/pages/TugasPage.tsx, /src/pages/CourseDetailPage.tsx, /src/components/MaterialViewer.tsx, /src/components/tugas/GroupSubmitDialog.tsx, /src/components/tugas/PraktikumManager.tsx[22m
+[2m5:00:11 PM[22m [36m[1m[vite][22m[39m [33mhmr invalidate [39m[2m/src/components/PhaseNode.tsx[22m Could not Fast Refresh ("PHASES" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+[2m5:00:11 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/MaterialFormDialog.tsx, /src/components/MaterialViewer.tsx, /src/components/RichTextEditor.tsx[22m
+[2m5:18:15 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/Sidebar.tsx[22m
+[2m5:18:29 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/Sidebar.tsx[22m
+[2m5:18:45 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/Sidebar.tsx[22m
+[2m5:18:58 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/Sidebar.tsx[22m
+[2m5:19:30 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/UsersPage.tsx[22m
+[2m5:19:36 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/UsersPage.tsx[22m
+[2m5:19:55 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/UsersPage.tsx[22m
+[2m5:20:11 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/UsersPage.tsx[22m
+[2m5:20:37 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/UsersPage.tsx[22m
+[2m5:21:07 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/UsersPage.tsx[22m
+[2m5:21:32 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/UsersPage.tsx[22m
+[2m5:21:43 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/UsersPage.tsx[22m
+[2m5:21:52 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/UsersPage.tsx[22m
+[2m5:22:29 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/UsersPage.tsx[22m
+[2m5:22:55 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/UsersPage.tsx[22m
+[2m5:23:02 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/UsersPage.tsx[22m
+[2m6:02:39 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/UsersPage.tsx[22m
+[2m6:02:48 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/UsersPage.tsx[22m
+[2m6:03:01 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/UsersPage.tsx[22m
+[2m6:03:08 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/UsersPage.tsx[22m
+[2m6:03:18 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/App.tsx[22m
+[2m6:03:39 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/Sidebar.tsx[22m
+[2m6:03:56 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/Sidebar.tsx[22m
+[2m6:15:17 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/hooks/useAuth.tsx, /src/pages/PengaturanPage.tsx, /src/pages/LogAktivitasPage.tsx, /src/pages/PengumpulanPage.tsx, /src/pages/DashboardPage.tsx, /src/pages/AbsensiPage.tsx, /src/pages/NilaiPage.tsx, /src/pages/CoursesPage.tsx, /src/pages/MitraPklPage.tsx, /src/pages/TugasPage.tsx, /src/pages/UsersPage.tsx, /src/pages/CourseDetailPage.tsx, /src/components/MaterialFormDialog.tsx, /src/components/MaterialViewer.tsx, /src/components/tugas/GroupSubmitDialog.tsx, /src/components/tugas/KuisRunner.tsx, /src/components/tugas/PraktikumManager.tsx, /src/components/classroom/ScheduleTab.tsx, /src/components/classroom/LessonCalendarTab.tsx, /src/components/classroom/ActivityLeaderboard.tsx, /src/components/classroom/ActivityScoringPanel.tsx, /src/components/MaterialComments.tsx, /src/components/TopNav.tsx, /src/components/PhaseNode.tsx[22m
+[2m6:15:17 PM[22m [36m[1m[vite][22m[39m [33mhmr invalidate [39m[2m/src/hooks/useAuth.tsx[22m Could not Fast Refresh ("useAuth" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+[2m6:15:17 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/App.tsx, /src/pages/PengaturanPage.tsx, /src/pages/LoginPage.tsx, /src/pages/DashboardPage.tsx, /src/pages/AbsensiPage.tsx, /src/pages/NilaiPage.tsx, /src/pages/CoursesPage.tsx, /src/pages/MitraPklPage.tsx, /src/pages/TugasPage.tsx, /src/pages/CourseDetailPage.tsx, /src/components/AppLayout.tsx, /src/components/MaterialViewer.tsx, /src/components/tugas/GroupSubmitDialog.tsx, /src/components/classroom/ActivityLeaderboard.tsx, /src/components/Sidebar.tsx, /src/components/TopNav.tsx, /src/pages/UsersPage.tsx[22m
+[2m6:15:17 PM[22m [36m[1m[vite][22m[39m [33mhmr invalidate [39m[2m/src/components/MaterialFormDialog.tsx[22m Could not Fast Refresh ("decodeLinks" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+[2m6:15:17 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/PengumpulanPage.tsx, /src/pages/TugasPage.tsx, /src/pages/CourseDetailPage.tsx, /src/components/MaterialViewer.tsx, /src/components/tugas/GroupSubmitDialog.tsx, /src/components/tugas/PraktikumManager.tsx[22m
+[2m6:15:17 PM[22m [36m[1m[vite][22m[39m [33mhmr invalidate [39m[2m/src/components/PhaseNode.tsx[22m Could not Fast Refresh ("PHASES" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+[2m6:15:17 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/MaterialFormDialog.tsx, /src/components/MaterialViewer.tsx, /src/components/RichTextEditor.tsx[22m
+[2m6:15:17 PM[22m [36m[1m[vite][22m[39m [33mhmr invalidate [39m[2m/src/components/MaterialFormDialog.tsx[22m Could not Fast Refresh ("decodeLinks" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+[2m6:15:17 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/PengumpulanPage.tsx, /src/pages/TugasPage.tsx, /src/pages/CourseDetailPage.tsx, /src/components/MaterialViewer.tsx, /src/components/tugas/GroupSubmitDialog.tsx, /src/components/tugas/PraktikumManager.tsx[22m
+[2m6:19:09 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/UsersPage.tsx[22m
+[2m6:19:21 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/UsersPage.tsx[22m
+[2m6:19:43 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/UsersPage.tsx[22m
+[2m6:20:10 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/UsersPage.tsx[22m
+[2m6:20:33 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/UsersPage.tsx[22m
+[2m6:21:04 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/UsersPage.tsx[22m
+[2m6:21:13 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/UsersPage.tsx[22m
+[2m6:21:22 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/UsersPage.tsx[22m
+[2m6:21:46 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/UsersPage.tsx[22m
+[2m6:21:53 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/UsersPage.tsx[22m
+[2m6:22:12 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/UsersPage.tsx[22m
+[2m6:22:29 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/App.tsx[22m
+[2m6:22:38 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/Sidebar.tsx[22m
+[2m6:22:48 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/Sidebar.tsx[22m
+[2m6:22:54 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/Sidebar.tsx[22m
+[2m9:46:15 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/PengumpulanPage.tsx[22m
+[2m9:46:24 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/PengumpulanPage.tsx[22m
+[2m9:46:36 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/PengumpulanPage.tsx[22m
+[2m9:46:51 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/PengumpulanPage.tsx[22m
+[2m9:47:11 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/PengumpulanPage.tsx[22m
+[2m9:48:34 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/AbsensiPage.tsx[22m
+[2m9:48:44 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/PengumpulanPage.tsx[22m
+[2m10:01:51 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/UsersPage.tsx[22m
+[2m10:02:01 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/UsersPage.tsx[22m
+[2m10:02:29 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/UsersPage.tsx[22m
+[2m10:02:29 PM[22m [31m[1m[vite][22m[39m [31mInternal server error: C:\Users\hp\Pictures\project\lms\frontend\src\pages\UsersPage.tsx: Missing semicolon. (1209:19)
+
+[0m [90m 1207 |[31m                       [33m<[31m[33m/[31m[33mTable[31m[33m.[31m[33mCell[31m[33m>[31m
+ [90m 1208 |[31m                     [33m<[31m[33m/[31m[33mTable[31m[33m.[31m[33mRow[31m[33m>[31m
+[31m[1m>[22m[31m[90m 1209 |[31m                   ))}
+ [90m      |[31m                    [31m[1m^[22m[31m
+ [90m 1210 |[31m                 [33m<[31m[33m/[31m[33mTable[31m[33m.[31m[33mBody[31m[33m>[31m
+ [90m 1211 |[31m               [33m<[31m[33m/[31m[33mTable[31m[33m.[31m[33mRoot[31m[33m>[31m[33m<[31m[33m/[31m[33mBox[31m[33m>[31m
+ [90m 1212 |[31m               [33m<[31m[33mPagination[31m page[33m=[31m{parentsPaged[33m.[31mpage} pageSize[33m=[31m{parentsPaged[33m.[31mpageSize} total[33m=[31m{parentsPaged[33m.[31mtotal} onPageChange[33m=[31m{parentsPaged[33m.[31msetPage} [33m/[31m[33m>[31m[0m[39m
+  Plugin: [35mvite:react-babel[39m
+  File: [36mC:/Users/hp/Pictures/project/lms/frontend/src/pages/UsersPage.tsx[39m:1209:19
+[33m  1207|                        </Table.Cell>
+  1208|                      </Table.Row>
+  1209|                    ))}
+     |                     ^
+  1210|                  </Table.Body>
+  1211|                </Table.Root></Box>[39m
+      at constructor (C:\Users\hp\Pictures\project\lms\frontend\node_modules\@babel\parser\lib\index.js:365:19)
+      at TypeScriptParserMixin.raise (C:\Users\hp\Pictures\project\lms\frontend\node_modules\@babel\parser\lib\index.js:6616:19)
+      at TypeScriptParserMixin.semicolon (C:\Users\hp\Pictures\project\lms\frontend\node_modules\@babel\parser\lib\index.js:6912:10)
+      at TypeScriptParserMixin.parseReturnStatement (C:\Users\hp\Pictures\project\lms\frontend\node_modules\@babel\parser\lib\index.js:13160:12)
+      at TypeScriptParserMixin.parseStatementContent (C:\Users\hp\Pictures\project\lms\frontend\node_modules\@babel\parser\lib\index.js:12815:21)
+      at TypeScriptParserMixin.parseStatementContent (C:\Users\hp\Pictures\project\lms\frontend\node_modules\@babel\parser\lib\index.js:9525:18)
+      at TypeScriptParserMixin.parseStatementLike (C:\Users\hp\Pictures\project\lms\frontend\node_modules\@babel\parser\lib\index.js:12784:17)
+      at TypeScriptParserMixin.parseStatementListItem (C:\Users\hp\Pictures\project\lms\frontend\node_modules\@babel\parser\lib\index.js:12764:17)
+      at TypeScriptParserMixin.parseBlockOrModuleBlockBody (C:\Users\hp\Pictures\project\lms\frontend\node_modules\@babel\parser\lib\index.js:13333:61)
+      at TypeScriptParserMixin.parseBlockBody (C:\Users\hp\Pictures\project\lms\frontend\node_modules\@babel\parser\lib\index.js:13326:10)
+      at TypeScriptParserMixin.parseBlock (C:\Users\hp\Pictures\project\lms\frontend\node_modules\@babel\parser\lib\index.js:13314:10)
+      at TypeScriptParserMixin.parseFunctionBody (C:\Users\hp\Pictures\project\lms\frontend\node_modules\@babel\parser\lib\index.js:12117:24)
+      at TypeScriptParserMixin.parseArrowExpression (C:\Users\hp\Pictures\project\lms\frontend\node_modules\@babel\parser\lib\index.js:12092:10)
+      at TypeScriptParserMixin.parseParenAndDistinguishExpression (C:\Users\hp\Pictures\project\lms\frontend\node_modules\@babel\parser\lib\index.js:11704:12)
+      at TypeScriptParserMixin.parseExprAtom (C:\Users\hp\Pictures\project\lms\frontend\node_modules\@babel\parser\lib\index.js:11348:23)
+      at TypeScriptParserMixin.parseExprAtom (C:\Users\hp\Pictures\project\lms\frontend\node_modules\@babel\parser\lib\index.js:4776:20)
+      at TypeScriptParserMixin.parseExprSubscripts (C:\Users\hp\Pictures\project\lms\frontend\node_modules\@babel\parser\lib\index.js:11098:23)
+      at TypeScriptParserMixin.parseUpdate (C:\Users\hp\Pictures\project\lms\frontend\node_modules\@babel\parser\lib\index.js:11083:21)
+      at TypeScriptParserMixin.parseMaybeUnary (C:\Users\hp\Pictures\project\lms\frontend\node_modules\@babel\parser\lib\index.js:11063:23)
+      at TypeScriptParserMixin.parseMaybeUnary (C:\Users\hp\Pictures\project\lms\frontend\node_modules\@babel\parser\lib\index.js:9854:18)
+      at TypeScriptParserMixin.parseMaybeUnaryOrPrivate (C:\Users\hp\Pictures\project\lms\frontend\node_modules\@babel\parser\lib\index.js:10916:61)
+      at TypeScriptParserMixin.parseExprOps (C:\Users\hp\Pictures\project\lms\frontend\node_modules\@babel\parser\lib\index.js:10921:23)
+      at TypeScriptParserMixin.parseMaybeConditional (C:\Users\hp\Pictures\project\lms\frontend\node_modules\@babel\parser\lib\index.js:10898:23)
+      at TypeScriptParserMixin.parseMaybeAssign (C:\Users\hp\Pictures\project\lms\frontend\node_modules\@babel\parser\lib\index.js:10848:21)
+      at TypeScriptParserMixin.parseMaybeAssign (C:\Users\hp\Pictures\project\lms\frontend\node_modules\@babel\parser\lib\index.js:9803:20)
+      at C:\Users\hp\Pictures\project\lms\frontend\node_modules\@babel\parser\lib\index.js:10817:39
+      at TypeScriptParserMixin.allowInAnd (C:\Users\hp\Pictures\project\lms\frontend\node_modules\@babel\parser\lib\index.js:12443:12)
+      at TypeScriptParserMixin.parseMaybeAssignAllowIn (C:\Users\hp\Pictures\project\lms\frontend\node_modules\@babel\parser\lib\index.js:10817:17)
+      at TypeScriptParserMixin.parseMaybeAssignAllowInOrVoidPattern (C:\Users\hp\Pictures\project\lms\frontend\node_modules\@babel\parser\lib\index.js:12510:17)
+      at TypeScriptParserMixin.parseExprListItem (C:\Users\hp\Pictures\project\lms\frontend\node_modules\@babel\parser\lib\index.js:12192:18)
+      at TypeScriptParserMixin.parseCallExpressionArguments (C:\Users\hp\Pictures\project\lms\frontend\node_modules\@babel\parser\lib\index.js:11269:22)
+      at TypeScriptParserMixin.parseCoverCallAndAsyncArrowHead (C:\Users\hp\Pictures\project\lms\frontend\node_modules\@babel\parser\lib\index.js:11203:29)
+      at TypeScriptParserMixin.parseSubscript (C:\Users\hp\Pictures\project\lms\frontend\node_modules\@babel\parser\lib\index.js:11137:19)
+      at TypeScriptParserMixin.parseSubscript (C:\Users\hp\Pictures\project\lms\frontend\node_modules\@babel\parser\lib\index.js:9289:18)
+      at TypeScriptParserMixin.parseSubscripts (C:\Users\hp\Pictures\project\lms\frontend\node_modules\@babel\parser\lib\index.js:11111:19)
+      at TypeScriptParserMixin.parseExprSubscripts (C:\Users\hp\Pictures\project\lms\frontend\node_modules\@babel\parser\lib\index.js:11102:17)
+      at TypeScriptParserMixin.parseUpdate (C:\Users\hp\Pictures\project\lms\frontend\node_modules\@babel\parser\lib\index.js:11083:21)
+      at TypeScriptParserMixin.parseMaybeUnary (C:\Users\hp\Pictures\project\lms\frontend\node_modules\@babel\parser\lib\index.js:11063:23)
+      at TypeScriptParserMixin.parseMaybeUnary (C:\Users\hp\Pictures\project\lms\frontend\node_modules\@babel\parser\lib\index.js:9854:18)
+      at TypeScriptParserMixin.parseMaybeUnaryOrPrivate (C:\Users\hp\Pictures\project\lms\frontend\node_modules\@babel\parser\lib\index.js:10916:61)
+      at TypeScriptParserMixin.parseExprOps (C:\Users\hp\Pictures\project\lms\frontend\node_modules\@babel\parser\lib\index.js:10921:23)
+      at TypeScriptParserMixin.parseMaybeConditional (C:\Users\hp\Pictures\project\lms\frontend\node_modules\@babel\parser\lib\index.js:10898:23)
+      at TypeScriptParserMixin.parseMaybeAssign (C:\Users\hp\Pictures\project\lms\frontend\node_modules\@babel\parser\lib\index.js:10848:21)
+      at TypeScriptParserMixin.parseMaybeAssign (C:\Users\hp\Pictures\project\lms\frontend\node_modules\@babel\parser\lib\index.js:9803:20)
+      at TypeScriptParserMixin.parseConditional (C:\Users\hp\Pictures\project\lms\frontend\node_modules\@babel\parser\lib\index.js:10910:29)
+      at TypeScriptParserMixin.parseConditional (C:\Users\hp\Pictures\project\lms\frontend\node_modules\@babel\parser\lib\index.js:9620:18)
+      at TypeScriptParserMixin.parseMaybeConditional (C:\Users\hp\Pictures\project\lms\frontend\node_modules\@babel\parser\lib\index.js:10902:17)
+      at TypeScriptParserMixin.parseMaybeAssign (C:\Users\hp\Pictures\project\lms\frontend\node_modules\@babel\parser\lib\index.js:10848:21)
+      at TypeScriptParserMixin.parseMaybeAssign (C:\Users\hp\Pictures\project\lms\frontend\node_modules\@babel\parser\lib\index.js:9803:20)
+      at TypeScriptParserMixin.parseExpressionBase (C:\Users\hp\Pictures\project\lms\frontend\node_modules\@babel\parser\lib\index.js:10801:23)
+[2m10:02:51 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/UsersPage.tsx[22m
+[2m10:10:21 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/UsersPage.tsx[22m
+[2m10:10:58 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/UsersPage.tsx[22m
+[2m10:11:20 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/UsersPage.tsx[22m
+[2m10:20:00 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/hooks/useAuth.tsx, /src/pages/PengaturanPage.tsx, /src/pages/LogAktivitasPage.tsx, /src/pages/PengumpulanPage.tsx, /src/pages/DashboardPage.tsx, /src/pages/AbsensiPage.tsx, /src/pages/NilaiPage.tsx, /src/pages/CoursesPage.tsx, /src/pages/MitraPklPage.tsx, /src/pages/TugasPage.tsx, /src/pages/UsersPage.tsx, /src/pages/CourseDetailPage.tsx, /src/components/MaterialFormDialog.tsx, /src/components/MaterialViewer.tsx, /src/components/tugas/GroupSubmitDialog.tsx, /src/components/tugas/KuisRunner.tsx, /src/components/tugas/PraktikumManager.tsx, /src/components/classroom/ScheduleTab.tsx, /src/components/classroom/LessonCalendarTab.tsx, /src/components/classroom/ActivityLeaderboard.tsx, /src/components/classroom/ActivityScoringPanel.tsx, /src/components/MaterialComments.tsx, /src/components/TopNav.tsx, /src/components/PhaseNode.tsx[22m
+[2m10:20:00 PM[22m [36m[1m[vite][22m[39m [33mhmr invalidate [39m[2m/src/hooks/useAuth.tsx[22m Could not Fast Refresh ("useAuth" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+[2m10:20:00 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/App.tsx, /src/pages/PengaturanPage.tsx, /src/pages/LoginPage.tsx, /src/pages/DashboardPage.tsx, /src/pages/AbsensiPage.tsx, /src/pages/NilaiPage.tsx, /src/pages/CoursesPage.tsx, /src/pages/MitraPklPage.tsx, /src/pages/TugasPage.tsx, /src/pages/CourseDetailPage.tsx, /src/components/AppLayout.tsx, /src/components/MaterialViewer.tsx, /src/components/tugas/GroupSubmitDialog.tsx, /src/components/classroom/ActivityLeaderboard.tsx, /src/components/Sidebar.tsx, /src/components/TopNav.tsx, /src/pages/UsersPage.tsx[22m
+[2m10:20:00 PM[22m [36m[1m[vite][22m[39m [33mhmr invalidate [39m[2m/src/components/MaterialFormDialog.tsx[22m Could not Fast Refresh ("decodeLinks" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+[2m10:20:00 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/PengumpulanPage.tsx, /src/pages/TugasPage.tsx, /src/pages/CourseDetailPage.tsx, /src/components/MaterialViewer.tsx, /src/components/tugas/GroupSubmitDialog.tsx, /src/components/tugas/PraktikumManager.tsx[22m
+[2m10:20:00 PM[22m [36m[1m[vite][22m[39m [33mhmr invalidate [39m[2m/src/components/PhaseNode.tsx[22m Could not Fast Refresh ("PHASES" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+[2m10:20:00 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/MaterialFormDialog.tsx, /src/components/MaterialViewer.tsx, /src/components/RichTextEditor.tsx[22m
+[2m10:24:04 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/UsersPage.tsx[22m
+[2m10:24:14 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/UsersPage.tsx[22m
+[2m10:24:24 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/UsersPage.tsx[22m
+[2m10:24:34 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/UsersPage.tsx[22m
+[2m10:25:26 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/UsersPage.tsx[22m
+[2m10:25:36 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/UsersPage.tsx[22m
+[2m10:26:23 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/UsersPage.tsx[22m
+[2m10:27:25 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/UsersPage.tsx[22m
+[2m10:27:34 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/UsersPage.tsx[22m
+[2m10:27:43 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/UsersPage.tsx[22m
+[2m10:30:50 PM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /user.v1.UserService/ListUsers[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1194:18)
+    at afterConnectMultiple (node:net:1784:7)
+[2m10:30:52 PM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /user.v1.UserService/ListUsers[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1194:18)
+    at afterConnectMultiple (node:net:1784:7)
+[2m10:31:02 PM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /user.v1.UserService/ListUsers[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1194:18)
+    at afterConnectMultiple (node:net:1784:7)
+[2m10:42:46 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/hooks/useAuth.tsx, /src/pages/PengaturanPage.tsx, /src/pages/LogAktivitasPage.tsx, /src/pages/PengumpulanPage.tsx, /src/pages/DashboardPage.tsx, /src/pages/AbsensiPage.tsx, /src/pages/NilaiPage.tsx, /src/pages/CoursesPage.tsx, /src/pages/MitraPklPage.tsx, /src/pages/TugasPage.tsx, /src/pages/UsersPage.tsx, /src/pages/CourseDetailPage.tsx, /src/components/MaterialFormDialog.tsx, /src/components/MaterialViewer.tsx, /src/components/tugas/GroupSubmitDialog.tsx, /src/components/tugas/KuisRunner.tsx, /src/components/tugas/PraktikumManager.tsx, /src/components/classroom/ScheduleTab.tsx, /src/components/classroom/LessonCalendarTab.tsx, /src/components/classroom/ActivityLeaderboard.tsx, /src/components/classroom/ActivityScoringPanel.tsx, /src/components/MaterialComments.tsx, /src/components/TopNav.tsx, /src/components/PhaseNode.tsx[22m
+[2m10:42:47 PM[22m [36m[1m[vite][22m[39m [33mhmr invalidate [39m[2m/src/hooks/useAuth.tsx[22m Could not Fast Refresh ("useAuth" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+[2m10:42:47 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/App.tsx, /src/pages/PengaturanPage.tsx, /src/pages/LoginPage.tsx, /src/pages/DashboardPage.tsx, /src/pages/AbsensiPage.tsx, /src/pages/NilaiPage.tsx, /src/pages/CoursesPage.tsx, /src/pages/MitraPklPage.tsx, /src/pages/TugasPage.tsx, /src/pages/CourseDetailPage.tsx, /src/components/AppLayout.tsx, /src/components/MaterialViewer.tsx, /src/components/tugas/GroupSubmitDialog.tsx, /src/components/classroom/ActivityLeaderboard.tsx, /src/components/Sidebar.tsx, /src/components/TopNav.tsx, /src/pages/UsersPage.tsx[22m
+[2m10:42:47 PM[22m [36m[1m[vite][22m[39m [33mhmr invalidate [39m[2m/src/components/MaterialFormDialog.tsx[22m Could not Fast Refresh ("decodeLinks" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+[2m10:42:47 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/PengumpulanPage.tsx, /src/pages/TugasPage.tsx, /src/pages/CourseDetailPage.tsx, /src/components/MaterialViewer.tsx, /src/components/tugas/GroupSubmitDialog.tsx, /src/components/tugas/PraktikumManager.tsx[22m
+[2m10:42:47 PM[22m [36m[1m[vite][22m[39m [33mhmr invalidate [39m[2m/src/components/PhaseNode.tsx[22m Could not Fast Refresh ("PHASES" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+[2m10:42:47 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/MaterialFormDialog.tsx, /src/components/MaterialViewer.tsx, /src/components/RichTextEditor.tsx[22m
+[2m10:42:49 PM[22m [36m[1m[vite][22m[39m [33mhmr invalidate [39m[2m/src/components/MaterialFormDialog.tsx[22m Could not Fast Refresh ("decodeLinks" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+[2m10:42:49 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/PengumpulanPage.tsx, /src/pages/TugasPage.tsx, /src/pages/CourseDetailPage.tsx, /src/components/MaterialViewer.tsx, /src/components/tugas/GroupSubmitDialog.tsx, /src/components/tugas/PraktikumManager.tsx[22m
+[2m10:46:56 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/PengaturanPage.tsx[22m
+[2m10:47:13 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/PengaturanPage.tsx[22m
+[2m10:48:00 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/PengaturanPage.tsx[22m
+[2m10:49:19 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/LoginPage.tsx[22m
+[2m10:49:30 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/LoginPage.tsx[22m
+[2m10:49:42 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/LoginPage.tsx[22m
+[2m10:49:57 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/LoginPage.tsx[22m
+[2m10:50:07 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/App.tsx[22m
+[2m10:50:15 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/App.tsx[22m
+[2m10:50:36 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/App.tsx[22m
+[2m10:51:29 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/LandingPage.tsx[22m
+[2m6:32:46 AM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/LandingPage.tsx[22m
+[2m6:37:09 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /school.v1.SchoolService/GetSchool[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1194:18)
+    at afterConnectMultiple (node:net:1784:7)
+[2m6:37:09 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /school.v1.SchoolService/GetSchool[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1194:18)
+    at afterConnectMultiple (node:net:1784:7)
+[2m6:37:24 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /user.v1.UserService/Login[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1194:18)
+    at afterConnectMultiple (node:net:1784:7)
+[2m6:37:27 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /user.v1.UserService/Login[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1194:18)
+    at afterConnectMultiple (node:net:1784:7)
+[2m6:37:43 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /user.v1.UserService/GetProfile[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1194:18)
+    at afterConnectMultiple (node:net:1784:7)
+[2m6:37:43 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /user.v1.UserService/GetProfile[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1194:18)
+    at afterConnectMultiple (node:net:1784:7)
+[2m6:37:43 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /school.v1.SchoolService/GetSchool[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1194:18)
+    at afterConnectMultiple (node:net:1784:7)
+[2m6:37:43 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /school.v1.SchoolService/GetSchool[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1194:18)
+    at afterConnectMultiple (node:net:1784:7)
+[2m6:37:48 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /school.v1.SchoolService/GetSchool[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1194:18)
+    at afterConnectMultiple (node:net:1784:7)
+[2m6:37:48 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /school.v1.SchoolService/GetSchool[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1194:18)
+    at afterConnectMultiple (node:net:1784:7)
+[2m6:37:55 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /school.v1.SchoolService/GetSchool[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1194:18)
+    at afterConnectMultiple (node:net:1784:7)
+[2m6:37:55 AM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /school.v1.SchoolService/GetSchool[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1194:18)
+    at afterConnectMultiple (node:net:1784:7)
+[2m7:39:10 AM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/hooks/useAuth.tsx, /src/pages/PengaturanPage.tsx, /src/pages/LogAktivitasPage.tsx, /src/pages/PengumpulanPage.tsx, /src/pages/DashboardPage.tsx, /src/pages/AbsensiPage.tsx, /src/pages/NilaiPage.tsx, /src/pages/CoursesPage.tsx, /src/pages/MitraPklPage.tsx, /src/pages/TugasPage.tsx, /src/pages/UsersPage.tsx, /src/pages/CourseDetailPage.tsx, /src/components/MaterialFormDialog.tsx, /src/components/MaterialViewer.tsx, /src/components/tugas/GroupSubmitDialog.tsx, /src/components/tugas/KuisRunner.tsx, /src/components/tugas/PraktikumManager.tsx, /src/components/classroom/ScheduleTab.tsx, /src/components/classroom/LessonCalendarTab.tsx, /src/components/classroom/ActivityLeaderboard.tsx, /src/components/classroom/ActivityScoringPanel.tsx, /src/components/MaterialComments.tsx, /src/components/TopNav.tsx, /src/components/PhaseNode.tsx, /src/pages/LoginPage.tsx, /src/pages/LandingPage.tsx[22m
+[2m7:42:36 AM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/App.tsx[22m
+[2m7:42:45 AM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/App.tsx[22m
+[2m7:42:53 AM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/Sidebar.tsx[22m
+[2m7:43:03 AM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/Sidebar.tsx[22m
+[2m7:43:18 AM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/PengaturanPage.tsx[22m
+[2m7:43:35 AM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/PengaturanPage.tsx[22m
+[2m7:43:45 AM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/PengaturanPage.tsx[22m
+[2m7:44:25 AM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/PengaturanPage.tsx[22m
+[2m7:45:02 AM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/LandingPage.tsx[22m
+[2m7:45:14 AM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/LandingPage.tsx[22m
+[2m7:45:35 AM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/LandingPage.tsx[22m
+[2m7:46:05 AM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/LandingPage.tsx[22m
+[2m7:46:30 AM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/LandingPage.tsx[22m
+[2m7:47:46 AM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/ProfilSekolahPage.tsx[22m
+[2m8:23:27 AM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/hooks/useAuth.tsx, /src/pages/PengaturanPage.tsx, /src/pages/LogAktivitasPage.tsx, /src/pages/PengumpulanPage.tsx, /src/pages/DashboardPage.tsx, /src/pages/AbsensiPage.tsx, /src/pages/NilaiPage.tsx, /src/pages/CoursesPage.tsx, /src/pages/MitraPklPage.tsx, /src/pages/TugasPage.tsx, /src/pages/UsersPage.tsx, /src/pages/CourseDetailPage.tsx, /src/components/MaterialFormDialog.tsx, /src/components/MaterialViewer.tsx, /src/components/tugas/GroupSubmitDialog.tsx, /src/components/tugas/KuisRunner.tsx, /src/components/tugas/PraktikumManager.tsx, /src/components/classroom/ScheduleTab.tsx, /src/components/classroom/LessonCalendarTab.tsx, /src/components/classroom/ActivityLeaderboard.tsx, /src/components/classroom/ActivityScoringPanel.tsx, /src/components/MaterialComments.tsx, /src/components/TopNav.tsx, /src/components/PhaseNode.tsx, /src/pages/LoginPage.tsx, /src/pages/LandingPage.tsx, /src/pages/ProfilSekolahPage.tsx[22m
+[2m8:23:29 AM[22m [36m[1m[vite][22m[39m [33mhmr invalidate [39m[2m/src/hooks/useAuth.tsx[22m Could not Fast Refresh ("useAuth" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+[2m8:23:29 AM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/App.tsx, /src/pages/PengaturanPage.tsx, /src/pages/LoginPage.tsx, /src/pages/DashboardPage.tsx, /src/pages/AbsensiPage.tsx, /src/pages/NilaiPage.tsx, /src/pages/CoursesPage.tsx, /src/pages/MitraPklPage.tsx, /src/pages/TugasPage.tsx, /src/pages/CourseDetailPage.tsx, /src/components/AppLayout.tsx, /src/components/MaterialViewer.tsx, /src/components/tugas/GroupSubmitDialog.tsx, /src/components/classroom/ActivityLeaderboard.tsx, /src/components/Sidebar.tsx, /src/components/TopNav.tsx, /src/pages/UsersPage.tsx, /src/pages/LandingPage.tsx[22m
+[2m8:23:29 AM[22m [36m[1m[vite][22m[39m [33mhmr invalidate [39m[2m/src/components/MaterialFormDialog.tsx[22m Could not Fast Refresh ("decodeLinks" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+[2m8:23:29 AM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/PengumpulanPage.tsx, /src/pages/TugasPage.tsx, /src/pages/CourseDetailPage.tsx, /src/components/MaterialViewer.tsx, /src/components/tugas/GroupSubmitDialog.tsx, /src/components/tugas/PraktikumManager.tsx[22m
+[2m8:23:29 AM[22m [36m[1m[vite][22m[39m [33mhmr invalidate [39m[2m/src/components/PhaseNode.tsx[22m Could not Fast Refresh ("PHASES" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+[2m8:23:29 AM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/MaterialFormDialog.tsx, /src/components/MaterialViewer.tsx, /src/components/RichTextEditor.tsx[22m
+[2m8:23:31 AM[22m [36m[1m[vite][22m[39m [33mhmr invalidate [39m[2m/src/components/MaterialFormDialog.tsx[22m Could not Fast Refresh ("decodeLinks" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+[2m8:23:31 AM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/PengumpulanPage.tsx, /src/pages/TugasPage.tsx, /src/pages/CourseDetailPage.tsx, /src/components/MaterialViewer.tsx, /src/components/tugas/GroupSubmitDialog.tsx, /src/components/tugas/PraktikumManager.tsx[22m
+[2m8:27:47 AM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/ProfilSekolahPage.tsx[22m
+[2m8:27:58 AM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/ProfilSekolahPage.tsx[22m
+[2m8:28:14 AM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/ProfilSekolahPage.tsx[22m
+[2m8:28:27 AM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/ProfilSekolahPage.tsx[22m
+[2m8:28:53 AM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/ProfilSekolahPage.tsx[22m
+[2m8:29:13 AM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/LandingPage.tsx[22m
+[2m8:29:23 AM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/LandingPage.tsx[22m
+[2m8:29:40 AM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/LandingPage.tsx[22m
+[2m8:29:55 AM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/LandingPage.tsx[22m
+[2m8:30:09 AM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/LandingPage.tsx[22m
+[2m11:32:59 AM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/hooks/useAuth.tsx, /src/pages/PengaturanPage.tsx, /src/pages/LogAktivitasPage.tsx, /src/pages/PengumpulanPage.tsx, /src/pages/DashboardPage.tsx, /src/pages/AbsensiPage.tsx, /src/pages/NilaiPage.tsx, /src/pages/CoursesPage.tsx, /src/pages/MitraPklPage.tsx, /src/pages/TugasPage.tsx, /src/pages/UsersPage.tsx, /src/pages/CourseDetailPage.tsx, /src/components/MaterialFormDialog.tsx, /src/components/MaterialViewer.tsx, /src/components/tugas/GroupSubmitDialog.tsx, /src/components/tugas/KuisRunner.tsx, /src/components/tugas/PraktikumManager.tsx, /src/components/classroom/ScheduleTab.tsx, /src/components/classroom/LessonCalendarTab.tsx, /src/components/classroom/ActivityLeaderboard.tsx, /src/components/classroom/ActivityScoringPanel.tsx, /src/components/MaterialComments.tsx, /src/components/TopNav.tsx, /src/components/PhaseNode.tsx, /src/pages/LoginPage.tsx, /src/pages/LandingPage.tsx, /src/pages/ProfilSekolahPage.tsx[22m
+[2m11:33:00 AM[22m [36m[1m[vite][22m[39m [33mhmr invalidate [39m[2m/src/hooks/useAuth.tsx[22m Could not Fast Refresh ("useAuth" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+[2m11:33:00 AM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/App.tsx, /src/pages/PengaturanPage.tsx, /src/pages/LoginPage.tsx, /src/pages/DashboardPage.tsx, /src/pages/AbsensiPage.tsx, /src/pages/NilaiPage.tsx, /src/pages/CoursesPage.tsx, /src/pages/MitraPklPage.tsx, /src/pages/TugasPage.tsx, /src/pages/CourseDetailPage.tsx, /src/components/AppLayout.tsx, /src/components/MaterialViewer.tsx, /src/components/tugas/GroupSubmitDialog.tsx, /src/components/classroom/ActivityLeaderboard.tsx, /src/components/Sidebar.tsx, /src/components/TopNav.tsx, /src/pages/UsersPage.tsx, /src/pages/LandingPage.tsx[22m
+[2m11:33:00 AM[22m [36m[1m[vite][22m[39m [33mhmr invalidate [39m[2m/src/components/MaterialFormDialog.tsx[22m Could not Fast Refresh ("decodeLinks" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+[2m11:33:00 AM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/PengumpulanPage.tsx, /src/pages/TugasPage.tsx, /src/pages/CourseDetailPage.tsx, /src/components/MaterialViewer.tsx, /src/components/tugas/GroupSubmitDialog.tsx, /src/components/tugas/PraktikumManager.tsx[22m
+[2m11:33:00 AM[22m [36m[1m[vite][22m[39m [33mhmr invalidate [39m[2m/src/components/PhaseNode.tsx[22m Could not Fast Refresh ("PHASES" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+[2m11:33:00 AM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/MaterialFormDialog.tsx, /src/components/MaterialViewer.tsx, /src/components/RichTextEditor.tsx[22m
+[2m11:37:16 AM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/ProfilSekolahPage.tsx[22m
+[2m11:37:28 AM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/ProfilSekolahPage.tsx[22m
+[2m11:37:40 AM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/ProfilSekolahPage.tsx[22m
+[2m11:40:53 AM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/ProfilSekolahPage.tsx[22m
+[2m11:41:01 AM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/ProfilSekolahPage.tsx[22m
+[2m11:41:07 AM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/ProfilSekolahPage.tsx[22m
+[2m11:41:32 AM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/Sidebar.tsx[22m
+[2m11:41:49 AM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/Sidebar.tsx[22m
+[2m11:41:59 AM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/App.tsx[22m
+[2m11:42:30 AM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/LandingPage.tsx[22m
+[2m11:42:36 AM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/LandingPage.tsx[22m
+[2m11:42:44 AM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/LandingPage.tsx[22m
+[2m11:42:56 AM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/LandingPage.tsx[22m
+[2m11:43:20 AM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/LandingPage.tsx[22m
+[2m11:43:33 AM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/LandingPage.tsx[22m
+[2m1:43:16 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/LandingPage.tsx[22m
+[2m1:43:22 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/LandingPage.tsx[22m
+[2m1:43:31 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/LandingPage.tsx[22m
+[2m1:43:42 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/LandingPage.tsx[22m
+[2m1:44:01 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/LandingPage.tsx[22m
+[2m1:45:44 PM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /school.v1.SchoolService/GetSchool[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1194:18)
+    at afterConnectMultiple (node:net:1784:7)
+[2m1:45:44 PM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /school.v1.SchoolService/ListStaff[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1194:18)
+    at afterConnectMultiple (node:net:1784:7)
+[2m1:45:44 PM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /school.v1.SchoolService/ListContent[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1194:18)
+    at afterConnectMultiple (node:net:1784:7)
+[2m1:45:44 PM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /school.v1.SchoolService/ListContent[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1194:18)
+    at afterConnectMultiple (node:net:1784:7)
+[2m1:45:44 PM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /school.v1.SchoolService/ListContent[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1194:18)
+    at afterConnectMultiple (node:net:1784:7)
+[2m1:45:44 PM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /school.v1.SchoolService/ListContent[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1194:18)
+    at afterConnectMultiple (node:net:1784:7)
+[2m1:45:44 PM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /school.v1.SchoolService/ListContent[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1194:18)
+    at afterConnectMultiple (node:net:1784:7)
+[2m1:45:44 PM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /school.v1.SchoolService/ListContent[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1194:18)
+    at afterConnectMultiple (node:net:1784:7)
+[2m1:45:44 PM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /school.v1.SchoolService/ListContent[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1194:18)
+    at afterConnectMultiple (node:net:1784:7)
+[2m1:45:44 PM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /school.v1.SchoolService/GetSchool[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1194:18)
+    at afterConnectMultiple (node:net:1784:7)
+[2m1:45:44 PM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /school.v1.SchoolService/ListStaff[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1194:18)
+    at afterConnectMultiple (node:net:1784:7)
+[2m1:45:44 PM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /school.v1.SchoolService/ListContent[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1194:18)
+    at afterConnectMultiple (node:net:1784:7)
+[2m1:45:44 PM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /school.v1.SchoolService/ListContent[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1194:18)
+    at afterConnectMultiple (node:net:1784:7)
+[2m1:45:44 PM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /school.v1.SchoolService/ListContent[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1194:18)
+    at afterConnectMultiple (node:net:1784:7)
+[2m1:45:44 PM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /school.v1.SchoolService/ListContent[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1194:18)
+    at afterConnectMultiple (node:net:1784:7)
+[2m1:45:44 PM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /school.v1.SchoolService/ListContent[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1194:18)
+    at afterConnectMultiple (node:net:1784:7)
+[2m1:45:44 PM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /school.v1.SchoolService/ListContent[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1194:18)
+    at afterConnectMultiple (node:net:1784:7)
+[2m1:45:44 PM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /school.v1.SchoolService/ListContent[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1194:18)
+    at afterConnectMultiple (node:net:1784:7)
+[2m1:45:56 PM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /school.v1.SchoolService/GetSchool[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1194:18)
+    at afterConnectMultiple (node:net:1784:7)
+[2m1:45:56 PM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /school.v1.SchoolService/ListStaff[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1194:18)
+    at afterConnectMultiple (node:net:1784:7)
+[2m1:45:56 PM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /school.v1.SchoolService/ListContent[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1194:18)
+    at afterConnectMultiple (node:net:1784:7)
+[2m1:45:56 PM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /school.v1.SchoolService/ListContent[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1194:18)
+    at afterConnectMultiple (node:net:1784:7)
+[2m1:45:56 PM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /school.v1.SchoolService/ListContent[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1194:18)
+    at afterConnectMultiple (node:net:1784:7)
+[2m1:45:56 PM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /school.v1.SchoolService/ListContent[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1194:18)
+    at afterConnectMultiple (node:net:1784:7)
+[2m1:45:56 PM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /school.v1.SchoolService/ListContent[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1194:18)
+    at afterConnectMultiple (node:net:1784:7)
+[2m1:45:56 PM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /school.v1.SchoolService/ListContent[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1194:18)
+    at afterConnectMultiple (node:net:1784:7)
+[2m1:45:56 PM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /school.v1.SchoolService/ListContent[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1194:18)
+    at afterConnectMultiple (node:net:1784:7)
+[2m1:45:56 PM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /school.v1.SchoolService/GetSchool[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1194:18)
+    at afterConnectMultiple (node:net:1784:7)
+[2m1:45:56 PM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /school.v1.SchoolService/ListStaff[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1194:18)
+    at afterConnectMultiple (node:net:1784:7)
+[2m1:45:56 PM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /school.v1.SchoolService/ListContent[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1194:18)
+    at afterConnectMultiple (node:net:1784:7)
+[2m1:45:56 PM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /school.v1.SchoolService/ListContent[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1194:18)
+    at afterConnectMultiple (node:net:1784:7)
+[2m1:45:56 PM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /school.v1.SchoolService/ListContent[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1194:18)
+    at afterConnectMultiple (node:net:1784:7)
+[2m1:45:56 PM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /school.v1.SchoolService/ListContent[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1194:18)
+    at afterConnectMultiple (node:net:1784:7)
+[2m1:45:56 PM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /school.v1.SchoolService/ListContent[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1194:18)
+    at afterConnectMultiple (node:net:1784:7)
+[2m1:45:56 PM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /school.v1.SchoolService/ListContent[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1194:18)
+    at afterConnectMultiple (node:net:1784:7)
+[2m1:45:56 PM[22m [31m[1m[vite][22m[39m [31mhttp proxy error: /school.v1.SchoolService/ListContent[39m
+AggregateError [ECONNREFUSED]: 
+    at internalConnectMultiple (node:net:1194:18)
+    at afterConnectMultiple (node:net:1784:7)
+[2m1:50:59 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/LandingPage.tsx[22m
+[2m1:51:06 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/LandingPage.tsx[22m
+[2m2:04:46 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/LandingPage.tsx[22m
+[2m2:05:12 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/LandingPage.tsx[22m
+[2m2:05:29 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/LandingPage.tsx[22m
+[2m2:06:36 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/LandingSlideshow.tsx[22m
+[2m8:17:28 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/hooks/useAuth.tsx, /src/pages/PengaturanPage.tsx, /src/pages/LogAktivitasPage.tsx, /src/pages/PengumpulanPage.tsx, /src/pages/DashboardPage.tsx, /src/pages/AbsensiPage.tsx, /src/pages/NilaiPage.tsx, /src/pages/CoursesPage.tsx, /src/pages/MitraPklPage.tsx, /src/pages/TugasPage.tsx, /src/pages/UsersPage.tsx, /src/pages/CourseDetailPage.tsx, /src/components/MaterialFormDialog.tsx, /src/components/MaterialViewer.tsx, /src/components/tugas/GroupSubmitDialog.tsx, /src/components/tugas/KuisRunner.tsx, /src/components/tugas/PraktikumManager.tsx, /src/components/classroom/ScheduleTab.tsx, /src/components/classroom/LessonCalendarTab.tsx, /src/components/classroom/ActivityLeaderboard.tsx, /src/components/classroom/ActivityScoringPanel.tsx, /src/components/MaterialComments.tsx, /src/components/TopNav.tsx, /src/components/PhaseNode.tsx, /src/pages/LoginPage.tsx, /src/pages/LandingPage.tsx, /src/pages/ProfilSekolahPage.tsx, /src/components/ContentListEditor.tsx[22m
+[2m8:17:29 PM[22m [36m[1m[vite][22m[39m [33mhmr invalidate [39m[2m/src/hooks/useAuth.tsx[22m Could not Fast Refresh ("useAuth" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+[2m8:17:29 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/App.tsx, /src/pages/PengaturanPage.tsx, /src/pages/LoginPage.tsx, /src/pages/DashboardPage.tsx, /src/pages/AbsensiPage.tsx, /src/pages/NilaiPage.tsx, /src/pages/CoursesPage.tsx, /src/pages/MitraPklPage.tsx, /src/pages/TugasPage.tsx, /src/pages/CourseDetailPage.tsx, /src/components/AppLayout.tsx, /src/components/MaterialViewer.tsx, /src/components/tugas/GroupSubmitDialog.tsx, /src/components/classroom/ActivityLeaderboard.tsx, /src/components/Sidebar.tsx, /src/components/TopNav.tsx, /src/pages/UsersPage.tsx, /src/pages/LandingPage.tsx[22m
+[2m8:17:29 PM[22m [36m[1m[vite][22m[39m [33mhmr invalidate [39m[2m/src/components/MaterialFormDialog.tsx[22m Could not Fast Refresh ("decodeLinks" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+[2m8:17:29 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/PengumpulanPage.tsx, /src/pages/TugasPage.tsx, /src/pages/CourseDetailPage.tsx, /src/components/MaterialViewer.tsx, /src/components/tugas/GroupSubmitDialog.tsx, /src/components/tugas/PraktikumManager.tsx[22m
+[2m8:17:29 PM[22m [36m[1m[vite][22m[39m [33mhmr invalidate [39m[2m/src/components/PhaseNode.tsx[22m Could not Fast Refresh ("PHASES" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+[2m8:17:29 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/MaterialFormDialog.tsx, /src/components/MaterialViewer.tsx, /src/components/RichTextEditor.tsx[22m
+[2m8:17:29 PM[22m [36m[1m[vite][22m[39m [33mhmr invalidate [39m[2m/src/components/MaterialFormDialog.tsx[22m Could not Fast Refresh ("decodeLinks" export is incompatible). Learn more at https://github.com/vitejs/vite-plugin-react/tree/main/packages/plugin-react#consistent-components-exports
+[2m8:17:29 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/PengumpulanPage.tsx, /src/pages/TugasPage.tsx, /src/pages/CourseDetailPage.tsx, /src/components/MaterialViewer.tsx, /src/components/tugas/GroupSubmitDialog.tsx, /src/components/tugas/PraktikumManager.tsx[22m
+[2m8:25:25 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/PengaturanPage.tsx[22m
+[2m8:25:47 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/PengaturanPage.tsx[22m
+[2m8:26:44 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/PengaturanPage.tsx[22m
+[2m10:49:06 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/ProfilSekolahPage.tsx[22m
+[2m10:49:21 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/Sidebar.tsx[22m
+[2m10:50:00 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/Sidebar.tsx[22m

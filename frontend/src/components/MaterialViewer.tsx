@@ -29,7 +29,7 @@ interface Props {
   material: Material | null
 }
 
-const LINK_WAIT = 120 // detik: siswa harus membuka link lalu tunggu 2 menit → auto-centang
+const LINK_WAIT = 120 // detik: murid harus membuka link lalu tunggu 2 menit → auto-centang
 
 interface ShuffledOption { text: string; correct: boolean }
 interface ShuffledQuestion { question: string; image: string; options: ShuffledOption[] }
@@ -115,6 +115,17 @@ export default function MaterialViewer({ open, onClose, material }: Props) {
   const [tocOpenMobile, setTocOpenMobile] = useState(false)
   const tocVisible = isDesktop || tocOpenMobile
 
+  // Reading checklist per material: which Daftar Isi items the reader has ticked.
+  // Purely informational + local (localStorage) — NOT sent to the server and does
+  // NOT affect completion/progress. Shown to all roles (guru/admin/murid).
+  const [tocChecked, setTocChecked] = useState<Set<number>>(new Set())
+  const toggleTocCheck = (i: number) => setTocChecked((prev) => {
+    const next = new Set(prev)
+    if (next.has(i)) next.delete(i); else next.add(i)
+    if (material) { try { localStorage.setItem(`lms_toc_read_${material.id}`, JSON.stringify([...next])) } catch { /* ignore */ } }
+    return next
+  })
+
   const onBodyScroll = () => {
     const el = bodyRef.current
     if (!el) return
@@ -165,7 +176,7 @@ export default function MaterialViewer({ open, onClose, material }: Props) {
   const [myRating, setMyRating] = useState(0)
   const [ratingSaving, setRatingSaving] = useState(false)
 
-  // Dialog "Keaktifan Siswa" (khusus guru).
+  // Dialog "Keaktifan Murid" (khusus guru).
   const [activeOpen, setActiveOpen] = useState(false)
 
   const isComplete = !!completion
@@ -248,6 +259,10 @@ export default function MaterialViewer({ open, onClose, material }: Props) {
     const mid = material.id
     setToc(parseHeadings(material.contentText))
     setScrollPct(0); setActiveToc(0); setTocOpenMobile(false)
+    try {
+      const raw = localStorage.getItem(`lms_toc_read_${mid}`)
+      setTocChecked(new Set(raw ? (JSON.parse(raw) as number[]) : []))
+    } catch { setTocChecked(new Set()) }
     const lnks = decodeLinks(material.contentUrl).filter((l) => l.url)
     setLinks(lnks)
     const starts: (number | null)[] = []
@@ -552,7 +567,7 @@ export default function MaterialViewer({ open, onClose, material }: Props) {
                                           <Flex align="center" gap="6px">
                                             <Text fontSize="12px" fontWeight="600" color={COLORS.text}>{c.authorName}</Text>
                                             <Badge colorPalette={c.authorRole === 'teacher' || c.authorRole === 'admin' ? 'purple' : 'blue'} variant="subtle" fontSize="10px" flexShrink={0}>
-                                              {c.authorRole === 'teacher' || c.authorRole === 'admin' ? 'Guru' : 'Siswa'}
+                                              {c.authorRole === 'teacher' || c.authorRole === 'admin' ? 'Guru' : 'Murid'}
                                             </Badge>
                                           </Flex>
                                           <Text fontSize="13px" color={COLORS.text} mt="2px">{c.content}</Text>
@@ -587,20 +602,40 @@ export default function MaterialViewer({ open, onClose, material }: Props) {
                         <Flex as="button" w="full" align="center" justify="space-between"
                           onClick={() => !isDesktop && setTocOpenMobile((o) => !o)} cursor={isDesktop ? 'default' : 'pointer'}>
                           <Text fontSize="13px" fontWeight="700" display="flex" alignItems="center" gap="6px" color={COLORS.text}><Icon as={LuList} /> Daftar Isi</Text>
-                          {!isDesktop && <Icon as={LuChevronDown} transform={tocOpenMobile ? 'rotate(180deg)' : undefined} transition="transform .2s" />}
+                          <Flex align="center" gap="8px">
+                            {tocChecked.size > 0 && <Text fontSize="11px" color={COLORS.success} fontWeight="600">{tocChecked.size}/{toc.length} ditandai</Text>}
+                            {!isDesktop && <Icon as={LuChevronDown} transform={tocOpenMobile ? 'rotate(180deg)' : undefined} transition="transform .2s" />}
+                          </Flex>
                         </Flex>
                         {tocVisible && (
-                          <Stack gap="1px" mt="10px" maxH={{ lg: '50vh' }} overflowY="auto">
-                            {toc.map((h, i) => (
-                              <Text as="button" key={i} textAlign="left" fontSize="12.5px" py="3px"
-                                pl={`${8 + (h.level - 1) * 12}px`} lineClamp={2}
-                                borderLeft="2px solid" borderColor={activeToc === i ? COLORS.primary : 'transparent'}
-                                color={activeToc === i ? COLORS.primary : COLORS.muted}
-                                fontWeight={activeToc === i ? '700' : '400'}
-                                _hover={{ color: COLORS.primary }}
-                                onClick={() => scrollToHeading(i)}>{h.text}</Text>
-                            ))}
-                          </Stack>
+                          <>
+                            <Text fontSize="10.5px" color={COLORS.muted} mt="6px">Centang bagian yang sudah dibaca (penanda pribadi — tidak memengaruhi progres).</Text>
+                            <Stack gap="1px" mt="8px" maxH={{ lg: '50vh' }} overflowY="auto">
+                              {toc.map((h, i) => {
+                                const checked = tocChecked.has(i)
+                                return (
+                                  <Flex key={i} align="flex-start" gap="7px" pl={`${(h.level - 1) * 12}px`} py="1px">
+                                    <Flex as="button" flexShrink={0} mt="4px" boxSize="15px" borderRadius="3px"
+                                      aria-label={checked ? `Batalkan tanda: ${h.text}` : `Tandai sudah dibaca: ${h.text}`}
+                                      align="center" justify="center" cursor="pointer"
+                                      border="1.5px solid" borderColor={checked ? COLORS.success : COLORS.border}
+                                      bg={checked ? COLORS.success : 'transparent'} color="white"
+                                      _hover={{ borderColor: COLORS.success }}
+                                      onClick={() => toggleTocCheck(i)}>
+                                      {checked && <Icon as={LuCheck} boxSize="11px" />}
+                                    </Flex>
+                                    <Text as="button" textAlign="left" fontSize="12.5px" py="2px" pl="6px" lineClamp={2}
+                                      borderLeft="2px solid" borderColor={activeToc === i ? COLORS.primary : 'transparent'}
+                                      color={checked ? COLORS.muted : (activeToc === i ? COLORS.primary : COLORS.text)}
+                                      textDecoration={checked ? 'line-through' : undefined}
+                                      fontWeight={activeToc === i ? '700' : '400'}
+                                      _hover={{ color: COLORS.primary }}
+                                      onClick={() => scrollToHeading(i)}>{h.text}</Text>
+                                  </Flex>
+                                )
+                              })}
+                            </Stack>
+                          </>
                         )}
                       </Box>
                     )}
@@ -625,14 +660,14 @@ export default function MaterialViewer({ open, onClose, material }: Props) {
                       </Box>
                     )}
 
-                    {/* Keaktifan siswa — KHUSUS guru (siswa tidak melihat) */}
+                    {/* Keaktifan murid — KHUSUS guru (murid tidak melihat) */}
                     {!isStudent && material && material.courseId && material.courseId !== 'general' && (
                       <Box border="1px solid" borderColor={COLORS.border} borderRadius="10px" p="12px" bg={COLORS.surface}>
                         <Flex align="center" gap="6px" mb="8px">
                           <Icon as={LuListChecks} boxSize="15px" color={COLORS.primary} />
-                          <Text fontSize="13px" fontWeight="700" color={COLORS.text}>Keaktifan Siswa</Text>
+                          <Text fontSize="13px" fontWeight="700" color={COLORS.text}>Keaktifan Murid</Text>
                         </Flex>
-                        <Text fontSize="11px" color={COLORS.muted} mb="8px">Nilai apersepsi/keaktifan siswa sambil mengajar.</Text>
+                        <Text fontSize="11px" color={COLORS.muted} mb="8px">Nilai apersepsi/keaktifan murid sambil mengajar.</Text>
                         <Button size="sm" w="full" variant="outline" onClick={() => setActiveOpen(true)}>
                           <Icon as={LuListChecks} /> Nilai Keaktifan
                         </Button>
@@ -680,7 +715,7 @@ export default function MaterialViewer({ open, onClose, material }: Props) {
       </Dialog.Positioner>
     </Dialog.Root>
 
-    {/* Dialog penilaian keaktifan siswa (khusus guru) */}
+    {/* Dialog penilaian keaktifan murid (khusus guru) */}
     {!isStudent && material && material.courseId && material.courseId !== 'general' && (
       <Dialog.Root open={activeOpen} onOpenChange={(e) => setActiveOpen(e.open)} scrollBehavior="inside" size="xl">
         <Dialog.Backdrop />
@@ -689,7 +724,7 @@ export default function MaterialViewer({ open, onClose, material }: Props) {
             <Dialog.Header>
               <Flex align="center" gap="8px" w="full">
                 <Icon as={LuListChecks} color={COLORS.primary} />
-                <Dialog.Title flex="1" fontSize="15px">Keaktifan Siswa — {material.title}</Dialog.Title>
+                <Dialog.Title flex="1" fontSize="15px">Keaktifan Murid — {material.title}</Dialog.Title>
               </Flex>
             </Dialog.Header>
             <Dialog.Body>

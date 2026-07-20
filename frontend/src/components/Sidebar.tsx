@@ -4,11 +4,15 @@ import { Box, Button, Flex, HStack, Icon, Image, Stack, Text } from '@chakra-ui/
 import type { IconType } from 'react-icons'
 import {
   LuHouse, LuLibrary, LuBookOpen, LuClipboardList, LuInbox,
-  LuTrophy, LuActivity, LuSettings, LuWrench, LuSchool, LuLogOut,
+  LuTrophy, LuActivity, LuWrench, LuSchool, LuLogOut, LuUsers,
   LuLayoutGrid, LuChevronDown, LuChevronRight, LuQrCode, LuBriefcase,
+  LuGraduationCap, LuUser, LuContact, LuShield,
+  LuBuilding2, LuMegaphone,
+  LuImages, LuNewspaper, LuCalendarDays,
 } from 'react-icons/lu'
 import { useAuth } from '@/hooks/useAuth'
 import { Role } from '@/gen/user/v1/user_pb'
+import { can, canAny } from '@/lib/permissions'
 import { COLORS, SIDEBAR_WIDTH } from '@/theme/tokens'
 
 export { SIDEBAR_WIDTH }
@@ -17,7 +21,9 @@ interface NavLeaf {
   label: string
   path: string
   icon: IconType
-  roles?: Role[] // if set, only these roles see the item
+  roles?: Role[]    // if set, only these roles see the item
+  perm?: string     // if set, requires this access-right (admins always pass)
+  anyPerm?: string[] // if set, requires at least one of these access-rights
 }
 interface NavGroup {
   label: string
@@ -30,24 +36,43 @@ function isGroup(e: NavEntry): e is NavGroup {
   return (e as NavGroup).children !== undefined
 }
 
-const MANAGER = [Role.ADMIN, Role.TEACHER]
-
 const NAV: NavEntry[] = [
   { label: 'Beranda', path: '/dashboard', icon: LuHouse },
   { label: 'Absensi', path: '/absensi', icon: LuQrCode },
   {
-    label: 'Mata Pelajaran',
+    label: 'Pembelajaran',
     icon: LuLibrary,
     children: [
       { label: 'Daftar Mapel', path: '/courses', icon: LuLayoutGrid },
       { label: 'Materi Umum', path: '/materi', icon: LuBookOpen },
       { label: 'Tugas', path: '/tugas', icon: LuClipboardList },
-      { label: 'Pengumpulan', path: '/pengumpulan', icon: LuInbox, roles: MANAGER },
+      { label: 'Pengumpulan', path: '/pengumpulan', icon: LuInbox, perm: 'kelola_nilai' },
       { label: 'Nilai', path: '/nilai', icon: LuTrophy },
-      { label: 'Log Aktivitas', path: '/log', icon: LuActivity, roles: MANAGER },
+      { label: 'Log Aktivitas', path: '/log', icon: LuActivity, perm: 'kelola_log' },
     ],
   },
-  { label: 'Master Data', path: '/users', icon: LuSettings, roles: MANAGER },
+  { label: 'Data Akademik', path: '/akademik', icon: LuSchool, perm: 'kelola_sekolah' },
+  {
+    label: 'Profil Sekolah',
+    icon: LuBuilding2,
+    children: [
+      { label: 'Beranda', path: '/profil-sekolah/beranda', icon: LuBuilding2, perm: 'kelola_sekolah' },
+      { label: 'PPDB', path: '/profil-sekolah/ppdb', icon: LuMegaphone, perm: 'kelola_sekolah' },
+      { label: 'Galeri', path: '/profil-sekolah/galeri', icon: LuImages, perm: 'kelola_sekolah' },
+      { label: 'Berita', path: '/profil-sekolah/berita', icon: LuNewspaper, perm: 'kelola_sekolah' },
+      { label: 'Akademik', path: '/profil-sekolah/akademik', icon: LuCalendarDays, perm: 'kelola_sekolah' },
+    ],
+  },
+  {
+    label: 'Pengguna',
+    icon: LuUsers,
+    children: [
+      { label: 'Guru', path: '/pengguna/guru', icon: LuGraduationCap, perm: 'kelola_guru' },
+      { label: 'Murid', path: '/pengguna/siswa', icon: LuUser, perm: 'kelola_siswa' },
+      { label: 'Orang Tua', path: '/pengguna/ortu', icon: LuContact, perm: 'kelola_ortu' },
+      { label: 'Admin', path: '/pengguna/admin', icon: LuShield, roles: [Role.ADMIN] },
+    ],
+  },
   { label: 'Mitra PKL', path: '/mitra-pkl', icon: LuBriefcase },
   { label: 'Pengaturan', path: '/pengaturan', icon: LuWrench },
 ]
@@ -55,14 +80,14 @@ const NAV: NavEntry[] = [
 const ROLE_LABELS: Record<number, string> = {
   [Role.ADMIN]: 'Admin',
   [Role.TEACHER]: 'Guru',
-  [Role.STUDENT]: 'Siswa',
+  [Role.STUDENT]: 'Murid',
   [Role.UNSPECIFIED]: '-',
 }
 
 const ROLE_PANEL: Record<number, string> = {
   [Role.ADMIN]: 'Panel Admin',
   [Role.TEACHER]: 'Panel Guru',
-  [Role.STUDENT]: 'Panel Siswa',
+  [Role.STUDENT]: 'Panel Murid',
   [Role.UNSPECIFIED]: 'Portal Belajar',
 }
 
@@ -86,7 +111,12 @@ export default function Sidebar({ mobileOpen = false, onNavigate }: { mobileOpen
   const isActive = (path: string) =>
     location.pathname === path || location.pathname.startsWith(path + '/')
 
-  const canSee = (roles?: Role[]) => !roles || (user != null && roles.includes(user.role))
+  const canSee = (item: NavLeaf) => {
+    if (item.roles && !(user != null && item.roles.includes(user.role))) return false
+    if (item.perm && !can(user, item.perm)) return false
+    if (item.anyPerm && !canAny(user, item.anyPerm)) return false
+    return true
+  }
 
   // Leaf row (used for both top-level items and indented children).
   const Leaf = ({ item, indented }: { item: NavLeaf; indented?: boolean }) => {
@@ -154,10 +184,10 @@ export default function Sidebar({ mobileOpen = false, onNavigate }: { mobileOpen
       <Stack gap={0} py="10px" flex={1} overflowY="auto">
         {NAV.map((entry) => {
           if (!isGroup(entry)) {
-            return canSee(entry.roles) ? <Leaf key={entry.path} item={entry} /> : null
+            return canSee(entry) ? <Leaf key={entry.path} item={entry} /> : null
           }
           // Group with children
-          const children = entry.children.filter((c) => canSee(c.roles))
+          const children = entry.children.filter((c) => canSee(c))
           if (children.length === 0) return null
           const groupActive = children.some((c) => isActive(c.path))
           const open = openGroups[entry.label] ?? groupActive

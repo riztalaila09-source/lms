@@ -339,7 +339,7 @@ export default function CoursesPage() {
                           onClick={() => setForm({ ...form, backgroundImage: '' })}><Icon as={LuX} /> Hapus</Button>
                       </Box>
                     ) : (
-                      <Text fontSize="12px" color={COLORS.muted} mb="6px">Belum ada foto. Tampil sebagai banner di halaman mapel (guru & siswa).</Text>
+                      <Text fontSize="12px" color={COLORS.muted} mb="6px">Belum ada foto. Tampil sebagai banner di halaman mapel (guru & murid).</Text>
                     )}
                     <input type="file" accept="image/*" disabled={uploadingBg}
                       onChange={(e) => handleBgUpload(e.target.files?.[0])} style={{ fontSize: 12 }} />

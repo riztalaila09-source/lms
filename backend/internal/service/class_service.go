@@ -18,11 +18,39 @@ var (
 )
 
 type ClassService struct {
-	repo repository.ClassRepository
+	repo     repository.ClassRepository
+	userRepo repository.UserRepository
 }
 
-func NewClassService(repo repository.ClassRepository) *ClassService {
-	return &ClassService{repo: repo}
+func NewClassService(repo repository.ClassRepository, userRepo repository.UserRepository) *ClassService {
+	return &ClassService{repo: repo, userRepo: userRepo}
+}
+
+// SetClassWali assigns the homeroom teacher of a class (teacherID "" clears it).
+func (s *ClassService) SetClassWali(ctx context.Context, callerRole, classID, teacherID string) (*repository.Class, error) {
+	if !isManager(callerRole) {
+		return nil, ErrPermissionDenied
+	}
+	if teacherID != "" {
+		u, err := s.userRepo.GetByID(ctx, teacherID)
+		if err != nil {
+			if errors.Is(err, repository.ErrNotFound) {
+				return nil, fmt.Errorf("%w: guru tidak ditemukan", ErrInvalidArgument)
+			}
+			return nil, fmt.Errorf("get teacher: %w", err)
+		}
+		if u.Role != "teacher" {
+			return nil, fmt.Errorf("%w: wali kelas harus seorang guru", ErrInvalidArgument)
+		}
+	}
+	c, err := s.repo.SetWali(ctx, classID, teacherID)
+	if err != nil {
+		if errors.Is(err, repository.ErrClassNotFound) {
+			return nil, ErrClassNotFound
+		}
+		return nil, fmt.Errorf("set wali: %w", err)
+	}
+	return c, nil
 }
 
 func (s *ClassService) CreateClass(ctx context.Context, callerRole, name string) (*repository.Class, error) {

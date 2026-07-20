@@ -54,7 +54,7 @@ export default function CourseCard({
           {course.teacher?.fullName || 'Pengajar'}
         </Text>
         <Flex align="center" gap="10px" mt="6px" fontSize="11px" color={UDEMY.inkMuted}>
-          <Flex align="center" gap="3px"><Icon as={LuUsers} /> {course.studentCount} siswa</Flex>
+          <Flex align="center" gap="3px"><Icon as={LuUsers} /> {course.studentCount} murid</Flex>
           {course.kelas?.length > 0 && (
             <Flex align="center" gap="3px"><Icon as={LuGraduationCap} /> {course.kelas.length} kelas</Flex>
           )}

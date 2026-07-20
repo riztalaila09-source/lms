@@ -11,6 +11,9 @@ message Class {
   string name = 2;
   int32 student_count = 3;
   google.protobuf.Timestamp created_at = 4;
+  string wali_teacher_id = 5; // homeroom teacher ('' = none)
+  string wali_name = 6;       // teacher's full name (read-only, from join)
+  string wali_phone = 7;      // teacher's phone (read-only, from join)
 }
 
 message CreateClassRequest {
@@ -34,9 +37,16 @@ message DeleteClassRequest {
 
 message DeleteClassResponse {}
 
+// Assign (or clear, when teacher_id is empty) the homeroom teacher of a class.
+message SetClassWaliRequest {
+  string class_id = 1;
+  string teacher_id = 2;
+}
+
 service ClassService {
   rpc CreateClass(CreateClassRequest) returns (Class);
   rpc UpdateClass(UpdateClassRequest) returns (Class);
   rpc ListClasses(ListClassesRequest) returns (ListClassesResponse);
   rpc DeleteClass(DeleteClassRequest) returns (DeleteClassResponse);
+  rpc SetClassWali(SetClassWaliRequest) returns (Class);
 }

@@ -101,7 +101,7 @@ export default function NotifikasiAbsenDialog({
             ) : (
               <Stack gap="10px">
                 <Text fontSize="13px" color={COLORS.muted}>
-                  Pilih orang tua yang akan dikirimi notifikasi. Tiap pesan berisi nama siswa, status, tanggal, dan nama sekolah.
+                  Pilih orang tua yang akan dikirimi notifikasi. Tiap pesan berisi nama murid, status, tanggal, dan nama sekolah.
                 </Text>
                 <Stack gap="4px" maxH="300px" overflowY="auto">
                   {targets.map((t) => {
@@ -128,7 +128,7 @@ export default function NotifikasiAbsenDialog({
                   })}
                 </Stack>
                 <Flex align="center" gap="6px" fontSize="12px" color={COLORS.muted}>
-                  <Icon as={LuInfo} /> {withPhone.length} dari {targets.length} siswa punya No. HP orang tua.
+                  <Icon as={LuInfo} /> {withPhone.length} dari {targets.length} murid punya No. HP orang tua.
                 </Flex>
               </Stack>
             )}

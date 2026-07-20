@@ -160,7 +160,7 @@ function MaterialPreview({ title, description, content, coverImage, categoryName
         </VideoContext.Provider>
       </MCQContext.Provider>
       <Text fontSize="11px" color={COLORS.muted} mt="16px" fontStyle="italic">
-        * Lampiran, soal, rating & progres tampil saat siswa membaca materi yang sudah tersimpan.
+        * Lampiran, soal, rating & progres tampil saat murid membaca materi yang sudah tersimpan.
       </Text>
     </Box>
   )
@@ -393,7 +393,7 @@ export default function MaterialFormDialog({ open, onClose, courseId, material, 
                             <Switch.Control />
                           </Switch.Root>
                           <Text fontSize="13px" color={publish ? COLORS.success : COLORS.muted} fontWeight="600">
-                            {publish ? 'Tampil ke siswa' : 'Draft (tersembunyi)'}
+                            {publish ? 'Tampil ke murid' : 'Draft (tersembunyi)'}
                           </Text>
                         </Flex>
                       </SettingCard>
@@ -544,7 +544,7 @@ export default function MaterialFormDialog({ open, onClose, courseId, material, 
                               </Flex>
                             </Flex>
                             {essayQuestions.length === 0 ? (
-                              <Text fontSize="11px" color={COLORS.muted}>Belum ada. Siswa menjawab lewat kolom komentar.</Text>
+                              <Text fontSize="11px" color={COLORS.muted}>Belum ada. Murid menjawab lewat kolom komentar.</Text>
                             ) : (
                               <Stack gap="6px">
                                 {essayQuestions.map((eq, i) => (

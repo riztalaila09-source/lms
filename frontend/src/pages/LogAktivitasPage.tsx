@@ -12,7 +12,7 @@ import { COLORS } from '@/theme/tokens'
 import { toaster } from '@/components/ui/toaster'
 
 const ROLE_LABEL: Record<string, string> = {
-  admin: 'Admin', teacher: 'Guru', student: 'Siswa',
+  admin: 'Admin', teacher: 'Guru', student: 'Murid',
 }
 
 export default function LogAktivitasPage() {
@@ -38,7 +38,7 @@ export default function LogAktivitasPage() {
 
   const askResetAll = () => setConfirm({
     title: 'Reset Semua Log Aktivitas',
-    message: 'Seluruh catatan login (semua siswa & guru) akan dihapus dan tidak bisa dikembalikan. Lanjutkan?',
+    message: 'Seluruh catatan login (semua murid & guru) akan dihapus dan tidak bisa dikembalikan. Lanjutkan?',
     variant: 'danger',
     confirmLabel: 'Ya, Reset Semua',
     onConfirm: async () => {

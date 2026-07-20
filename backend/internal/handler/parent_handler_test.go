@@ -34,13 +34,13 @@ func TestParentHandler_CRUD(t *testing.T) {
 	require.NoError(t, userRepo.Create(ctx, student))
 
 	t.Run("no claims → unauthenticated", func(t *testing.T) {
-		_, err := h.CreateParent(context.Background(), connect.NewRequest(&parentv1.CreateParentRequest{NamaAyah: "X"}))
+		_, err := h.CreateParent(context.Background(), connect.NewRequest(&parentv1.CreateParentRequest{NamaOrtu: "X"}))
 		require.Error(t, err)
 		assert.Equal(t, connect.CodeUnauthenticated, connect.CodeOf(err))
 	})
 
 	t.Run("student role → permission denied", func(t *testing.T) {
-		_, err := h.CreateParent(parentClaims("student"), connect.NewRequest(&parentv1.CreateParentRequest{NamaAyah: "X"}))
+		_, err := h.CreateParent(parentClaims("student"), connect.NewRequest(&parentv1.CreateParentRequest{NamaOrtu: "X"}))
 		require.Error(t, err)
 		assert.Equal(t, connect.CodePermissionDenied, connect.CodeOf(err))
 	})
@@ -48,7 +48,7 @@ func TestParentHandler_CRUD(t *testing.T) {
 	var parentID string
 	t.Run("teacher creates with child", func(t *testing.T) {
 		res, err := h.CreateParent(parentClaims("teacher"), connect.NewRequest(&parentv1.CreateParentRequest{
-			NamaAyah: "Pak Budi", Phone: "0812", StudentIds: []string{student.ID},
+			NamaOrtu: "Pak Budi", Phone: "0812", StudentIds: []string{student.ID},
 		}))
 		require.NoError(t, err)
 		assert.Len(t, res.Msg.Children, 1)
@@ -57,7 +57,7 @@ func TestParentHandler_CRUD(t *testing.T) {
 
 	t.Run("invalid child → invalid argument", func(t *testing.T) {
 		_, err := h.CreateParent(parentClaims("admin"), connect.NewRequest(&parentv1.CreateParentRequest{
-			NamaAyah: "X", StudentIds: []string{"nope"},
+			NamaOrtu: "X", StudentIds: []string{"nope"},
 		}))
 		require.Error(t, err)
 		assert.Equal(t, connect.CodeInvalidArgument, connect.CodeOf(err))

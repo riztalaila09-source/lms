@@ -221,7 +221,7 @@ function GuruPkl({ partners, reload }: { partners: Partner[]; reload: () => void
   )
 }
 
-// ───────────────────────── Siswa ─────────────────────────
+// ───────────────────────── Murid ─────────────────────────
 function SiswaPkl({ partners, reload }: { partners: Partner[]; reload: () => void }) {
   const [busy, setBusy] = useState(false)
   const applied = partners.find((p) => p.appliedByMe)

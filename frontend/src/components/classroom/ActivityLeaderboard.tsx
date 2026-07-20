@@ -14,7 +14,7 @@ const RANK_COLOR = ['#F59E0B', '#94A3B8', '#B45309'] // emas, perak, perunggu
 /**
  * Papan peringkat keaktifan (total poin, tertinggi→terendah).
  * - Guru: 10 besar, dengan pilihan Total / Per Hari.
- * - Siswa: daftar penuh (total), baris sendiri disorot.
+ * - Murid: daftar penuh (total), baris sendiri disorot.
  */
 export default function ActivityLeaderboard({ courseId, canManage }: { courseId: string; canManage: boolean }) {
   const { user } = useAuth()
@@ -71,7 +71,7 @@ export default function ActivityLeaderboard({ courseId, canManage }: { courseId:
         <Flex align="center" gap="8px" mb="12px" wrap="wrap">
           <Flex align="center" gap="6px" flex="1" minW="180px" border="1px solid" borderColor={COLORS.border} borderRadius="6px" px="8px">
             <Icon as={LuSearch} color={COLORS.muted} />
-            <Input size="sm" variant="outline" border="none" px="0" placeholder="Cari nama siswa…" value={search} onChange={(e) => setSearch(e.target.value)} />
+            <Input size="sm" variant="outline" border="none" px="0" placeholder="Cari nama murid…" value={search} onChange={(e) => setSearch(e.target.value)} />
           </Flex>
           <NativeSelect.Root size="sm" w="170px">
             <NativeSelect.Field value={kelas} onChange={(e) => setKelas(e.target.value)}>
@@ -86,7 +86,7 @@ export default function ActivityLeaderboard({ courseId, canManage }: { courseId:
           <Flex justify="center" py="24px"><Spinner color={COLORS.primary} /></Flex>
         ) : ranked.length === 0 ? (
           <Text fontSize="13px" color={COLORS.muted} py="10px">
-            {search || kelas ? 'Tidak ada siswa yang cocok dengan pencarian/filter.' : `Belum ada poin keaktifan${mode === 'day' ? ' pada tanggal ini' : ''}.`}
+            {search || kelas ? 'Tidak ada murid yang cocok dengan pencarian/filter.' : `Belum ada poin keaktifan${mode === 'day' ? ' pada tanggal ini' : ''}.`}
           </Text>
         ) : (
           <Box overflowX="auto">

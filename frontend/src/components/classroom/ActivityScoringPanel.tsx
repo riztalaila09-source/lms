@@ -13,7 +13,7 @@ function todayWIB(): string {
 
 /**
  * Penilaian keaktifan (poin kumulatif) saat guru "baca materi": klik nama → beri
- * nilai 1–10; boleh berkali-kali untuk siswa yang sama. Ada pencarian nama &
+ * nilai 1–10; boleh berkali-kali untuk murid yang sama. Ada pencarian nama &
  * filter per kelas. Guru saja.
  */
 export default function ActivityScoringPanel({ courseId }: { courseId: string }) {
@@ -75,7 +75,7 @@ export default function ActivityScoringPanel({ courseId }: { courseId: string })
       <Flex align="center" gap="8px" mb="12px" wrap="wrap">
         <Flex align="center" gap="6px" flex="1" minW="180px" border="1px solid" borderColor={COLORS.border} borderRadius="6px" px="8px">
           <Icon as={LuSearch} color={COLORS.muted} />
-          <Input size="sm" variant="outline" border="none" px="0" placeholder="Cari nama siswa…" value={search} onChange={(e) => setSearch(e.target.value)} />
+          <Input size="sm" variant="outline" border="none" px="0" placeholder="Cari nama murid…" value={search} onChange={(e) => setSearch(e.target.value)} />
         </Flex>
         <NativeSelect.Root size="sm" w="170px">
           <NativeSelect.Field value={kelas} onChange={(e) => setKelas(e.target.value)}>
@@ -89,9 +89,9 @@ export default function ActivityScoringPanel({ courseId }: { courseId: string })
       {loading ? (
         <Flex justify="center" py="24px"><Spinner color={COLORS.primary} /></Flex>
       ) : rows.length === 0 ? (
-        <Text fontSize="13px" color={COLORS.muted} py="12px">Belum ada siswa terdaftar di mapel ini.</Text>
+        <Text fontSize="13px" color={COLORS.muted} py="12px">Belum ada murid terdaftar di mapel ini.</Text>
       ) : filtered.length === 0 ? (
-        <Text fontSize="13px" color={COLORS.muted} py="12px">Tidak ada siswa yang cocok dengan pencarian/filter.</Text>
+        <Text fontSize="13px" color={COLORS.muted} py="12px">Tidak ada murid yang cocok dengan pencarian/filter.</Text>
       ) : (
         <Box overflowX="auto">
           <Table.Root size="sm">

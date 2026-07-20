@@ -27,6 +27,8 @@ message User {
   string mapel = 14; // teacher's subject taught
   string gender = 15; // '' | 'L' (laki-laki) | 'P' (perempuan)
   string phone = 16; // contact phone / WhatsApp
+  // Granular access-right keys for teachers (admins ignore this — always full).
+  repeated string permissions = 17;
   google.protobuf.Timestamp created_at = 7;
   google.protobuf.Timestamp updated_at = 8;
   // Plaintext password, populated ONLY in manager-only ListUsers responses so
@@ -59,6 +61,7 @@ message CreateUserRequest {
   string mapel = 8;
   string gender = 9;
   string phone = 10;
+  repeated string permissions = 11; // access-right keys (teachers)
 }
 
 message GetUserRequest {
@@ -78,6 +81,10 @@ message UpdateUserRequest {
   optional string mapel = 10;
   optional string gender = 11;
   optional string phone = 12;
+  // Access rights are only applied when set_permissions is true, so ordinary
+  // edits don't wipe them.
+  repeated string permissions = 13;
+  bool set_permissions = 14;
 }
 
 // Self-service profile update (any logged-in user updates their own account).

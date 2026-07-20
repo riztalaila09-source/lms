@@ -11,7 +11,7 @@ import { toaster } from '@/components/ui/toaster'
 
 interface LinkRow { label: string; url: string }
 
-/** Pengumpulan tugas kelompok (praktikum) untuk siswa anggota. */
+/** Pengumpulan tugas kelompok (praktikum) untuk murid anggota. */
 export default function GroupSubmitDialog({ assignment, open, onClose, onDone }: {
   assignment: Assignment | null; open: boolean; onClose: () => void; onDone: () => void
 }) {

@@ -152,7 +152,7 @@ function TeacherNilai() {
   }
 
   return (
-    <AppLayout title={<><Icon as={LuTrophy} /> Nilai Siswa</>} subtitle="Rekap nilai per tugas + export CSV">
+    <AppLayout title={<><Icon as={LuTrophy} /> Nilai Murid</>} subtitle="Rekap nilai per tugas + export CSV">
       <Stack gap="14px">
         <Card>
           <Flex gap="10px" flexWrap="wrap" align="flex-end">
@@ -177,8 +177,8 @@ function TeacherNilai() {
               </NativeSelect.Root>
             </Box>
             <Box flex={1} minW="160px">
-              <Text fontSize="12px" fontWeight="500" mb="4px" display="flex" alignItems="center" gap="4px"><Icon as={LuSearch} /> Cari Siswa</Text>
-              <Input size="sm" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Nama siswa…" />
+              <Text fontSize="12px" fontWeight="500" mb="4px" display="flex" alignItems="center" gap="4px"><Icon as={LuSearch} /> Cari Murid</Text>
+              <Input size="sm" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Nama murid…" />
             </Box>
             <Flex gap="6px" flexWrap="wrap">
               <Button size="sm" bg={COLORS.success} color="white" onClick={() => exportCsv('none')}><Icon as={LuDownload} /> CSV</Button>

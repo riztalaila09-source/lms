@@ -24,20 +24,15 @@ func NewParentService(repo repository.ParentRepository, userRepo repository.User
 
 // ParentInput carries the household fields plus the final set of children.
 type ParentInput struct {
-	NamaAyah     string
-	NamaIbu      string
-	NamaWali     string
-	HubunganWali string
-	Phone        string
-	Pekerjaan    string
-	Alamat       string
-	StudentIDs   []string
+	NamaOrtu   string
+	Hubungan   string
+	Phone      string
+	Alamat     string
+	StudentIDs []string
 }
 
 func (in ParentInput) hasName() bool {
-	return strings.TrimSpace(in.NamaAyah) != "" ||
-		strings.TrimSpace(in.NamaIbu) != "" ||
-		strings.TrimSpace(in.NamaWali) != ""
+	return strings.TrimSpace(in.NamaOrtu) != ""
 }
 
 // validateStudents makes sure every id refers to an existing student.
@@ -62,21 +57,18 @@ func (s *ParentService) CreateParent(ctx context.Context, callerRole string, in 
 		return nil, ErrPermissionDenied
 	}
 	if !in.hasName() {
-		return nil, fmt.Errorf("%w: isi minimal nama ayah, ibu, atau wali", ErrInvalidArgument)
+		return nil, fmt.Errorf("%w: nama orang tua wajib diisi", ErrInvalidArgument)
 	}
 	if err := s.validateStudents(ctx, in.StudentIDs); err != nil {
 		return nil, err
 	}
 
 	p := &repository.Parent{
-		ID:           uuid.New().String(),
-		NamaAyah:     in.NamaAyah,
-		NamaIbu:      in.NamaIbu,
-		NamaWali:     in.NamaWali,
-		HubunganWali: in.HubunganWali,
-		Phone:        in.Phone,
-		Pekerjaan:    in.Pekerjaan,
-		Alamat:       in.Alamat,
+		ID:       uuid.New().String(),
+		NamaOrtu: in.NamaOrtu,
+		Hubungan: in.Hubungan,
+		Phone:    in.Phone,
+		Alamat:   in.Alamat,
 	}
 	if err := s.repo.Create(ctx, p); err != nil {
 		return nil, fmt.Errorf("create parent: %w", err)
@@ -92,7 +84,7 @@ func (s *ParentService) UpdateParent(ctx context.Context, callerRole, id string,
 		return nil, ErrPermissionDenied
 	}
 	if !in.hasName() {
-		return nil, fmt.Errorf("%w: isi minimal nama ayah, ibu, atau wali", ErrInvalidArgument)
+		return nil, fmt.Errorf("%w: nama orang tua wajib diisi", ErrInvalidArgument)
 	}
 	p, err := s.repo.GetByID(ctx, id)
 	if err != nil {
@@ -105,12 +97,9 @@ func (s *ParentService) UpdateParent(ctx context.Context, callerRole, id string,
 		return nil, err
 	}
 
-	p.NamaAyah = in.NamaAyah
-	p.NamaIbu = in.NamaIbu
-	p.NamaWali = in.NamaWali
-	p.HubunganWali = in.HubunganWali
+	p.NamaOrtu = in.NamaOrtu
+	p.Hubungan = in.Hubungan
 	p.Phone = in.Phone
-	p.Pekerjaan = in.Pekerjaan
 	p.Alamat = in.Alamat
 	if err := s.repo.Update(ctx, p); err != nil {
 		return nil, fmt.Errorf("update parent: %w", err)

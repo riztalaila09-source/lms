@@ -33,14 +33,11 @@ func (h *ParentHandler) CreateParent(ctx context.Context, req *connect.Request[p
 		return nil, connect.NewError(connect.CodeUnauthenticated, nil)
 	}
 	p, err := h.svc.CreateParent(ctx, claims.Role, service.ParentInput{
-		NamaAyah:     req.Msg.NamaAyah,
-		NamaIbu:      req.Msg.NamaIbu,
-		NamaWali:     req.Msg.NamaWali,
-		HubunganWali: req.Msg.HubunganWali,
-		Phone:        req.Msg.Phone,
-		Pekerjaan:    req.Msg.Pekerjaan,
-		Alamat:       req.Msg.Alamat,
-		StudentIDs:   req.Msg.StudentIds,
+		NamaOrtu:   req.Msg.NamaOrtu,
+		Hubungan:   req.Msg.Hubungan,
+		Phone:      req.Msg.Phone,
+		Alamat:     req.Msg.Alamat,
+		StudentIDs: req.Msg.StudentIds,
 	})
 	if err != nil {
 		return nil, mapParentError(err)
@@ -66,14 +63,11 @@ func (h *ParentHandler) UpdateParent(ctx context.Context, req *connect.Request[p
 		return nil, connect.NewError(connect.CodeUnauthenticated, nil)
 	}
 	p, err := h.svc.UpdateParent(ctx, claims.Role, req.Msg.Id, service.ParentInput{
-		NamaAyah:     req.Msg.NamaAyah,
-		NamaIbu:      req.Msg.NamaIbu,
-		NamaWali:     req.Msg.NamaWali,
-		HubunganWali: req.Msg.HubunganWali,
-		Phone:        req.Msg.Phone,
-		Pekerjaan:    req.Msg.Pekerjaan,
-		Alamat:       req.Msg.Alamat,
-		StudentIDs:   req.Msg.StudentIds,
+		NamaOrtu:   req.Msg.NamaOrtu,
+		Hubungan:   req.Msg.Hubungan,
+		Phone:      req.Msg.Phone,
+		Alamat:     req.Msg.Alamat,
+		StudentIDs: req.Msg.StudentIds,
 	})
 	if err != nil {
 		return nil, mapParentError(err)
@@ -140,17 +134,14 @@ func parentToProto(p *repository.Parent) *parentv1.Parent {
 		})
 	}
 	return &parentv1.Parent{
-		Id:           p.ID,
-		NamaAyah:     p.NamaAyah,
-		NamaIbu:      p.NamaIbu,
-		NamaWali:     p.NamaWali,
-		HubunganWali: p.HubunganWali,
-		Phone:        p.Phone,
-		Pekerjaan:    p.Pekerjaan,
-		Alamat:       p.Alamat,
-		Children:     children,
-		CreatedAt:    timestamppb.New(p.CreatedAt),
-		UpdatedAt:    timestamppb.New(p.UpdatedAt),
+		Id:        p.ID,
+		NamaOrtu:  p.NamaOrtu,
+		Hubungan:  p.Hubungan,
+		Phone:     p.Phone,
+		Alamat:    p.Alamat,
+		Children:  children,
+		CreatedAt: timestamppb.New(p.CreatedAt),
+		UpdatedAt: timestamppb.New(p.UpdatedAt),
 	}
 }
 

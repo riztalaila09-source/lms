@@ -76,12 +76,27 @@ func (h *ClassHandler) DeleteClass(ctx context.Context, req *connect.Request[cla
 	return connect.NewResponse(&classv1.DeleteClassResponse{}), nil
 }
 
+func (h *ClassHandler) SetClassWali(ctx context.Context, req *connect.Request[classv1.SetClassWaliRequest]) (*connect.Response[classv1.Class], error) {
+	claims, ok := middleware.ClaimsFromContext(ctx)
+	if !ok {
+		return nil, connect.NewError(connect.CodeUnauthenticated, nil)
+	}
+	c, err := h.svc.SetClassWali(ctx, claims.Role, req.Msg.ClassId, req.Msg.TeacherId)
+	if err != nil {
+		return nil, mapClassError(err)
+	}
+	return connect.NewResponse(classToProto(c)), nil
+}
+
 func classToProto(c *repository.Class) *classv1.Class {
 	return &classv1.Class{
-		Id:           c.ID,
-		Name:         c.Name,
-		StudentCount: int32(c.StudentCount),
-		CreatedAt:    timestamppb.New(c.CreatedAt),
+		Id:            c.ID,
+		Name:          c.Name,
+		StudentCount:  int32(c.StudentCount),
+		CreatedAt:     timestamppb.New(c.CreatedAt),
+		WaliTeacherId: c.WaliTeacherID,
+		WaliName:      c.WaliName,
+		WaliPhone:     c.WaliPhone,
 	}
 }
 
@@ -93,6 +108,8 @@ func mapClassError(err error) error {
 		return connect.NewError(connect.CodeAlreadyExists, err)
 	case errors.Is(err, service.ErrPermissionDenied):
 		return connect.NewError(connect.CodePermissionDenied, err)
+	case errors.Is(err, service.ErrInvalidArgument):
+		return connect.NewError(connect.CodeInvalidArgument, err)
 	default:
 		return connect.NewError(connect.CodeInternal, err)
 	}

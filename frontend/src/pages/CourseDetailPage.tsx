@@ -222,13 +222,13 @@ export default function CourseDetailPage({ forcedCourseId }: { forcedCourseId?: 
       await userClient.updateUser({ id: student.id, isActive: nextActive })
       await loadStudents()
     } catch (err: unknown) {
-      toaster.create({ description: err instanceof Error ? err.message : 'Gagal mengubah status siswa', type: 'error' })
+      toaster.create({ description: err instanceof Error ? err.message : 'Gagal mengubah status murid', type: 'error' })
     }
   }
 
   const handleResetProgress = (s: StudentCompletionSummary) => setConfirm({
-    title: 'Reset Progress Siswa',
-    message: `Reset semua progress "${s.studentName}" di mata pelajaran ini? Semua jawaban kuis & uraian akan dihapus dan siswa harus mengerjakan ulang.`,
+    title: 'Reset Progress Murid',
+    message: `Reset semua progress "${s.studentName}" di mata pelajaran ini? Semua jawaban kuis & uraian akan dihapus dan murid harus mengerjakan ulang.`,
     variant: 'danger', confirmLabel: 'Ya, Reset',
     onConfirm: async () => {
       try { await materialClient.resetStudentProgress({ courseId: id ?? '', studentId: s.studentId }); await loadCompletions() }
@@ -345,7 +345,7 @@ export default function CourseDetailPage({ forcedCourseId }: { forcedCourseId?: 
                       Guru: <Text as="span" fontWeight="medium" color="gray.700">{course.teacher?.fullName || '-'}</Text>
                     </Text>
                     {isGeneral ? (
-                      <Badge colorPalette="purple" variant="subtle">Untuk semua siswa &amp; guru</Badge>
+                      <Badge colorPalette="purple" variant="subtle">Untuk semua murid &amp; guru</Badge>
                     ) : (
                       <>
                         <Flex gap="5px" align="center" wrap="wrap">
@@ -421,7 +421,7 @@ export default function CourseDetailPage({ forcedCourseId }: { forcedCourseId?: 
                 borderColor={activeTab === 'completions' ? COLORS.primary : 'transparent'}
                 color={activeTab === 'completions' ? COLORS.primary : 'gray.600'}
                 onClick={() => setActiveTab('completions')}>
-                Siswa Selesai
+                Murid Selesai
               </Button>
             )}
             {!isGeneral && (
@@ -445,7 +445,7 @@ export default function CourseDetailPage({ forcedCourseId }: { forcedCourseId?: 
                 borderColor={activeTab === 'active' ? COLORS.primary : 'transparent'}
                 color={activeTab === 'active' ? COLORS.primary : 'gray.600'}
                 onClick={() => setActiveTab('active')}>
-                Siswa Aktif
+                Murid Aktif
               </Button>
             )}
             {canManage && isGeneral && (
@@ -464,7 +464,7 @@ export default function CourseDetailPage({ forcedCourseId }: { forcedCourseId?: 
               {canManage ? (
                 <>
                   <Text fontSize="12px" color={COLORS.muted}>
-                    Tambahkan poin Capaian & Tujuan Pembelajaran. Siswa akan melihatnya di tab ini.
+                    Tambahkan poin Capaian & Tujuan Pembelajaran. Murid akan melihatnya di tab ini.
                   </Text>
                   <SimpleGrid columns={{ base: 1, lg: 2 }} gap="16px">
                     <Card.Root><Card.Body>
@@ -600,7 +600,7 @@ export default function CourseDetailPage({ forcedCourseId }: { forcedCourseId?: 
                           </HStack>
                           <Text fontSize="13px" fontWeight="semibold" lineClamp={2}>{m.title}</Text>
                           {(m.ratingCount > 0 || m.avgRating > 0) && <StarsDisplay value={m.avgRating} count={m.ratingCount} size={11} />}
-                          {/* Shown to everyone (guru & siswa) */}
+                          {/* Shown to everyone (guru & murid) */}
                           <Text fontSize="10px" color={COLORS.muted}>
                             Dibuat oleh: {m.createdByName || '—'}
                           </Text>
@@ -788,8 +788,8 @@ export default function CourseDetailPage({ forcedCourseId }: { forcedCourseId?: 
                               size="xs"
                               colorPalette={e.student?.isActive ? 'orange' : 'green'}
                               variant="outline"
-                              aria-label={e.student?.isActive ? 'Nonaktifkan siswa' : 'Aktifkan siswa'}
-                              title={e.student?.isActive ? 'Nonaktifkan siswa' : 'Aktifkan siswa'}
+                              aria-label={e.student?.isActive ? 'Nonaktifkan murid' : 'Aktifkan murid'}
+                              title={e.student?.isActive ? 'Nonaktifkan murid' : 'Aktifkan murid'}
                               onClick={() => handleToggleStudentActive(e)}>
                               <Icon as={LuPower} />
                             </IconButton>
@@ -803,7 +803,7 @@ export default function CourseDetailPage({ forcedCourseId }: { forcedCourseId?: 
               </Card.Body></Card.Root>
           )}
 
-          {/* Siswa Selesai */}
+          {/* Murid Selesai */}
           {activeTab === 'completions' && canManage && (
               <Card.Root><Card.Body>
                 <Flex gap="10px" mb="12px" flexWrap="wrap" align="flex-end">
@@ -879,7 +879,7 @@ export default function CourseDetailPage({ forcedCourseId }: { forcedCourseId?: 
               materials={materials.map((m) => ({ id: m.id, title: m.title }))} />
           )}
 
-          {/* Siswa Aktif — papan peringkat poin keaktifan (guru & siswa) */}
+          {/* Murid Aktif — papan peringkat poin keaktifan (guru & murid) */}
           {activeTab === 'active' && !isGeneral && id && (
             <ActivityLeaderboard courseId={id} canManage={canManage} />
           )}

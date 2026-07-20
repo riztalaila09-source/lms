@@ -22,7 +22,7 @@ function CommentRow({ c, reply }: { c: PC; reply?: boolean }) {
       <CommentAvatar name={c.authorName} photo={c.authorPhoto} size={reply ? 24 : 28} />
       <Box flex="1" minW={0}>
         <Flex align="center" gap="5px" mb="1px" wrap="wrap">
-          <Badge colorPalette={guru ? 'purple' : 'blue'} variant="subtle" fontSize="9px">{guru ? 'Guru' : 'Siswa'}</Badge>
+          <Badge colorPalette={guru ? 'purple' : 'blue'} variant="subtle" fontSize="9px">{guru ? 'Guru' : 'Murid'}</Badge>
           <Text fontSize="11px" fontWeight="700" color={COLORS.text} lineClamp={1}>{c.authorName}</Text>
         </Flex>
         <Text fontSize="12.5px" color={COLORS.text} lineHeight="1.4">{c.content}</Text>

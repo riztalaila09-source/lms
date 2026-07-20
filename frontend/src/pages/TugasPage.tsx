@@ -127,7 +127,7 @@ export default function TugasPage() {
   const [courseFilter, setCourseFilter] = useState('')
   const [tab, setTab] = useState<TabKey>('tugas')
 
-  // kuis runner (siswa) + praktikum dialogs
+  // kuis runner (murid) + praktikum dialogs
   const [kuisOpen, setKuisOpen] = useState(false)
   const [kuisTarget, setKuisTarget] = useState<Assignment | null>(null)
   const [groupOpen, setGroupOpen] = useState(false)
@@ -148,7 +148,7 @@ export default function TugasPage() {
   const [subErr, setSubErr] = useState('')
   const [subSaving, setSubSaving] = useState(false)
 
-  // teacher "blokir siswa" modal
+  // teacher "blokir murid" modal
   const [blockOpen, setBlockOpen] = useState(false)
   const [blockTarget, setBlockTarget] = useState<Assignment | null>(null)
   const [blockStudents, setBlockStudents] = useState<Enrollment[]>([])
@@ -455,7 +455,7 @@ export default function TugasPage() {
     }
   }
 
-  // distinct courses present in the assignments (works for guru & siswa)
+  // distinct courses present in the assignments (works for guru & murid)
   const courseOpts = useMemo(() => {
     const m = new Map<string, string>()
     assignments.forEach((a) => { if (a.courseId) m.set(a.courseId, a.courseName) })
@@ -482,7 +482,7 @@ export default function TugasPage() {
   return (
     <AppLayout
       title={<><Icon as={LuClipboardList} /> Tugas</>}
-      subtitle={canManage ? 'Kelola tugas untuk siswa' : 'Daftar tugas Anda'}
+      subtitle={canManage ? 'Kelola tugas untuk murid' : 'Daftar tugas Anda'}
       actions={canManage ? <Button bg={COLORS.primary} color="white" _hover={{ bg: COLORS.primaryDark }} onClick={openCreate}><Icon as={LuPlus} /> Buat {tab === 'kuis' ? 'Kuis' : tab === 'praktikum' ? 'Praktikum' : 'Tugas'}</Button> : undefined}
     >
       {error && <Text color={COLORS.danger} mb="10px">{error}</Text>}
@@ -562,7 +562,7 @@ export default function TugasPage() {
                             <RowActionsMenu actions={[
                               ...(a.type === 'praktikum' ? [{ label: 'Atur Kelompok & Nilai', icon: LuUsers, onClick: () => { setMgrTarget(a); setMgrOpen(true) } }] : []),
                               { label: a.isActive ? 'Nonaktifkan tugas' : 'Aktifkan tugas', icon: LuPower, onClick: () => toggleActive(a) },
-                              { label: 'Blokir siswa', icon: LuBan, onClick: () => openBlock(a) },
+                              { label: 'Blokir murid', icon: LuBan, onClick: () => openBlock(a) },
                               { label: 'Kirim ke WhatsApp', icon: LuMessageCircle, onClick: () => kirimWA(a) },
                               { label: 'Edit', icon: LuPencil, onClick: () => openEdit(a) },
                               { label: 'Hapus', icon: LuTrash2, onClick: () => remove(a), danger: true },
@@ -847,12 +847,12 @@ export default function TugasPage() {
         </Dialog.Positioner>
       </Dialog.Root>
 
-      {/* Teacher: Blokir Siswa dialog */}
+      {/* Teacher: Blokir Murid dialog */}
       <Dialog.Root open={blockOpen} onOpenChange={(e) => setBlockOpen(e.open)} scrollBehavior="inside">
         <Dialog.Backdrop />
         <Dialog.Positioner>
           <Dialog.Content maxW="560px">
-            <Dialog.Header><Dialog.Title><Icon as={LuBan} /> Blokir Siswa — {blockTarget?.title}</Dialog.Title></Dialog.Header>
+            <Dialog.Header><Dialog.Title><Icon as={LuBan} /> Blokir Murid — {blockTarget?.title}</Dialog.Title></Dialog.Header>
             <Dialog.Body>
               {(() => {
                 const kelasOpts = Array.from(new Set(blockStudents.map((e) => e.student?.kelas).filter(Boolean))) as string[]
@@ -864,10 +864,10 @@ export default function TugasPage() {
                 })
                 return (
                   <Stack gap="10px">
-                    <Text fontSize="12px" color={COLORS.muted}>Siswa yang diblokir tidak bisa mengumpulkan tugas ini.</Text>
+                    <Text fontSize="12px" color={COLORS.muted}>Murid yang diblokir tidak bisa mengumpulkan tugas ini.</Text>
                     <Flex gap="8px" flexWrap="wrap" align="flex-end">
                       <Box flex={1} minW="180px">
-                        <Text fontSize="12px" fontWeight="500" mb="4px">Cari siswa</Text>
+                        <Text fontSize="12px" fontWeight="500" mb="4px">Cari murid</Text>
                         <Input size="sm" value={blockSearch} onChange={(e) => setBlockSearch(e.target.value)} placeholder="Nama / email…" />
                       </Box>
                       <Box minW="140px">
@@ -892,7 +892,7 @@ export default function TugasPage() {
                         </Table.Header>
                         <Table.Body>
                           {filtered.length === 0 ? (
-                            <Table.Row><Table.Cell colSpan={3} textAlign="center" color={COLORS.muted}>Tidak ada siswa</Table.Cell></Table.Row>
+                            <Table.Row><Table.Cell colSpan={3} textAlign="center" color={COLORS.muted}>Tidak ada murid</Table.Cell></Table.Row>
                           ) : filtered.map((e) => {
                             const sid = e.student?.id ?? ''
                             const blocked = blockedIds.has(sid)
@@ -980,9 +980,9 @@ export default function TugasPage() {
         </Dialog.Positioner>
       </Dialog.Root>
 
-      {/* Kuis (siswa) */}
+      {/* Kuis (murid) */}
       <KuisRunner assignment={kuisTarget} open={kuisOpen} onClose={() => setKuisOpen(false)} onDone={load} />
-      {/* Praktikum: pengumpulan kelompok (siswa) */}
+      {/* Praktikum: pengumpulan kelompok (murid) */}
       <GroupSubmitDialog assignment={groupTarget} open={groupOpen} onClose={() => setGroupOpen(false)} onDone={load} />
       {/* Praktikum: pengatur kelompok & penilaian (guru) */}
       <PraktikumManager assignment={mgrTarget} open={mgrOpen} onClose={() => setMgrOpen(false)} />

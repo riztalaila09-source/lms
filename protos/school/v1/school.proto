@@ -7,8 +7,43 @@ option go_package = "lms/backend/gen/school/v1;schoolv1";
 import "google/protobuf/timestamp.proto";
 
 message School {
-  string name    = 1;
-  string address = 2;
+  string name           = 1;
+  string address        = 2;
+  string app_name       = 3;
+  string logo           = 4; // base64 data URL
+  string profil         = 5;
+  string visi           = 6;
+  string misi           = 7;
+  string kepala_sekolah = 8;
+  string tahun_berdiri  = 9;
+  string email          = 10;
+  string whatsapp       = 11;
+  string npsn           = 12;
+  string status         = 13; // Negeri / Swasta
+  string akreditasi     = 14;
+  string jenjang        = 15; // SD / SMP / SMA / SMK …
+  string profil_image   = 16; // URL / data URL
+  string profil_video   = 17; // video link (YouTube …)
+  string maps_url       = 18; // Google Maps link
+  string ppdb_aktif     = 19; // '1' = tampilkan menu PPDB
+  string ppdb_info      = 20;
+  string ppdb_brosur    = 21; // URL / data URL
+  string ppdb_daftar_url = 22;
+  string ppdb_pengumuman = 23;
+  string kepala_sekolah_foto = 24; // URL / data URL
+}
+
+// A staff member (guru / tata usaha) shown on the landing page.
+message Staff {
+  string id = 1;
+  string nama = 2;
+  string jabatan = 3;
+  string foto = 4; // URL / data URL
+}
+message StaffInput {
+  string nama = 1;
+  string jabatan = 2;
+  string foto = 3;
 }
 
 message Semester {
@@ -20,7 +55,72 @@ message Semester {
 }
 
 message GetSchoolRequest {}
-message UpdateSchoolRequest { string name = 1; string address = 2; }
+// All fields optional — only the ones sent are updated (merge), so partial
+// edits from different screens don't wipe each other.
+message UpdateSchoolRequest {
+  optional string name           = 1;
+  optional string address        = 2;
+  optional string app_name       = 3;
+  optional string logo           = 4;
+  optional string profil         = 5;
+  optional string visi           = 6;
+  optional string misi           = 7;
+  optional string kepala_sekolah = 8;
+  optional string tahun_berdiri  = 9;
+  optional string email          = 10;
+  optional string whatsapp       = 11;
+  optional string npsn           = 12;
+  optional string status         = 13;
+  optional string akreditasi     = 14;
+  optional string jenjang        = 15;
+  optional string profil_image    = 16;
+  optional string profil_video    = 17;
+  optional string maps_url        = 18;
+  optional string ppdb_aktif      = 19;
+  optional string ppdb_info       = 20;
+  optional string ppdb_brosur     = 21;
+  optional string ppdb_daftar_url = 22;
+  optional string ppdb_pengumuman = 23;
+  optional string kepala_sekolah_foto = 24;
+}
+
+message ListStaffRequest {}
+message ListStaffResponse { repeated Staff staff = 1; }
+message SetStaffRequest { repeated StaffInput staff = 1; }
+
+// Generic content item (galeri/jurusan/berita/pengumuman/agenda/kelulusan).
+message ContentItem {
+  string id = 1;
+  string type = 2;
+  string title = 3;
+  string subtitle = 4;
+  string body = 5;
+  string image = 6;
+  string url = 7;
+}
+message ContentInput {
+  string title = 1;
+  string subtitle = 2;
+  string body = 3;
+  string image = 4;
+  string url = 5;
+}
+message ListContentRequest { string type = 1; }
+message ListContentResponse { repeated ContentItem items = 1; }
+message SetContentRequest { string type = 1; repeated ContentInput items = 2; }
+
+// Central access policy: capability keys (e.g. "materi.edit", "materi.delete")
+// that are DENIED to teachers globally. Empty = everything allowed. Admin-only.
+message GetAccessPolicyRequest {}
+message AccessPolicyResponse { repeated string denied_keys = 1; }
+message SetAccessPolicyRequest { repeated string denied_keys = 1; }
+
+// Download a consistent snapshot of the SQLite database. Admin-only.
+message ExportBackupRequest {}
+message ExportBackupResponse {
+  bytes  data     = 1;
+  string filename = 2;
+}
 
 message CreateSemesterRequest { string semester = 1; string tahun_ajaran = 2; }
 message ListSemestersRequest {}
@@ -36,4 +136,11 @@ service SchoolService {
   rpc ListSemesters(ListSemestersRequest) returns (ListSemestersResponse);
   rpc SetActiveSemester(SetActiveSemesterRequest) returns (Semester);
   rpc DeleteSemester(DeleteSemesterRequest) returns (DeleteSemesterResponse);
+  rpc ListStaff(ListStaffRequest) returns (ListStaffResponse);        // public
+  rpc SetStaff(SetStaffRequest) returns (ListStaffResponse);          // kelola_sekolah
+  rpc ListContent(ListContentRequest) returns (ListContentResponse);  // public
+  rpc SetContent(SetContentRequest) returns (ListContentResponse);    // kelola_sekolah
+  rpc GetAccessPolicy(GetAccessPolicyRequest) returns (AccessPolicyResponse);  // admin
+  rpc SetAccessPolicy(SetAccessPolicyRequest) returns (AccessPolicyResponse);  // admin
+  rpc ExportBackup(ExportBackupRequest) returns (ExportBackupResponse);        // admin
 }

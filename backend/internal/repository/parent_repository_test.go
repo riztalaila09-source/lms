@@ -31,7 +31,7 @@ func TestParentRepository_CRUDAndChildren(t *testing.T) {
 	adik := mkStudentP(t, ur, ctx, "Adik")
 	lain := mkStudentP(t, ur, ctx, "Lain")
 
-	p := &repository.Parent{ID: testutil.NewUserID(), NamaAyah: "Pak Budi", NamaIbu: "Bu Sri", Phone: "0812", Pekerjaan: "Petani"}
+	p := &repository.Parent{ID: testutil.NewUserID(), NamaOrtu: "Pak Budi", Hubungan: "Ayah", Phone: "0812", Alamat: "Jl. Mawar"}
 	require.NoError(t, pr.Create(ctx, p))
 
 	// Link two siblings to the one household.
@@ -39,7 +39,7 @@ func TestParentRepository_CRUDAndChildren(t *testing.T) {
 
 	got, err := pr.GetByID(ctx, p.ID)
 	require.NoError(t, err)
-	assert.Equal(t, "Pak Budi", got.NamaAyah)
+	assert.Equal(t, "Pak Budi", got.NamaOrtu)
 	assert.Len(t, got.Children, 2, "one parent can have many children")
 
 	// The third student remains unlinked.
@@ -57,10 +57,10 @@ func TestParentRepository_CRUDAndChildren(t *testing.T) {
 	assert.Equal(t, "", ga.ParentID, "detached child is unlinked")
 
 	// Update fields.
-	got.NamaWali = "Paman"
+	got.Hubungan = "Wali"
 	require.NoError(t, pr.Update(ctx, got))
 	got2, _ := pr.GetByID(ctx, p.ID)
-	assert.Equal(t, "Paman", got2.NamaWali)
+	assert.Equal(t, "Wali", got2.Hubungan)
 
 	// List finds it (with children attached).
 	list, total, err := pr.List(ctx, "", 1, 20)

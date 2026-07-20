@@ -21,17 +21,14 @@ type ChildRef struct {
 // Parent is a parent/guardian household. Contact data for now; a login account
 // may be attached later.
 type Parent struct {
-	ID           string
-	NamaAyah     string
-	NamaIbu      string
-	NamaWali     string
-	HubunganWali string
-	Phone        string
-	Pekerjaan    string
-	Alamat       string
-	Children     []ChildRef
-	CreatedAt    time.Time
-	UpdatedAt    time.Time
+	ID        string
+	NamaOrtu  string // guardian name
+	Hubungan  string // relationship (Ayah / Ibu / Wali / …)
+	Phone     string
+	Alamat    string
+	Children  []ChildRef
+	CreatedAt time.Time
+	UpdatedAt time.Time
 }
 
 type ParentRepository interface {
@@ -51,10 +48,10 @@ func NewParentRepository(db *sql.DB) ParentRepository {
 	return &sqliteParentRepository{db: db}
 }
 
-const parentColumns = `id, nama_ayah, nama_ibu, nama_wali, hubungan_wali, phone, pekerjaan, alamat, created_at, updated_at`
+const parentColumns = `id, nama_ortu, hubungan, phone, alamat, created_at, updated_at`
 
 func scanParent(s interface{ Scan(dest ...any) error }, p *Parent) error {
-	return s.Scan(&p.ID, &p.NamaAyah, &p.NamaIbu, &p.NamaWali, &p.HubunganWali, &p.Phone, &p.Pekerjaan, &p.Alamat, &p.CreatedAt, &p.UpdatedAt)
+	return s.Scan(&p.ID, &p.NamaOrtu, &p.Hubungan, &p.Phone, &p.Alamat, &p.CreatedAt, &p.UpdatedAt)
 }
 
 func (r *sqliteParentRepository) loadChildren(ctx context.Context, parentID string) ([]ChildRef, error) {
@@ -80,8 +77,8 @@ func (r *sqliteParentRepository) Create(ctx context.Context, p *Parent) error {
 	p.CreatedAt, p.UpdatedAt = now, now
 	_, err := r.db.ExecContext(ctx, `
 		INSERT INTO parents (`+parentColumns+`)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		p.ID, p.NamaAyah, p.NamaIbu, p.NamaWali, p.HubunganWali, p.Phone, p.Pekerjaan, p.Alamat, p.CreatedAt, p.UpdatedAt)
+		VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		p.ID, p.NamaOrtu, p.Hubungan, p.Phone, p.Alamat, p.CreatedAt, p.UpdatedAt)
 	if err != nil {
 		return fmt.Errorf("create parent: %w", err)
 	}
@@ -109,9 +106,9 @@ func (r *sqliteParentRepository) Update(ctx context.Context, p *Parent) error {
 	p.UpdatedAt = time.Now().UTC()
 	res, err := r.db.ExecContext(ctx, `
 		UPDATE parents
-		SET nama_ayah=?, nama_ibu=?, nama_wali=?, hubungan_wali=?, phone=?, pekerjaan=?, alamat=?, updated_at=?
+		SET nama_ortu=?, hubungan=?, phone=?, alamat=?, updated_at=?
 		WHERE id=?`,
-		p.NamaAyah, p.NamaIbu, p.NamaWali, p.HubunganWali, p.Phone, p.Pekerjaan, p.Alamat, p.UpdatedAt, p.ID)
+		p.NamaOrtu, p.Hubungan, p.Phone, p.Alamat, p.UpdatedAt, p.ID)
 	if err != nil {
 		return fmt.Errorf("update parent: %w", err)
 	}
@@ -147,9 +144,9 @@ func (r *sqliteParentRepository) List(ctx context.Context, search string, page, 
 	where := ""
 	args := []any{}
 	if search != "" {
-		where = ` WHERE (nama_ayah LIKE ? OR nama_ibu LIKE ? OR nama_wali LIKE ? OR phone LIKE ?)`
+		where = ` WHERE (nama_ortu LIKE ? OR phone LIKE ?)`
 		like := "%" + search + "%"
-		args = append(args, like, like, like, like)
+		args = append(args, like, like)
 	}
 
 	var total int

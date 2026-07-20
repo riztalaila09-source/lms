@@ -36,7 +36,7 @@ func TestParentService_CreateLinksChildren(t *testing.T) {
 	b := mkStudentSvc(t, ur, ctx, "Anak2", "student")
 
 	p, err := svc.CreateParent(ctx, "teacher", service.ParentInput{
-		NamaAyah: "Pak A", Phone: "0899", StudentIDs: []string{a.ID, b.ID},
+		NamaOrtu: "Pak A", Phone: "0899", StudentIDs: []string{a.ID, b.ID},
 	})
 	require.NoError(t, err)
 	assert.Len(t, p.Children, 2)
@@ -46,7 +46,7 @@ func TestParentService_ManagerGate(t *testing.T) {
 	svc, ur, ctx := setupParentSvc(t)
 	a := mkStudentSvc(t, ur, ctx, "Anak", "student")
 
-	_, err := svc.CreateParent(ctx, "student", service.ParentInput{NamaAyah: "X", StudentIDs: []string{a.ID}})
+	_, err := svc.CreateParent(ctx, "student", service.ParentInput{NamaOrtu: "X", StudentIDs: []string{a.ID}})
 	assert.ErrorIs(t, err, service.ErrPermissionDenied)
 
 	_, _, err = svc.ListParents(ctx, "student", "", 1, 20)
@@ -58,11 +58,11 @@ func TestParentService_ValidatesStudents(t *testing.T) {
 	teacher := mkStudentSvc(t, ur, ctx, "Guru", "teacher") // a non-student id
 
 	// Non-existent id.
-	_, err := svc.CreateParent(ctx, "admin", service.ParentInput{NamaAyah: "X", StudentIDs: []string{"nope"}})
+	_, err := svc.CreateParent(ctx, "admin", service.ParentInput{NamaOrtu: "X", StudentIDs: []string{"nope"}})
 	assert.ErrorIs(t, err, service.ErrInvalidArgument)
 
 	// Existing user that is not a student.
-	_, err = svc.CreateParent(ctx, "admin", service.ParentInput{NamaAyah: "X", StudentIDs: []string{teacher.ID}})
+	_, err = svc.CreateParent(ctx, "admin", service.ParentInput{NamaOrtu: "X", StudentIDs: []string{teacher.ID}})
 	assert.ErrorIs(t, err, service.ErrInvalidArgument)
 
 	// No name at all.
@@ -75,10 +75,10 @@ func TestParentService_UpdateReplacesChildren(t *testing.T) {
 	a := mkStudentSvc(t, ur, ctx, "A", "student")
 	b := mkStudentSvc(t, ur, ctx, "B", "student")
 
-	p, err := svc.CreateParent(ctx, "admin", service.ParentInput{NamaIbu: "Bu B", StudentIDs: []string{a.ID}})
+	p, err := svc.CreateParent(ctx, "admin", service.ParentInput{NamaOrtu: "Bu B", StudentIDs: []string{a.ID}})
 	require.NoError(t, err)
 
-	updated, err := svc.UpdateParent(ctx, "admin", p.ID, service.ParentInput{NamaIbu: "Bu B", StudentIDs: []string{b.ID}})
+	updated, err := svc.UpdateParent(ctx, "admin", p.ID, service.ParentInput{NamaOrtu: "Bu B", StudentIDs: []string{b.ID}})
 	require.NoError(t, err)
 	require.Len(t, updated.Children, 1)
 	assert.Equal(t, b.ID, updated.Children[0].StudentID)
@@ -87,6 +87,6 @@ func TestParentService_UpdateReplacesChildren(t *testing.T) {
 	assert.Equal(t, "", ga.ParentID, "removed child detached")
 
 	// Update missing parent → not found.
-	_, err = svc.UpdateParent(ctx, "admin", "nope", service.ParentInput{NamaIbu: "X"})
+	_, err = svc.UpdateParent(ctx, "admin", "nope", service.ParentInput{NamaOrtu: "X"})
 	assert.ErrorIs(t, err, service.ErrParentNotFound)
 }

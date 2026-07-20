@@ -26,6 +26,7 @@ export default function PengumpulanPage() {
   const [subs, setSubs] = useState<Submission[]>([])
   const [groupSubs, setGroupSubs] = useState<GroupSubmission[]>([])
   const [loading, setLoading] = useState(false)
+  const [kelasFilter, setKelasFilter] = useState('')
 
   const [gradeOpen, setGradeOpen] = useState(false)
   const [target, setTarget] = useState<Submission | null>(null)
@@ -70,6 +71,8 @@ export default function PengumpulanPage() {
   }, [assignmentId, assignments])
 
   useEffect(() => { reload() }, [reload])
+  // Reset the class filter whenever the course/assignment changes.
+  useEffect(() => { setKelasFilter('') }, [courseId, assignmentId])
 
   const openGrade = (s: Submission) => {
     setTarget(s); setGroupTarget(null)
@@ -105,13 +108,25 @@ export default function PengumpulanPage() {
     }
   }
 
-  const submitted = subs.filter((s) => s.submitted)
-  const notSubmitted = subs.filter((s) => !s.submitted)
   const currentAssignment = assignments.find((a) => a.id === assignmentId)
   const isPraktikum = currentAssignment?.type === 'praktikum'
 
+  // Classes to offer in the filter come from the course this assignment belongs
+  // to (e.g. "Bahasa Indonesia" → X-TKJ-1, X-TKJ-2, X-TKJ-3); fall back to the
+  // classes actually present in the submissions.
+  const effectiveCourse = courses.find((c) => c.id === (courseId || currentAssignment?.courseId))
+  const kelasOptions = (effectiveCourse?.kelas && effectiveCourse.kelas.length > 0)
+    ? [...effectiveCourse.kelas].sort()
+    : Array.from(new Set(subs.map((s) => s.studentKelas).filter(Boolean))).sort()
+
+  const matchKelas = (k: string) => !kelasFilter || k === kelasFilter
+  const submitted = subs.filter((s) => s.submitted && matchKelas(s.studentKelas))
+  const notSubmitted = subs.filter((s) => !s.submitted && matchKelas(s.studentKelas))
+  // Praktikum groups are named "<kelas> - Kelompok N", so match by prefix.
+  const groupSubsShown = groupSubs.filter((gs) => !kelasFilter || gs.groupName.startsWith(kelasFilter))
+
   return (
-    <AppLayout title={<><Icon as={LuInbox} /> Pengumpulan Tugas</>} subtitle="Lihat pengumpulan siswa dan beri nilai">
+    <AppLayout title={<><Icon as={LuInbox} /> Pengumpulan Tugas</>} subtitle="Lihat pengumpulan murid dan beri nilai">
       <Stack gap="14px">
         <Card>
           <Flex gap="10px" flexWrap="wrap" align="flex-end">
@@ -119,7 +134,7 @@ export default function PengumpulanPage() {
               <Text fontSize="12px" fontWeight="500" mb="4px">Filter Mata Pelajaran</Text>
               <NativeSelect.Root size="sm">
                 <NativeSelect.Field value={courseId} onChange={(e) => setCourseId(e.target.value)}>
-                  <option value="">— Semua Kelas —</option>
+                  <option value="">— Semua Mapel —</option>
                   {courses.map((c) => <option key={c.id} value={c.id}>{c.code} — {c.name}</option>)}
                 </NativeSelect.Field>
                 <NativeSelect.Indicator />
@@ -135,6 +150,16 @@ export default function PengumpulanPage() {
                 <NativeSelect.Indicator />
               </NativeSelect.Root>
             </Box>
+            <Box minW="150px">
+              <Text fontSize="12px" fontWeight="500" mb="4px">Filter Kelas</Text>
+              <NativeSelect.Root size="sm" disabled={kelasOptions.length === 0}>
+                <NativeSelect.Field value={kelasFilter} onChange={(e) => setKelasFilter(e.target.value)}>
+                  <option value="">— Semua Kelas —</option>
+                  {kelasOptions.map((k) => <option key={k} value={k}>{k}</option>)}
+                </NativeSelect.Field>
+                <NativeSelect.Indicator />
+              </NativeSelect.Root>
+            </Box>
           </Flex>
         </Card>
 
@@ -143,12 +168,12 @@ export default function PengumpulanPage() {
         ) : loading ? (
           <Card><Text color={COLORS.muted}>Memuat…</Text></Card>
         ) : isPraktikum ? (
-          <Card title={<><Icon as={LuUsers} /> Pengumpulan per Kelompok ({groupSubs.length})</>}>
-            {groupSubs.length === 0 ? (
-              <Text color={COLORS.muted} py="10px" fontSize="13px">Belum ada kelompok. Atur kelompok dulu di menu Tugas → Praktikum.</Text>
+          <Card title={<><Icon as={LuUsers} /> Pengumpulan per Kelompok ({groupSubsShown.length})</>}>
+            {groupSubsShown.length === 0 ? (
+              <Text color={COLORS.muted} py="10px" fontSize="13px">{kelasFilter ? 'Tidak ada kelompok untuk kelas ini.' : 'Belum ada kelompok. Atur kelompok dulu di menu Tugas → Praktikum.'}</Text>
             ) : (
               <Stack gap="10px">
-                {groupSubs.map((gs) => {
+                {groupSubsShown.map((gs) => {
                   const lnks = gs.fileUrl ? decodeLinks(gs.fileUrl).filter((l) => l.url) : []
                   return (
                     <Box key={gs.groupId} border="1px solid" borderColor={COLORS.border} borderRadius="8px" p="10px">
@@ -185,7 +210,7 @@ export default function PengumpulanPage() {
                 <Table.Root size="sm">
                   <Table.Header>
                     <Table.Row>
-                      <Table.ColumnHeader>Siswa</Table.ColumnHeader>
+                      <Table.ColumnHeader>Murid</Table.ColumnHeader>
                       <Table.ColumnHeader>Waktu</Table.ColumnHeader>
                       <Table.ColumnHeader>Nilai</Table.ColumnHeader>
                       <Table.ColumnHeader textAlign="right">Aksi</Table.ColumnHeader>
@@ -223,7 +248,7 @@ export default function PengumpulanPage() {
             {/* Not submitted */}
             <Card title={<><Icon as={LuCircleX} /> Belum Mengerjakan ({notSubmitted.length})</>}>
               {notSubmitted.length === 0 ? (
-                <Text color={COLORS.success} fontSize="13px" display="flex" alignItems="center" gap="4px">Semua siswa sudah mengumpulkan <Icon as={LuPartyPopper} /></Text>
+                <Text color={COLORS.success} fontSize="13px" display="flex" alignItems="center" gap="4px">Semua murid sudah mengumpulkan <Icon as={LuPartyPopper} /></Text>
               ) : (
                 <Stack gap="6px">
                   {notSubmitted.map((s) => (

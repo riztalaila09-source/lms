@@ -17,7 +17,7 @@ function shuffle<T>(arr: T[]): T[] {
 
 /**
  * Guru: atur kelompok (manual/acak) + nilai per kelompok untuk tugas praktikum.
- * Kelompok dibuat PER KELAS — satu kelompok pasti berisi siswa satu kelas
+ * Kelompok dibuat PER KELAS — satu kelompok pasti berisi murid satu kelas
  * (mapel bisa lintas kelas). Ada filter kelas untuk menyusun tiap kelas.
  */
 export default function PraktikumManager({ assignment, open, onClose }: {
@@ -235,7 +235,7 @@ export default function PraktikumManager({ assignment, open, onClose }: {
                     </Table.Row></Table.Header>
                     <Table.Body>
                       {classStudents.length === 0 ? (
-                        <Table.Row><Table.Cell colSpan={3} textAlign="center" color={COLORS.muted}>Tidak ada siswa di kelas ini.</Table.Cell></Table.Row>
+                        <Table.Row><Table.Cell colSpan={3} textAlign="center" color={COLORS.muted}>Tidak ada murid di kelas ini.</Table.Cell></Table.Row>
                       ) : classStudents.map((s) => (
                         <Table.Row key={s.id}>
                           <Table.Cell fontWeight="600">{s.name}</Table.Cell>
