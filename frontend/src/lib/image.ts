@@ -1,3 +1,18 @@
+// Read any file (e.g. audio) as a raw data URL, enforcing a max size so a huge
+// upload can't bloat the database. Returns the base64 data URL.
+export function fileToDataUrlRaw(file: File, maxBytes: number): Promise<string> {
+  return new Promise((resolve, reject) => {
+    if (file.size > maxBytes) {
+      reject(new Error(`Ukuran file maksimal ${Math.round(maxBytes / (1024 * 1024))}MB`))
+      return
+    }
+    const reader = new FileReader()
+    reader.onload = () => resolve(reader.result as string)
+    reader.onerror = () => reject(new Error('Gagal membaca file'))
+    reader.readAsDataURL(file)
+  })
+}
+
 // Read an image file and return a downscaled data URL (base64) so it stays
 // small enough to store in the database / embed in HTML content.
 export function fileToDataUrl(file: File, maxW = 1200, quality = 0.82): Promise<string> {

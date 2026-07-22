@@ -95,6 +95,11 @@ message ExportAttendanceRequest {
   string end = 2;      // 'YYYY-MM-DD'
   string kelas = 3;    // fill exactly one of kelas / jurusan
   string jurusan = 4;
+  // 'daily'   = one status per student per day, taken from the FIRST period
+  //             (jam ke-1) of that day (the whole day follows the first lesson).
+  // 'session' = count every session/mata pelajaran separately across the 10 jam.
+  // Empty defaults to 'session' (backward compatible).
+  string mode = 5;
 }
 message ExportAttendanceResponse { repeated ExportRow rows = 1; }
 

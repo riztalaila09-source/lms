@@ -25,6 +25,7 @@ import (
 	"lms/backend/gen/school/v1/schoolv1connect"
 	"lms/backend/gen/course/v1/coursev1connect"
 	"lms/backend/gen/dashboard/v1/dashboardv1connect"
+	"lms/backend/gen/game/v1/gamev1connect"
 	"lms/backend/gen/pkl/v1/pklv1connect"
 	"lms/backend/gen/material/v1/materialv1connect"
 	"lms/backend/gen/parent/v1/parentv1connect"
@@ -116,6 +117,7 @@ func main() {
 	pklRepo := repository.NewPklRepository(db)
 	classroomRepo := repository.NewClassroomRepository(db)
 	parentRepo := repository.NewParentRepository(db)
+	gameRepo := repository.NewGameRepository(db)
 
 	// Business logic
 	userSvc := service.NewUserService(userRepo, jwtSvc, activityRepo)
@@ -132,6 +134,7 @@ func main() {
 	pklSvc := service.NewPklService(pklRepo)
 	classroomSvc := service.NewClassroomService(classroomRepo)
 	parentSvc := service.NewParentService(parentRepo, userRepo)
+	gameSvc := service.NewGameService(gameRepo, assignmentQuestionRepo, submissionRepo, assignmentRepo, userRepo)
 
 	// Handlers
 	userHandler := handler.NewUserHandler(userSvc, courseSvc, schoolSvc)
@@ -146,6 +149,7 @@ func main() {
 	pklHandler := handler.NewPklHandler(pklSvc)
 	classroomHandler := handler.NewClassroomHandler(classroomSvc)
 	parentHandler := handler.NewParentHandler(parentSvc)
+	gameHandler := handler.NewGameHandler(gameSvc)
 
 	// Load the central access policy (teacher edit/delete capabilities) into cache.
 	if err := schoolSvc.LoadAccessPolicy(context.Background()); err != nil {
@@ -171,6 +175,7 @@ func main() {
 	pklPath, pklAPI := pklv1connect.NewPklServiceHandler(pklHandler, interceptors)
 	classroomPath, classroomAPI := classroomv1connect.NewClassroomServiceHandler(classroomHandler, interceptors)
 	parentPath, parentAPI := parentv1connect.NewParentServiceHandler(parentHandler, interceptors)
+	gamePath, gameAPI := gamev1connect.NewGameServiceHandler(gameHandler, interceptors)
 
 	mux.Handle(userPath, userAPI)
 	mux.Handle(coursePath, courseAPI)
@@ -184,6 +189,7 @@ func main() {
 	mux.Handle(pklPath, pklAPI)
 	mux.Handle(classroomPath, classroomAPI)
 	mux.Handle(parentPath, parentAPI)
+	mux.Handle(gamePath, gameAPI)
 
 	// Serve material cover images as cacheable binary (NOT base64 in JSON), so
 	// the materials list payload stays tiny and images load lazily/cached.
@@ -215,6 +221,37 @@ func main() {
 		}
 		w.Header().Set("Content-Type", mime)
 		w.Header().Set("Cache-Control", "public, max-age=86400")
+		_, _ = w.Write(raw)
+	})
+
+	// Stream the (optional) uploaded game soundtrack as binary audio, so the big
+	// blob never rides a JSON payload. Empty → 404 (client falls back to synth).
+	mux.HandleFunc("/game-music", func(w http.ResponseWriter, r *http.Request) {
+		var dataURL string
+		if err := db.QueryRowContext(r.Context(),
+			`SELECT game_music_data FROM school_settings WHERE id='default'`).Scan(&dataURL); err != nil || dataURL == "" {
+			http.NotFound(w, r)
+			return
+		}
+		comma := strings.IndexByte(dataURL, ',')
+		if comma < 0 || !strings.HasPrefix(dataURL, "data:") {
+			http.NotFound(w, r)
+			return
+		}
+		mime := dataURL[len("data:"):comma]
+		if semi := strings.IndexByte(mime, ';'); semi >= 0 {
+			mime = mime[:semi]
+		}
+		raw, err := base64.StdEncoding.DecodeString(dataURL[comma+1:])
+		if err != nil {
+			http.NotFound(w, r)
+			return
+		}
+		if mime == "" {
+			mime = "audio/mpeg"
+		}
+		w.Header().Set("Content-Type", mime)
+		w.Header().Set("Cache-Control", "no-cache") // may change when admin re-uploads
 		_, _ = w.Write(raw)
 	})
 

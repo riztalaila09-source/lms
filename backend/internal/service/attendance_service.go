@@ -189,7 +189,7 @@ func (s *AttendanceService) DeleteSession(ctx context.Context, callerID, callerR
 	return nil
 }
 
-func (s *AttendanceService) ExportAttendance(ctx context.Context, callerRole, start, end, kelas, jurusan string) ([]*repository.AttendanceExportRow, error) {
+func (s *AttendanceService) ExportAttendance(ctx context.Context, callerRole, start, end, kelas, jurusan, mode string) ([]*repository.AttendanceExportRow, error) {
 	if !isManager(callerRole) {
 		return nil, ErrPermissionDenied
 	}
@@ -208,7 +208,13 @@ func (s *AttendanceService) ExportAttendance(ctx context.Context, callerRole, st
 	// Sessions that have already ended (before "now" in WIB) count no-show students
 	// as alpa; sessions still in progress are not yet counted.
 	now := time.Now().In(wib)
-	return s.repo.ExportRecap(ctx, start, end, scope, value, now.Format("2006-01-02"), now.Format("15:04"))
+	day, hm := now.Format("2006-01-02"), now.Format("15:04")
+	if mode == "daily" {
+		// One status per student per day, from that day's first period (jam ke-1).
+		return s.repo.ExportRecapDaily(ctx, start, end, scope, value, day, hm)
+	}
+	// Default: per-session (per mata pelajaran) across all periods.
+	return s.repo.ExportRecap(ctx, start, end, scope, value, day, hm)
 }
 
 // DayGridResult backs the per-day recap grid for a class.

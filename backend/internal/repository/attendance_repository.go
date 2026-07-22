@@ -98,6 +98,10 @@ type AttendanceRepository interface {
 	// ExportRecap returns per-student attendance counts within [start,end] for
 	// students in the given scope ("kelas" or "jurusan" = value).
 	ExportRecap(ctx context.Context, start, end, scope, value, today, now string) ([]*AttendanceExportRow, error)
+	// ExportRecapDaily is like ExportRecap but collapses each day to ONE status per
+	// student — the status of that day's FIRST period (smallest jam_ke) — so the
+	// whole day follows the first lesson regardless of later sessions.
+	ExportRecapDaily(ctx context.Context, start, end, scope, value, today, now string) ([]*AttendanceExportRow, error)
 	// Per-day recap grid helpers.
 	ListSessionsByKelas(ctx context.Context, kelas, tanggal string) ([]*AttendanceSession, error)
 	RosterForDay(ctx context.Context, kelas string, sessionIDs []string) ([]*DayStudent, error)
@@ -386,6 +390,57 @@ func (r *sqliteAttendanceRepository) ExportRecap(ctx context.Context, start, end
 		ORDER BY full_name ASC`, today, today, now, start, end, value)
 	if err != nil {
 		return nil, fmt.Errorf("export recap: %w", err)
+	}
+	defer rows.Close()
+	var out []*AttendanceExportRow
+	for rows.Next() {
+		e := &AttendanceExportRow{}
+		if err := rows.Scan(&e.StudentName, &e.Kelas, &e.Jurusan, &e.Hadir, &e.Sakit, &e.Izin, &e.Alpa, &e.Total); err != nil {
+			return nil, err
+		}
+		out = append(out, e)
+	}
+	return out, rows.Err()
+}
+
+func (r *sqliteAttendanceRepository) ExportRecapDaily(ctx context.Context, start, end, scope, value, today, now string) ([]*AttendanceExportRow, error) {
+	col, ok := attendanceScopeCol(scope)
+	if !ok {
+		return nil, fmt.Errorf("invalid export scope: %q", scope)
+	}
+	// Same as ExportRecap, but the session join is restricted (via NOT EXISTS) to
+	// the FIRST period of each (class, day) — smallest jam_ke, then earliest
+	// start_time. So a student's whole day is classified by their status at the
+	// first lesson (jam ke-1), regardless of what happens later that day.
+	rows, err := r.db.QueryContext(ctx, `
+		SELECT full_name, kelas, jurusan,
+		       SUM(CASE WHEN counted AND status='hadir' THEN 1 ELSE 0 END),
+		       SUM(CASE WHEN counted AND status='sakit' THEN 1 ELSE 0 END),
+		       SUM(CASE WHEN counted AND status='izin'  THEN 1 ELSE 0 END),
+		       SUM(CASE WHEN counted AND status='alpa'  THEN 1 ELSE 0 END),
+		       SUM(CASE WHEN counted THEN 1 ELSE 0 END)
+		FROM (
+			SELECT u.id AS id, u.full_name AS full_name, u.kelas AS kelas, u.jurusan AS jurusan,
+			       COALESCE(rec.status,'alpa') AS status,
+			       (s.id IS NOT NULL AND (rec.status IS NOT NULL
+			            OR s.tanggal < ? OR (s.tanggal = ? AND s.end_time <= ?))) AS counted
+			FROM users u
+			LEFT JOIN attendance_sessions s
+			       ON s.kelas = u.kelas AND s.tanggal >= ? AND s.tanggal <= ?
+			      AND NOT EXISTS (
+			          SELECT 1 FROM attendance_sessions s2
+			          WHERE s2.kelas = s.kelas AND s2.tanggal = s.tanggal
+			            AND (s2.jam_ke < s.jam_ke
+			                 OR (s2.jam_ke = s.jam_ke AND s2.start_time < s.start_time)
+			                 OR (s2.jam_ke = s.jam_ke AND s2.start_time = s.start_time AND s2.id < s.id))
+			      )
+			LEFT JOIN attendance_records rec ON rec.session_id = s.id AND rec.student_id = u.id
+			WHERE u.role='student' AND u.`+col+` = ?
+		)
+		GROUP BY id
+		ORDER BY full_name ASC`, today, today, now, start, end, value)
+	if err != nil {
+		return nil, fmt.Errorf("export recap daily: %w", err)
 	}
 	defer rows.Close()
 	var out []*AttendanceExportRow

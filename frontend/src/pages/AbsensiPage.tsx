@@ -115,7 +115,7 @@ function QRImage({ text, size = 220 }: { text: string; size?: number }) {
 
 // ───────────────────────── Teacher ─────────────────────────
 function TeacherAbsensi() {
-  const [tab, setTab] = useState<'buat' | 'perhari' | 'hasil' | 'export'>('buat')
+  const [tab, setTab] = useState<'buat' | 'perhari' | 'hasil' | 'export' | 'rekapmapel'>('buat')
   const [courses, setCourses] = useState<Course[]>([])
   const [classNames, setClassNames] = useState<string[]>([])
   useEffect(() => { courseClient.listCourses({}).then((r) => setCourses(r.courses)).catch(() => setCourses([])) }, [])
@@ -210,7 +210,7 @@ function TeacherAbsensi() {
   return (
     <Stack gap="16px">
       <Flex gap="4px" borderBottom="2px solid" borderColor="gray.200">
-        {([['buat', 'Buat Absensi'], ['perhari', 'Per Hari'], ['hasil', 'Hasil Absensi'], ['export', 'Export']] as const).map(([k, label]) => (
+        {([['buat', 'Buat Absensi'], ['perhari', 'Per Hari'], ['hasil', 'Hasil Absensi'], ['export', 'Export (Harian)'], ['rekapmapel', 'Rekap Mapel']] as const).map(([k, label]) => (
           <Button key={k} variant="ghost" borderRadius={0} borderBottom="2px solid"
             borderColor={tab === k ? COLORS.primary : 'transparent'} color={tab === k ? COLORS.primary : 'gray.600'}
             onClick={() => setTab(k)}>{label}</Button>
@@ -324,7 +324,8 @@ function TeacherAbsensi() {
 
       {tab === 'perhari' && <PerHariAbsensi />}
       {tab === 'hasil' && <HasilAbsensi />}
-      {tab === 'export' && <ExportAbsensi />}
+      {tab === 'export' && <ExportAbsensi mode="daily" />}
+      {tab === 'rekapmapel' && <ExportAbsensi mode="session" />}
     </Stack>
   )
 }
@@ -563,7 +564,7 @@ function PerHariAbsensi() {
 // Type of a row returned by ExportAttendance.
 type ExportRow = Awaited<ReturnType<typeof attendanceClient.exportAttendance>>['rows'][number]
 
-function ExportAbsensi() {
+function ExportAbsensi({ mode }: { mode: 'daily' | 'session' }) {
   const [tahunOpts, setTahunOpts] = useState<string[]>([])
   const [classNames, setClassNames] = useState<string[]>([])
   const [jurusans, setJurusans] = useState<string[]>([])
@@ -598,7 +599,8 @@ function ExportAbsensi() {
     setLoading(true)
     try {
       const { start, end } = range()
-      const res = await attendanceClient.exportAttendance(by === 'kelas' ? { start, end, kelas: val } : { start, end, jurusan: val })
+      const base = by === 'kelas' ? { start, end, kelas: val } : { start, end, jurusan: val }
+      const res = await attendanceClient.exportAttendance({ ...base, mode })
       setRows(res.rows)
       if (res.rows.length === 0) toaster.create({ description: 'Tidak ada data untuk filter ini.', type: 'info' })
     } catch (e) { toaster.create({ description: errMsg(e), type: 'error' }) }
@@ -613,14 +615,19 @@ function ExportAbsensi() {
     const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' })
     const a = document.createElement('a')
     a.href = URL.createObjectURL(blob)
-    a.download = `absensi_${by}_${val}_${semester}_${(tahun || '').replace('/', '-')}.csv`
+    a.download = `absensi_${mode === 'daily' ? 'harian' : 'mapel'}_${by}_${val}_${semester}_${(tahun || '').replace('/', '-')}.csv`
     a.click()
     URL.revokeObjectURL(a.href)
   }
 
   return (
     <Card.Root><Card.Body>
-      <Heading size="sm" mb="12px">Export Rekap Absensi</Heading>
+      <Heading size="sm" mb="4px">{mode === 'daily' ? 'Export Rekap Harian' : 'Rekap per Mata Pelajaran'}</Heading>
+      <Text fontSize="12px" color={COLORS.muted} mb="12px">
+        {mode === 'daily'
+          ? 'Satu status per murid per hari, mengikuti jam pelajaran PERTAMA (jam ke-1). Contoh: hadir jam 1–2 tetap dihitung Hadir walau alpa di jam berikutnya.'
+          : 'Menghitung SETIAP sesi/mata pelajaran dalam 10 jam. Contoh: hadir jam 1–4, alpa jam 4–6, hadir jam 6–10 → 2× Hadir, 1× Alpa.'}
+      </Text>
       <Flex gap="10px" wrap="wrap" align="flex-end" mb="12px">
         <Field.Root maxW="150px"><Field.Label>Tahun Ajaran</Field.Label>
           <NativeSelect.Root>

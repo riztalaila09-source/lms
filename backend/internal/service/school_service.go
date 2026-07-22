@@ -99,7 +99,12 @@ func (s *SchoolService) ExportBackup(ctx context.Context, callerRole string) ([]
 }
 
 func (s *SchoolService) GetSchool(ctx context.Context) (*repository.School, error) {
-	return s.repo.GetSchool(ctx)
+	school, err := s.repo.GetSchool(ctx)
+	if err != nil {
+		return nil, err
+	}
+	school.GameMusicName, school.HasGameMusic, _ = s.repo.GameMusicInfo(ctx)
+	return school, nil
 }
 
 // UpdateSchoolInput carries only the fields the caller wants to change (nil =
@@ -108,7 +113,8 @@ type UpdateSchoolInput struct {
 	Name, Address, AppName, Logo, Profil, Visi, Misi, KepalaSekolah,
 	TahunBerdiri, Email, Whatsapp, Npsn, Status, Akreditasi, Jenjang,
 	ProfilImage, ProfilVideo, MapsURL, PpdbAktif, PpdbInfo, PpdbBrosur, PpdbDaftarURL, PpdbPengumuman,
-	KepalaSekolahFoto *string
+	KepalaSekolahFoto,
+	GameMusicData, GameMusicName *string // audio data URL ("" clears) + display name
 }
 
 func (s *SchoolService) UpdateSchool(ctx context.Context, callerRole string, in UpdateSchoolInput) (*repository.School, error) {
@@ -152,7 +158,23 @@ func (s *SchoolService) UpdateSchool(ctx context.Context, callerRole string, in 
 	apply(&cur.PpdbDaftarURL, in.PpdbDaftarURL, true)
 	apply(&cur.PpdbPengumuman, in.PpdbPengumuman, false)
 	apply(&cur.KepalaSekolahFoto, in.KepalaSekolahFoto, true)
-	return s.repo.UpdateSchool(ctx, cur)
+	out, err := s.repo.UpdateSchool(ctx, cur)
+	if err != nil {
+		return nil, err
+	}
+	// Game soundtrack is stored separately (the audio blob never rides the
+	// generic school overwrite). Only touched when explicitly provided.
+	if in.GameMusicData != nil {
+		name := ""
+		if in.GameMusicName != nil {
+			name = strings.TrimSpace(*in.GameMusicName)
+		}
+		if err := s.repo.SetGameMusic(ctx, *in.GameMusicData, name); err != nil {
+			return nil, err
+		}
+	}
+	out.GameMusicName, out.HasGameMusic, _ = s.repo.GameMusicInfo(ctx)
+	return out, nil
 }
 
 func (s *SchoolService) ListStaff(ctx context.Context) ([]*repository.Staff, error) {

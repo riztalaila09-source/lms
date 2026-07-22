@@ -40,6 +40,10 @@ type School struct {
 	PpdbDaftarURL string
 	PpdbPengumuman string
 	KepalaSekolahFoto string
+	// Game soundtrack — read-only summary (the audio blob is never loaded here;
+	// it is streamed by /game-music). Set via SetGameMusic.
+	HasGameMusic  bool
+	GameMusicName string
 }
 
 // Staff is a member of the guru / tata usaha directory.
@@ -75,6 +79,10 @@ type Semester struct {
 type SchoolRepository interface {
 	GetSchool(ctx context.Context) (*School, error)
 	UpdateSchool(ctx context.Context, s *School) (*School, error)
+	// SetGameMusic stores (or clears, when data=="") the uploaded game soundtrack.
+	SetGameMusic(ctx context.Context, dataURL, name string) error
+	// GameMusicInfo returns the track name and whether a soundtrack is set.
+	GameMusicInfo(ctx context.Context) (name string, has bool, err error)
 	CreateSemester(ctx context.Context, s *Semester) error
 	ListSemesters(ctx context.Context) ([]*Semester, error)
 	SetActiveSemester(ctx context.Context, id string) (*Semester, error)
@@ -140,6 +148,31 @@ func (r *sqliteSchoolRepository) UpdateSchool(ctx context.Context, s *School) (*
 		return nil, fmt.Errorf("update school: %w", err)
 	}
 	return s, nil
+}
+
+func (r *sqliteSchoolRepository) SetGameMusic(ctx context.Context, dataURL, name string) error {
+	_, err := r.db.ExecContext(ctx, `
+		INSERT INTO school_settings (id, game_music_data, game_music_name) VALUES ('default', ?, ?)
+		ON CONFLICT(id) DO UPDATE SET game_music_data=excluded.game_music_data, game_music_name=excluded.game_music_name`,
+		dataURL, name)
+	if err != nil {
+		return fmt.Errorf("set game music: %w", err)
+	}
+	return nil
+}
+
+func (r *sqliteSchoolRepository) GameMusicInfo(ctx context.Context) (string, bool, error) {
+	var name string
+	var has bool
+	err := r.db.QueryRowContext(ctx,
+		`SELECT game_music_name, game_music_data <> '' FROM school_settings WHERE id='default'`).Scan(&name, &has)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", false, nil
+	}
+	if err != nil {
+		return "", false, fmt.Errorf("game music info: %w", err)
+	}
+	return name, has, nil
 }
 
 func (r *sqliteSchoolRepository) CreateSemester(ctx context.Context, s *Semester) error {

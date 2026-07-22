@@ -102,6 +102,14 @@ const DICT: Record<string, { id: string; en: string }> = {
   'settings.tab.backup': { id: 'Backup', en: 'Backup' },
   'settings.appearance.title': { id: 'Tampilan', en: 'Appearance' },
   'settings.appearance.desc': { id: 'Sesuaikan tema warna dan bahasa antarmuka.', en: 'Customize the color theme and interface language.' },
+  'settings.tab.game': { id: 'Game', en: 'Game' },
+  'settings.game.title': { id: 'Musik Game Kuis', en: 'Quiz Game Music' },
+  'settings.game.desc': { id: 'Musik latar untuk game kuis live. Kosong = pakai musik bawaan (sintesis).', en: 'Background music for the live quiz game. Empty = use the built-in (synthesized) music.' },
+  'settings.game.current': { id: 'Musik saat ini', en: 'Current music' },
+  'settings.game.none': { id: 'Belum ada musik (pakai bawaan).', en: 'No music yet (using the default).' },
+  'settings.game.upload': { id: 'Upload musik (mp3/ogg)', en: 'Upload music (mp3/ogg)' },
+  'settings.game.remove': { id: 'Hapus musik', en: 'Remove music' },
+  'settings.game.help': { id: 'Dari YouTube? Unduh dulu jadi mp3 lalu upload. Maksimal 8MB.', en: 'From YouTube? Download it as mp3 first, then upload. Max 8MB.' },
 }
 
 interface LangCtx { lang: Lang; setLang: (l: Lang) => void; t: (key: string) => string }

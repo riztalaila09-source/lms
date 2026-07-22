@@ -190,7 +190,7 @@ func TestAttendanceService_Export(t *testing.T) {
 	// Out of range (Jan): must NOT be counted in the August export.
 	set(mkSess("2026-01-05").ID, "hadir")
 
-	rows, err := svc.ExportAttendance(ctx, "teacher", "2026-08-01", "2026-08-31", "UJI-TKJ-1", "")
+	rows, err := svc.ExportAttendance(ctx, "teacher", "2026-08-01", "2026-08-31", "UJI-TKJ-1", "", "session")
 	require.NoError(t, err)
 	byName := map[string]*repository.AttendanceExportRow{}
 	for _, r := range rows {
@@ -206,14 +206,14 @@ func TestAttendanceService_Export(t *testing.T) {
 	assert.Equal(t, 0, byName["Bob"].Total)
 
 	// Scope by jurusan works too.
-	jrows, err := svc.ExportAttendance(ctx, "teacher", "2026-08-01", "2026-08-31", "", "UJITKJ")
+	jrows, err := svc.ExportAttendance(ctx, "teacher", "2026-08-01", "2026-08-31", "", "UJITKJ", "session")
 	require.NoError(t, err)
 	assert.Len(t, jrows, 2)
 
 	// Student may not export; both/none scope invalid.
-	_, err = svc.ExportAttendance(ctx, "student", "2026-08-01", "2026-08-31", "UJI-TKJ-1", "")
+	_, err = svc.ExportAttendance(ctx, "student", "2026-08-01", "2026-08-31", "UJI-TKJ-1", "", "session")
 	assert.ErrorIs(t, err, service.ErrPermissionDenied)
-	_, err = svc.ExportAttendance(ctx, "teacher", "2026-08-01", "2026-08-31", "", "")
+	_, err = svc.ExportAttendance(ctx, "teacher", "2026-08-01", "2026-08-31", "", "", "session")
 	assert.ErrorIs(t, err, service.ErrInvalidArgument)
 }
 
@@ -286,7 +286,7 @@ func TestAttendanceService_ExportAutoAlpa(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	rows, err := svc.ExportAttendance(ctx, "teacher", yesterday, tomorrow, "AUTO-1", "")
+	rows, err := svc.ExportAttendance(ctx, "teacher", yesterday, tomorrow, "AUTO-1", "", "session")
 	require.NoError(t, err)
 	require.Len(t, rows, 1)
 	zoe := rows[0]
@@ -336,4 +336,64 @@ func TestAttendanceService_DayGrid(t *testing.T) {
 	// Students may not view the grid.
 	_, err = svc.DayGrid(ctx, "student", D, "UJI-DAY")
 	assert.ErrorIs(t, err, service.ErrPermissionDenied)
+}
+
+// Daily mode classifies the whole day by the FIRST period (jam ke-1); session
+// mode counts every session. Same data, different aggregation.
+func TestAttendanceService_ExportDaily(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	ctx := context.Background()
+	userRepo := repository.NewUserRepository(db)
+	svc := service.NewAttendanceService(repository.NewAttendanceRepository(db), repository.NewCourseRepository(db))
+	now := time.Now().UTC().Truncate(time.Second)
+
+	teacher := &repository.User{ID: testutil.NewUserID(), Username: "d_g", Email: "dg@d.com", PasswordHash: "x", Role: "teacher", FullName: "Guru", IsActive: true, CreatedAt: now, UpdatedAt: now}
+	require.NoError(t, userRepo.Create(ctx, teacher))
+	ali := &repository.User{ID: testutil.NewUserID(), Username: "d_ali", Email: "ali@d.com", PasswordHash: "x", Role: "student", FullName: "Ali", IsActive: true, Kelas: "DAY-1", Jurusan: "DJ", CreatedAt: now, UpdatedAt: now}
+	require.NoError(t, userRepo.Create(ctx, ali))
+
+	sess := func(tgl string, jam int, start, end string) string {
+		s, _, err := svc.CreateSession(ctx, teacher.ID, "teacher", service.CreateSessionInput{
+			Mapel: "M", Kelas: "DAY-1", Tanggal: tgl, JamKe: jam, StartTime: start, EndTime: end,
+		})
+		require.NoError(t, err)
+		return s.ID
+	}
+	mark := func(sessID, status string) {
+		_, err := svc.SetRecordStatus(ctx, teacher.ID, "teacher", sessID, ali.ID, status, "")
+		require.NoError(t, err)
+	}
+	// Day 1: hadir at jam-1, alpa at jam-5 → day = hadir.
+	mark(sess("2026-09-01", 1, "07:00", "08:00"), "hadir")
+	mark(sess("2026-09-01", 5, "11:00", "12:00"), "alpa")
+	// Day 2: sakit at jam-1, hadir at jam-5 → day = sakit.
+	mark(sess("2026-09-02", 1, "07:00", "08:00"), "sakit")
+	mark(sess("2026-09-02", 5, "11:00", "12:00"), "hadir")
+
+	byName := func(rows []*repository.AttendanceExportRow) *repository.AttendanceExportRow {
+		for _, r := range rows {
+			if r.StudentName == "Ali" {
+				return r
+			}
+		}
+		return nil
+	}
+
+	daily, err := svc.ExportAttendance(ctx, "teacher", "2026-09-01", "2026-09-30", "DAY-1", "", "daily")
+	require.NoError(t, err)
+	a := byName(daily)
+	require.NotNil(t, a)
+	assert.Equal(t, 1, a.Hadir, "day1 counted from jam-1 (hadir)")
+	assert.Equal(t, 1, a.Sakit, "day2 counted from jam-1 (sakit)")
+	assert.Equal(t, 0, a.Alpa, "jam-5 alpa ignored in daily mode")
+	assert.Equal(t, 2, a.Total, "two days")
+
+	sessionMode, err := svc.ExportAttendance(ctx, "teacher", "2026-09-01", "2026-09-30", "DAY-1", "", "session")
+	require.NoError(t, err)
+	b := byName(sessionMode)
+	require.NotNil(t, b)
+	assert.Equal(t, 2, b.Hadir, "per-session counts both hadir")
+	assert.Equal(t, 1, b.Sakit)
+	assert.Equal(t, 1, b.Alpa)
+	assert.Equal(t, 4, b.Total, "four sessions")
 }

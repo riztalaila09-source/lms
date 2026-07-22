@@ -47,6 +47,7 @@ func (h *SchoolHandler) UpdateSchool(ctx context.Context, req *connect.Request[s
 		ProfilImage: m.ProfilImage, ProfilVideo: m.ProfilVideo, MapsURL: m.MapsUrl, PpdbAktif: m.PpdbAktif,
 		PpdbInfo: m.PpdbInfo, PpdbBrosur: m.PpdbBrosur, PpdbDaftarURL: m.PpdbDaftarUrl, PpdbPengumuman: m.PpdbPengumuman,
 		KepalaSekolahFoto: m.KepalaSekolahFoto,
+		GameMusicData:     m.GameMusicData, GameMusicName: m.GameMusicName,
 	})
 	if err != nil {
 		return nil, mapSchoolError(err)
@@ -62,6 +63,7 @@ func schoolToProto(s *repository.School) *schoolv1.School {
 		ProfilImage: s.ProfilImage, ProfilVideo: s.ProfilVideo, MapsUrl: s.MapsURL, PpdbAktif: s.PpdbAktif,
 		PpdbInfo: s.PpdbInfo, PpdbBrosur: s.PpdbBrosur, PpdbDaftarUrl: s.PpdbDaftarURL, PpdbPengumuman: s.PpdbPengumuman,
 		KepalaSekolahFoto: s.KepalaSekolahFoto,
+		HasGameMusic:      s.HasGameMusic, GameMusicName: s.GameMusicName,
 	}
 }
 

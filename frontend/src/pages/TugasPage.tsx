@@ -4,7 +4,7 @@ import {
 } from '@chakra-ui/react'
 import {
   LuClipboardList, LuPlus, LuInbox, LuPencil, LuTrash2, LuSend, LuBan, LuMessageCircle, LuPower, LuX, LuSearch, LuImage,
-  LuUsers, LuClipboardCheck, LuCheck,
+  LuUsers, LuClipboardCheck, LuCheck, LuGamepad2,
 } from 'react-icons/lu'
 import { timestampDate, timestampFromDate } from '@bufbuild/protobuf/wkt'
 import { assignmentClient, courseClient } from '@/lib/client'
@@ -25,6 +25,8 @@ import { toaster } from '@/components/ui/toaster'
 import KuisRunner from '@/components/tugas/KuisRunner'
 import GroupSubmitDialog from '@/components/tugas/GroupSubmitDialog'
 import PraktikumManager from '@/components/tugas/PraktikumManager'
+import GameHost from '@/components/tugas/GameHost'
+import GamePlayer from '@/components/tugas/GamePlayer'
 
 interface LinkRow { label: string; url: string }
 
@@ -135,6 +137,11 @@ export default function TugasPage() {
   const [groupTarget, setGroupTarget] = useState<Assignment | null>(null)
   const [mgrOpen, setMgrOpen] = useState(false)
   const [mgrTarget, setMgrTarget] = useState<Assignment | null>(null)
+
+  // live game (Kahoot-style): host (guru) + join (murid)
+  const [hostOpen, setHostOpen] = useState(false)
+  const [hostTarget, setHostTarget] = useState<Assignment | null>(null)
+  const [joinOpen, setJoinOpen] = useState(false)
 
   const [open, setOpen] = useState(false)
   const [form, setForm] = useState<FormState>(EMPTY)
@@ -484,7 +491,12 @@ export default function TugasPage() {
     <AppLayout
       title={<><Icon as={LuClipboardList} /> Tugas</>}
       subtitle={canManage ? 'Kelola tugas untuk murid' : 'Daftar tugas Anda'}
-      actions={canManage ? <Button bg={COLORS.primary} color="white" _hover={{ bg: COLORS.primaryDark }} onClick={openCreate}><Icon as={LuPlus} /> Buat {tab === 'kuis' ? 'Kuis' : tab === 'praktikum' ? 'Praktikum' : 'Tugas'}</Button> : undefined}
+      actions={
+        <Flex gap="8px" flexWrap="wrap">
+          <Button variant="outline" colorPalette="purple" onClick={() => setJoinOpen(true)}><Icon as={LuGamepad2} /> Gabung Game</Button>
+          {canManage && <Button bg={COLORS.primary} color="white" _hover={{ bg: COLORS.primaryDark }} onClick={openCreate}><Icon as={LuPlus} /> Buat {tab === 'kuis' ? 'Kuis' : tab === 'praktikum' ? 'Praktikum' : 'Tugas'}</Button>}
+        </Flex>
+      }
     >
       {error && <Text color={COLORS.danger} mb="10px">{error}</Text>}
 
@@ -561,6 +573,7 @@ export default function TugasPage() {
                         <Flex gap="6px" wrap="wrap" justify="flex-end">
                           {canManage ? (
                             <RowActionsMenu actions={[
+                              ...(a.type === 'pilihan_ganda' ? [{ label: 'Main Game Live', icon: LuGamepad2, onClick: () => { setHostTarget(a); setHostOpen(true) } }] : []),
                               ...(a.type === 'praktikum' ? [{ label: 'Atur Kelompok & Nilai', icon: LuUsers, onClick: () => { setMgrTarget(a); setMgrOpen(true) } }] : []),
                               { label: a.isActive ? 'Nonaktifkan tugas' : 'Aktifkan tugas', icon: LuPower, onClick: () => toggleActive(a) },
                               { label: 'Blokir murid', icon: LuBan, onClick: () => openBlock(a) },
@@ -988,6 +1001,10 @@ export default function TugasPage() {
       <GroupSubmitDialog assignment={groupTarget} open={groupOpen} onClose={() => setGroupOpen(false)} onDone={load} />
       {/* Praktikum: pengatur kelompok & penilaian (guru) */}
       <PraktikumManager assignment={mgrTarget} open={mgrOpen} onClose={() => setMgrOpen(false)} />
+
+      {/* Live game (Kahoot-style) */}
+      <GameHost assignment={hostTarget} open={hostOpen} onClose={() => { setHostOpen(false); load() }} />
+      <GamePlayer open={joinOpen} onClose={() => { setJoinOpen(false); load() }} />
     </AppLayout>
   )
 }

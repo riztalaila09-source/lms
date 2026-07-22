@@ -160,3 +160,43 @@ func TestSchoolService_Content(t *testing.T) {
 	g, _ = svc.ListContent(ctx, "galeri_foto")
 	assert.Len(t, g, 2, "other type untouched")
 }
+
+// Game soundtrack is stored/cleared independently and never wipes other fields.
+func TestSchoolService_GameMusic(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	ctx := context.Background()
+	svc := service.NewSchoolService(repository.NewSchoolRepository(db))
+
+	// Set some regular fields first.
+	_, err := svc.UpdateSchool(ctx, "admin", service.UpdateSchoolInput{Name: sp("SMK Musik"), Visi: sp("Visi")})
+	require.NoError(t, err)
+
+	// No music yet.
+	s, err := svc.GetSchool(ctx)
+	require.NoError(t, err)
+	assert.False(t, s.HasGameMusic)
+
+	// Upload music (data URL) — an unrelated field edit must not clear it.
+	_, err = svc.UpdateSchool(ctx, "admin", service.UpdateSchoolInput{
+		GameMusicData: sp("data:audio/mpeg;base64,QUJD"), GameMusicName: sp("lagu.mp3"),
+	})
+	require.NoError(t, err)
+	_, err = svc.UpdateSchool(ctx, "admin", service.UpdateSchoolInput{Visi: sp("Visi baru")})
+	require.NoError(t, err)
+
+	s, err = svc.GetSchool(ctx)
+	require.NoError(t, err)
+	assert.True(t, s.HasGameMusic, "music survives unrelated edits")
+	assert.Equal(t, "lagu.mp3", s.GameMusicName)
+	assert.Equal(t, "Visi baru", s.Visi)
+	assert.Equal(t, "SMK Musik", s.Name)
+
+	// Clearing music with "" leaves other fields intact.
+	_, err = svc.UpdateSchool(ctx, "admin", service.UpdateSchoolInput{GameMusicData: sp("")})
+	require.NoError(t, err)
+	s, err = svc.GetSchool(ctx)
+	require.NoError(t, err)
+	assert.False(t, s.HasGameMusic)
+	assert.Equal(t, "", s.GameMusicName)
+	assert.Equal(t, "SMK Musik", s.Name)
+}

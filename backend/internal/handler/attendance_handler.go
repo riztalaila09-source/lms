@@ -169,7 +169,7 @@ func (h *AttendanceHandler) ExportAttendance(ctx context.Context, req *connect.R
 		return nil, err
 	}
 	m := req.Msg
-	rows, err := h.svc.ExportAttendance(ctx, c.Role, m.Start, m.End, m.Kelas, m.Jurusan)
+	rows, err := h.svc.ExportAttendance(ctx, c.Role, m.Start, m.End, m.Kelas, m.Jurusan, m.Mode)
 	if err != nil {
 		return nil, attendanceError(err)
 	}

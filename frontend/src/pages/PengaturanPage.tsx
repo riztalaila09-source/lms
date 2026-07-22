@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Box, Button, Field, Flex, Icon, Image, Input, NativeSelect, SimpleGrid, Stack, Tabs, Text, Textarea } from '@chakra-ui/react'
-import { LuUser, LuSave, LuKeyRound, LuLock, LuQuote, LuShieldCheck, LuDatabase, LuCheck, LuX, LuDownload, LuContact, LuPalette, LuMoon, LuSun, LuLanguages } from 'react-icons/lu'
+import { LuUser, LuSave, LuKeyRound, LuLock, LuQuote, LuShieldCheck, LuDatabase, LuCheck, LuX, LuDownload, LuContact, LuPalette, LuMoon, LuSun, LuLanguages, LuMusic, LuUpload, LuTrash2 } from 'react-icons/lu'
 import { userClient, schoolClient, parentClient } from '@/lib/client'
 import type { Parent } from '@/gen/parent/v1/parent_pb'
 import { Role } from '@/gen/user/v1/user_pb'
@@ -12,6 +12,7 @@ import { Card } from '@/components/Card'
 import { COLORS } from '@/theme/tokens'
 import { useLang, type Lang } from '@/i18n'
 import { useColorMode } from '@/components/ui/color-mode'
+import { fileToDataUrlRaw } from '@/lib/image'
 
 // Resources that teachers can edit/delete, controlled centrally by admin.
 // Keys mirror the backend `procedureCapabilities` map ("<resource>.<action>").
@@ -64,6 +65,39 @@ export default function PengaturanPage() {
   const [backupMsg, setBackupMsg] = useState('')
   const [backupErr, setBackupErr] = useState('')
   const [downloading, setDownloading] = useState(false)
+
+  // Game music (admin): current track name + presence, upload/remove state.
+  const [gameMusicName, setGameMusicName] = useState('')
+  const [hasGameMusic, setHasGameMusic] = useState(false)
+  const [musicBust, setMusicBust] = useState(0) // cache-buster for the preview <audio>
+  const [musicMsg, setMusicMsg] = useState('')
+  const [savingMusic, setSavingMusic] = useState(false)
+
+  useEffect(() => {
+    if (!admin) return
+    schoolClient.getSchool({}).then((s) => { setHasGameMusic(s.hasGameMusic); setGameMusicName(s.gameMusicName) }).catch(() => {})
+  }, [admin])
+
+  const uploadMusic = async (file: File) => {
+    setSavingMusic(true); setMusicMsg('')
+    try {
+      const dataUrl = await fileToDataUrlRaw(file, 8 * 1024 * 1024)
+      await schoolClient.updateSchool({ gameMusicData: dataUrl, gameMusicName: file.name })
+      setHasGameMusic(true); setGameMusicName(file.name); setMusicBust((n) => n + 1)
+      setMusicMsg('Musik berhasil diunggah.')
+    } catch (e) { setMusicMsg(e instanceof Error ? e.message : 'Gagal mengunggah musik') }
+    finally { setSavingMusic(false) }
+  }
+
+  const removeMusic = async () => {
+    setSavingMusic(true); setMusicMsg('')
+    try {
+      await schoolClient.updateSchool({ gameMusicData: '', gameMusicName: '' })
+      setHasGameMusic(false); setGameMusicName(''); setMusicBust((n) => n + 1)
+      setMusicMsg('Musik dihapus, kembali ke musik bawaan.')
+    } catch (e) { setMusicMsg(e instanceof Error ? e.message : 'Gagal menghapus musik') }
+    finally { setSavingMusic(false) }
+  }
 
   useEffect(() => {
     if (user) {
@@ -220,6 +254,7 @@ export default function PengaturanPage() {
           <Tabs.Trigger value="tampilan"><Icon as={LuPalette} /> {t('settings.tab.appearance')}</Tabs.Trigger>
           {admin && <Tabs.Trigger value="akses"><Icon as={LuShieldCheck} /> {t('settings.tab.access')}</Tabs.Trigger>}
           {admin && <Tabs.Trigger value="backup"><Icon as={LuDatabase} /> {t('settings.tab.backup')}</Tabs.Trigger>}
+          {admin && <Tabs.Trigger value="game"><Icon as={LuMusic} /> {t('settings.tab.game')}</Tabs.Trigger>}
         </Tabs.List>
 
         {/* Profil */}
@@ -415,6 +450,44 @@ export default function PengaturanPage() {
                 </SimpleGrid>
                 {backupErr && <Text fontSize="12px" color={COLORS.danger}>{backupErr}</Text>}
                 {backupMsg && <Text fontSize="12px" color={COLORS.success}>{backupMsg}</Text>}
+              </Stack>
+            </Card>
+          </Tabs.Content>
+        )}
+
+        {/* Game music (admin) */}
+        {admin && (
+          <Tabs.Content value="game">
+            <Card title={<><Icon as={LuMusic} /> {t('settings.game.title')}</>}>
+              <Stack gap="14px" maxW="560px">
+                <Text fontSize="12px" color={COLORS.muted}>{t('settings.game.desc')}</Text>
+
+                <Box>
+                  <Text fontSize="12px" fontWeight="600" mb="4px">{t('settings.game.current')}</Text>
+                  {hasGameMusic ? (
+                    <Stack gap="8px">
+                      <Flex align="center" gap="8px"><Icon as={LuMusic} color={COLORS.primary} /><Text fontSize="13px" fontWeight="600">{gameMusicName || 'musik.mp3'}</Text></Flex>
+                      <audio controls src={`/game-music?t=${musicBust}`} style={{ width: '100%', maxWidth: 420 }} />
+                    </Stack>
+                  ) : (
+                    <Text fontSize="13px" color={COLORS.muted}>{t('settings.game.none')}</Text>
+                  )}
+                </Box>
+
+                <Flex gap="8px" flexWrap="wrap">
+                  <Button as="label" cursor="pointer" size="sm" bg={COLORS.primary} color="white" _hover={{ bg: COLORS.primaryDark }} loading={savingMusic}>
+                    <Icon as={LuUpload} /> {t('settings.game.upload')}
+                    <input type="file" accept="audio/*" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadMusic(f); e.currentTarget.value = '' }} />
+                  </Button>
+                  {hasGameMusic && (
+                    <Button size="sm" variant="outline" colorPalette="red" loading={savingMusic} onClick={removeMusic}>
+                      <Icon as={LuTrash2} /> {t('settings.game.remove')}
+                    </Button>
+                  )}
+                </Flex>
+
+                <Text fontSize="11px" color={COLORS.muted}>{t('settings.game.help')}</Text>
+                {musicMsg && <Text fontSize="12px" color={COLORS.success}>{musicMsg}</Text>}
               </Stack>
             </Card>
           </Tabs.Content>
