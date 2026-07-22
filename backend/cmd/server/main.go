@@ -134,7 +134,7 @@ func main() {
 	parentSvc := service.NewParentService(parentRepo, userRepo)
 
 	// Handlers
-	userHandler := handler.NewUserHandler(userSvc, courseSvc)
+	userHandler := handler.NewUserHandler(userSvc, courseSvc, schoolSvc)
 	courseHandler := handler.NewCourseHandler(courseSvc)
 	materialHandler := handler.NewMaterialHandler(materialSvc, completionSvc, essaySvc)
 	assignmentHandler := handler.NewAssignmentHandler(assignmentSvc)

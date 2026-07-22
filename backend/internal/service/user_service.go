@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 
+	"lms/backend/internal/normalize"
 	"lms/backend/internal/repository"
 )
 
@@ -207,13 +208,13 @@ func (s *UserService) CreateUser(ctx context.Context, callerRole string, callerP
 		PasswordHash:  string(hash),
 		PasswordPlain: password,
 		Role:          role,
-		FullName:      fullName,
+		FullName:      normalize.Name(fullName),
 		IsActive:      true,
 		Kelas:         kelas,
 		Jurusan:       jurusan,
 		Mapel:         mapel,
 		Gender:        gender,
-		Phone:         phone,
+		Phone:         normalize.PhoneID(phone),
 		Permissions:   perms,
 		CreatedAt:     now,
 		UpdatedAt:     now,
@@ -276,7 +277,7 @@ func (s *UserService) UpdateUser(ctx context.Context, callerRole string, callerP
 	}
 
 	if input.FullName != nil {
-		u.FullName = *input.FullName
+		u.FullName = normalize.Name(*input.FullName)
 	}
 	if input.Email != nil {
 		u.Email = *input.Email
@@ -306,7 +307,7 @@ func (s *UserService) UpdateUser(ctx context.Context, callerRole string, callerP
 		u.Gender = *input.Gender
 	}
 	if input.Phone != nil {
-		u.Phone = *input.Phone
+		u.Phone = normalize.PhoneID(*input.Phone)
 	}
 	// Access rights apply to teachers only; sanitized to valid keys.
 	if input.Permissions != nil {
@@ -350,7 +351,7 @@ func (s *UserService) UpdateProfile(ctx context.Context, callerID string, input 
 		return nil, fmt.Errorf("get user: %w", err)
 	}
 	if input.FullName != nil {
-		u.FullName = *input.FullName
+		u.FullName = normalize.Name(*input.FullName)
 	}
 	if input.Username != nil {
 		u.Username = *input.Username
@@ -365,7 +366,7 @@ func (s *UserService) UpdateProfile(ctx context.Context, callerID string, input 
 		u.Story = *input.Story
 	}
 	if input.Phone != nil {
-		u.Phone = strings.TrimSpace(*input.Phone)
+		u.Phone = normalize.PhoneID(*input.Phone)
 	}
 	if input.Gender != nil {
 		g := strings.ToUpper(strings.TrimSpace(*input.Gender))

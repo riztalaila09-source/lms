@@ -17,31 +17,18 @@ import (
 // A barcode/token is valid for this long after it is generated.
 const AttendanceTokenTTL = 60 * time.Second
 
-// Scanning in later than (session start + this) is recorded as "telat".
-const AttendanceTelatTolerance = 10 * time.Minute
-
 // WIB (UTC+7) — school-local time, no tzdata dependency.
 var wib = time.FixedZone("WIB", 7*3600)
-
-// computeAttendanceStatus returns "telat" if `now` is past the session start
-// (tanggal + startTime, interpreted in WIB) plus the tolerance; else "hadir".
-func computeAttendanceStatus(tanggal, startTime string, now time.Time) string {
-	start, err := time.ParseInLocation("2006-01-02 15:04", tanggal+" "+startTime, wib)
-	if err != nil {
-		return "hadir"
-	}
-	if now.In(wib).After(start.Add(AttendanceTelatTolerance)) {
-		return "telat"
-	}
-	return "hadir"
-}
 
 var (
 	ErrTokenInvalid = errors.New("kode absensi tidak valid")
 	ErrTokenExpired = errors.New("kode absensi sudah kadaluarsa")
 )
 
-var validAttendanceStatus = map[string]bool{"hadir": true, "telat": true, "sakit": true, "izin": true, "alpa": true}
+// A student who scans within the session window is always "hadir" (no "telat").
+// Students never scanned are treated as "alpa" once the session ends (computed at
+// read time in ExportRecap / the day grid).
+var validAttendanceStatus = map[string]bool{"hadir": true, "sakit": true, "izin": true, "alpa": true}
 
 type AttendanceService struct {
 	repo       repository.AttendanceRepository
@@ -108,13 +95,32 @@ func (s *AttendanceService) CreateSession(ctx context.Context, callerID, callerR
 	if in.Tanggal == "" || in.Kelas == "" || in.StartTime == "" || in.EndTime == "" {
 		return nil, nil, fmt.Errorf("%w: tanggal, kelas, jam mulai & selesai wajib diisi", ErrInvalidArgument)
 	}
+	now := time.Now().UTC()
+
+	// Reuse an existing session for the same teacher + class + date + lesson-hour
+	// slot instead of creating a duplicate. This is what makes a session created
+	// for "jam 1 s/d 3" survive navigating away and re-opening the page: recreating
+	// it simply returns the same session (with a refreshed token) — no more piling
+	// up duplicate absensi.
+	if existing, err := s.repo.FindSessionSlot(ctx, callerID, in.Kelas, in.Tanggal, in.JamKe, in.StartTime); err == nil && existing != nil {
+		tok, code := genToken(), genCode()
+		exp := now.Add(AttendanceTokenTTL)
+		if err := s.repo.SetToken(ctx, existing.ID, tok, code, exp); err != nil {
+			return nil, nil, fmt.Errorf("refresh token: %w", err)
+		}
+		full, err := s.repo.GetSession(ctx, existing.ID)
+		if err != nil {
+			return nil, nil, err
+		}
+		return full, tokenInfo(full), nil
+	}
+
 	mapel := in.Mapel
 	if mapel == "" && in.CourseID != "" {
 		if c, err := s.courseRepo.GetByID(ctx, in.CourseID); err == nil {
 			mapel = c.Name
 		}
 	}
-	now := time.Now().UTC()
 	sess := &repository.AttendanceSession{
 		ID:        uuid.New().String(),
 		CreatedBy: callerID,
@@ -199,7 +205,10 @@ func (s *AttendanceService) ExportAttendance(ctx context.Context, callerRole, st
 	default:
 		return nil, fmt.Errorf("%w: pilih tepat satu dari kelas/jurusan", ErrInvalidArgument)
 	}
-	return s.repo.ExportRecap(ctx, start, end, scope, value)
+	// Sessions that have already ended (before "now" in WIB) count no-show students
+	// as alpa; sessions still in progress are not yet counted.
+	now := time.Now().In(wib)
+	return s.repo.ExportRecap(ctx, start, end, scope, value, now.Format("2006-01-02"), now.Format("15:04"))
 }
 
 // DayGridResult backs the per-day recap grid for a class.
@@ -305,8 +314,8 @@ func (s *AttendanceService) Scan(ctx context.Context, callerID, callerRole, toke
 	if !sess.TokenExpiresAt.Valid || time.Now().After(sess.TokenExpiresAt.Time) {
 		return nil, false, ErrTokenExpired
 	}
-	status := computeAttendanceStatus(sess.Tanggal, sess.StartTime, time.Now())
-	already, err := s.repo.MarkPresent(ctx, sess.ID, callerID, status)
+	// A valid scan within the session window is always "hadir" (late or not).
+	already, err := s.repo.MarkPresent(ctx, sess.ID, callerID, "hadir")
 	if err != nil {
 		return nil, false, err
 	}
@@ -314,9 +323,9 @@ func (s *AttendanceService) Scan(ctx context.Context, callerID, callerRole, toke
 }
 
 type MyTodayResult struct {
-	Tanggal                         string
-	Hadir, Telat, Sakit, Izin, Alpa int
-	Entries                         []*repository.AttendanceTodayEntry
+	Tanggal                  string
+	Hadir, Sakit, Izin, Alpa int
+	Entries                  []*repository.AttendanceTodayEntry
 }
 
 func (s *AttendanceService) MyToday(ctx context.Context, callerID, callerRole, tanggal string) (*MyTodayResult, error) {
@@ -335,8 +344,6 @@ func (s *AttendanceService) MyToday(ctx context.Context, callerID, callerRole, t
 		switch e.Status {
 		case "hadir":
 			res.Hadir++
-		case "telat":
-			res.Telat++
 		case "sakit":
 			res.Sakit++
 		case "izin":

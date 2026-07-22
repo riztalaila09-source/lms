@@ -14,12 +14,48 @@ import { useAuth } from '@/hooks/useAuth'
 import { fileToDataUrl } from '@/lib/image'
 import AppLayout from '@/components/AppLayout'
 import ConfirmDialog, { type ConfirmState } from '@/components/ConfirmDialog'
+import DataMenu from '@/components/DataMenu'
 import { toaster } from '@/components/ui/toaster'
 import { COLORS } from '@/theme/tokens'
 
 const decodePoints = (s: string): string[] => (s || '').split('\n').map((p) => p.trim()).filter(Boolean)
 const encodePoints = (arr: string[]): string => arr.map((p) => p.trim()).filter(Boolean).join('\n')
 const errMsg = (e: unknown) => (e instanceof ConnectError ? e.rawMessage : e instanceof Error ? e.message : 'Terjadi kesalahan')
+
+// ── Mitra PKL CSV (import / export / template) ──
+const PKL_CSV_HEAD = 'Nama,Alamat,Deskripsi,MapsUrl,Lat,Lng,KontakWA,BidangUsaha,JobRequirement,Kuota'
+// Multi-point fields (Bidang Usaha / Job Requirement) list items separated by " | ".
+const PKL_TEMPLATE_CSV = [
+  PKL_CSV_HEAD,
+  'PT Contoh Teknologi,"Jl. Merdeka No. 1, Jakarta",Perusahaan bidang IT,,-6.200000,106.800000,08123456789,Jaringan | Server,Rajin | Disiplin,2',
+].join('\r\n')
+
+function downloadCSV(content: string, filename: string) {
+  const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url; a.download = filename; a.click()
+  URL.revokeObjectURL(url)
+}
+// One CSV field, quoted if it contains a comma, quote, or newline.
+const csvField = (s: string) => (/[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s)
+// Splits one CSV line honoring double-quoted fields.
+function splitCSVLine(line: string): string[] {
+  const out: string[] = []
+  let cur = '', inQ = false
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i]
+    if (inQ) {
+      if (ch === '"') { if (line[i + 1] === '"') { cur += '"'; i++ } else inQ = false }
+      else cur += ch
+    } else if (ch === '"') inQ = true
+    else if (ch === ',') { out.push(cur); cur = '' }
+    else cur += ch
+  }
+  out.push(cur)
+  return out
+}
+const splitPoints = (s: string): string[] => (s || '').split('|').map((p) => p.trim()).filter(Boolean)
 const waLink = (no: string) => {
   let n = (no || '').replace(/\D/g, '')
   if (n.startsWith('0')) n = '62' + n.slice(1)
@@ -66,6 +102,48 @@ function GuruPkl({ partners, reload }: { partners: Partner[]; reload: () => void
   const [confirm, setConfirm] = useState<ConfirmState | null>(null)
   const [applicantsOf, setApplicantsOf] = useState<Partner | null>(null)
   const [applicants, setApplicants] = useState<Applicant[]>([])
+  const [importing, setImporting] = useState(false)
+  const [importResult, setImportResult] = useState<{ success: number; failed: number; errors: string[] } | null>(null)
+
+  const handleExport = () => {
+    const rows = partners.map((p) => [
+      p.name, p.alamat, p.deskripsi, p.mapsUrl,
+      p.lat ? String(p.lat) : '', p.lng ? String(p.lng) : '', p.kontakWa,
+      decodePoints(p.bidangUsaha).join(' | '), decodePoints(p.jobRequirement).join(' | '),
+      String(p.kuota || 1),
+    ].map(csvField).join(','))
+    downloadCSV([PKL_CSV_HEAD, ...rows].join('\r\n'), 'mitra-pkl.csv')
+  }
+
+  const handleImport = async (file: File) => {
+    setImporting(true); setImportResult(null)
+    try {
+      const lines = (await file.text()).split(/\r?\n/).filter((l) => l.trim())
+      if (lines.length < 2) { setImportResult({ success: 0, failed: 0, errors: ['File CSV kosong atau tidak sesuai template.'] }); return }
+      let success = 0
+      const errors: string[] = []
+      for (let i = 1; i < lines.length; i++) {
+        const c = splitCSVLine(lines[i])
+        const name = (c[0] || '').trim()
+        if (!name) { errors.push(`Baris ${i + 1}: nama kosong, dilewati`); continue }
+        try {
+          await pklClient.createPartner({
+            name, alamat: (c[1] || '').trim(), deskripsi: (c[2] || '').trim(), mapsUrl: (c[3] || '').trim(),
+            lat: parseFloat(c[4]) || 0, lng: parseFloat(c[5]) || 0, kontakWa: (c[6] || '').trim(),
+            bidangUsaha: encodePoints(splitPoints(c[7] || '')), jobRequirement: encodePoints(splitPoints(c[8] || '')),
+            kuota: Math.max(1, parseInt(c[9], 10) || 1), logo: '',
+          })
+          success++
+        } catch (e) { errors.push(`Baris ${i + 1} (${name}): ${errMsg(e)}`) }
+      }
+      setImportResult({ success, failed: errors.length, errors })
+      reload()
+    } catch (e) {
+      setImportResult({ success: 0, failed: 1, errors: [`Error membaca file: ${errMsg(e)}`] })
+    } finally {
+      setImporting(false)
+    }
+  }
 
   const openCreate = () => { setForm(emptyForm); setOpen(true) }
   const openEdit = (p: Partner) => {
@@ -106,11 +184,29 @@ function GuruPkl({ partners, reload }: { partners: Partner[]; reload: () => void
 
   return (
     <>
-      <Flex justify="flex-end" mb="12px">
+      <Flex justify="flex-end" gap="6px" mb="12px" flexWrap="wrap">
+        <DataMenu
+          onImportFile={handleImport}
+          onExport={handleExport}
+          onTemplate={() => downloadCSV(PKL_TEMPLATE_CSV, 'template-mitra-pkl.csv')}
+          importing={importing}
+          exportDisabled={partners.length === 0}
+        />
         <Button bg={COLORS.primary} color="white" _hover={{ bg: COLORS.primaryDark }} onClick={openCreate}>
           <Icon as={LuPlus} /> Tambah Mitra PKL
         </Button>
       </Flex>
+      {importResult && (
+        <Box mb="12px" p="10px" borderRadius="8px" fontSize="13px"
+          bg={importResult.failed === 0 ? '#DCFCE7' : '#FEF3C7'}>
+          <Text fontWeight="600">
+            Hasil Import: {importResult.success} berhasil{importResult.failed > 0 ? `, ${importResult.failed} gagal` : ''}
+          </Text>
+          {importResult.errors.map((err, i) => (
+            <Text key={i} color={COLORS.danger} fontSize="12px">• {err}</Text>
+          ))}
+        </Box>
+      )}
       {partners.length === 0 ? (
         <Text color={COLORS.muted} fontSize="14px">Belum ada mitra PKL.</Text>
       ) : (

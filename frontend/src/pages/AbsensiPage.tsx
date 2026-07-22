@@ -34,7 +34,6 @@ const JAM_PELAJARAN: { ke: number; start: string; end: string }[] = [
 ]
 const STATUSES = [
   { v: 'hadir', label: 'Hadir', color: 'green' },
-  { v: 'telat', label: 'Telat', color: 'yellow' },
   { v: 'sakit', label: 'Sakit', color: 'orange' },
   { v: 'izin', label: 'Izin', color: 'blue' },
   { v: 'alpa', label: 'Alpa', color: 'red' },
@@ -42,6 +41,9 @@ const STATUSES = [
 
 const todayStr = () => new Date().toLocaleDateString('en-CA') // YYYY-MM-DD (local)
 const hariOf = (d: string) => { try { return HARI[new Date(d + 'T00:00:00').getDay()] } catch { return '' } }
+// localStorage key for the teacher's currently-active absensi session (per day).
+const ABSEN_KEY = 'lms_absen_active'
+
 const jamLabel = (s: { jamKe: number; jamKeAkhir?: number; startTime: string; endTime: string }) => {
   const time = `${s.startTime}–${s.endTime}`
   if (!s.jamKe) return time
@@ -49,12 +51,14 @@ const jamLabel = (s: { jamKe: number; jamKeAkhir?: number; startTime: string; en
   return `Jam ke-${s.jamKe} · ${time}`
 }
 function StatusBadge({ s }: { s: string }) {
+  // 'belum' = sesi belum berakhir & murid belum absen (belum diputuskan alpa).
+  if (s === 'belum') return <Badge colorPalette="gray" variant="outline">Belum</Badge>
   const m = STATUSES.find((x) => x.v === s)
   return <Badge colorPalette={m?.color ?? 'gray'}>{m?.label ?? s}</Badge>
 }
 const errMsg = (e: unknown) => (e instanceof ConnectError ? e.rawMessage : e instanceof Error ? e.message : 'Terjadi kesalahan')
 
-// "Tidak masuk" = tidak hadir (alpa/sakit/izin); telat tetap dianggap hadir.
+// "Tidak masuk" = tidak hadir (alpa/sakit/izin).
 const ABSENT = new Set(['alpa', 'sakit', 'izin'])
 const statusMeta = (v: string) => STATUSES.find((x) => x.v === v)
 // Normalisasi nomor Indonesia untuk WhatsApp (0→62, buang non-digit).
@@ -149,9 +153,14 @@ function TeacherAbsensi() {
       setToken(res.token ?? null)
       setCountdown(res.token?.expiresInSeconds ?? 60)
       setRecords([])
+      // Remember the active session so leaving & re-opening the page restores it
+      // (instead of forcing a re-create, which used to pile up duplicate absensi).
+      if (res.session) try { localStorage.setItem(ABSEN_KEY, JSON.stringify({ id: res.session.id, tanggal: form.tanggal })) } catch { /* ignore */ }
     } catch (e) { toaster.create({ description: errMsg(e), type: 'error' }) }
     finally { setCreating(false) }
   }
+  // Clear the active session to start a fresh one.
+  const clearSession = () => { setSession(null); setToken(null); setRecords([]); try { localStorage.removeItem(ABSEN_KEY) } catch { /* ignore */ } }
   const regen = useCallback(async () => {
     if (!session) return
     try {
@@ -178,6 +187,25 @@ function TeacherAbsensi() {
     const t = setInterval(load, 4000)
     return () => { stop = true; clearInterval(t) }
   }, [session])
+
+  // Restore today's active session after navigating away & back (or a refresh),
+  // so a session created for e.g. "jam 1 s/d 3" is kept instead of re-created.
+  useEffect(() => {
+    let raw: string | null = null
+    try { raw = localStorage.getItem(ABSEN_KEY) } catch { return }
+    if (!raw) return
+    let saved: { id: string; tanggal: string }
+    try { saved = JSON.parse(raw) } catch { return }
+    if (saved.tanggal !== todayStr()) { try { localStorage.removeItem(ABSEN_KEY) } catch { /* ignore */ }; return }
+    attendanceClient.listSessions({ tanggal: saved.tanggal }).then((r) => {
+      const found = r.sessions.find((x) => x.id === saved.id)
+      if (!found) { try { localStorage.removeItem(ABSEN_KEY) } catch { /* ignore */ }; return }
+      setSession(found)
+      attendanceClient.regenerateToken({ sessionId: found.id })
+        .then((tr) => { setToken(tr.token ?? null); setCountdown(tr.token?.expiresInSeconds ?? 60) })
+        .catch(() => {})
+    }).catch(() => {})
+  }, [])
 
   return (
     <Stack gap="16px">
@@ -263,7 +291,10 @@ function TeacherAbsensi() {
               </Flex>
             ) : (
               <Stack gap="10px" align="center">
-                <Text fontSize="13px" color={COLORS.muted}>{session.mapel || '—'} · {session.kelas}{session.ruang ? ` · ${session.ruang}` : ''} · {jamLabel(session)}</Text>
+                <Flex w="full" justify="space-between" align="center" gap="8px">
+                  <Text fontSize="13px" color={COLORS.muted}>{session.mapel || '—'} · {session.kelas}{session.ruang ? ` · ${session.ruang}` : ''} · {jamLabel(session)}</Text>
+                  <Button size="xs" variant="ghost" flexShrink={0} onClick={clearSession}><Icon as={LuPlus} /> Sesi baru</Button>
+                </Flex>
                 <QRImage text={token.token} />
                 <Text fontSize="12px" color={COLORS.muted}>atau ketik kode:</Text>
                 <Text fontSize="30px" fontWeight="900" letterSpacing="4px" fontFamily="mono" color={COLORS.text}>{token.code}</Text>
@@ -342,13 +373,24 @@ function PerHariAbsensi() {
   }, [tanggal, kelas])
   useEffect(() => { load() }, [load])
 
-  // status of (session,student): recorded, else 'alpa'.
+  // status of (session,student): recorded status, else 'alpa' once the session has
+  // ended, else 'belum' (still in progress — the murid may still check in).
   const cellMap = useMemo(() => {
     const m = new Map<string, string>()
     data?.cells.forEach((c) => m.set(`${c.sessionId}|${c.studentId}`, c.status))
     return m
   }, [data])
-  const statusOf = (sessionId: string, studentId: string) => cellMap.get(`${sessionId}|${studentId}`) ?? 'alpa'
+  const endedMap = useMemo(() => {
+    const now = new Date()
+    const m = new Map<string, boolean>()
+    data?.sessions.forEach((s) => { m.set(s.id, new Date(`${tanggal}T${s.endTime || '23:59'}:00`) <= now) })
+    return m
+  }, [data, tanggal])
+  const statusOf = (sessionId: string, studentId: string) => {
+    const rec = cellMap.get(`${sessionId}|${studentId}`)
+    if (rec) return rec
+    return endedMap.get(sessionId) ? 'alpa' : 'belum'
+  }
 
   const setStatus = async (sessionId: string, studentId: string, status: string) => {
     try { await attendanceClient.setRecordStatus({ sessionId, studentId, status }); await load() }
@@ -396,8 +438,8 @@ function PerHariAbsensi() {
     const head = ['Nama', ...sessLabels, ...STATUSES.map((x) => x.label)]
     const cell = (v: string | number) => `"${String(v).replace(/"/g, '""')}"`
     const lines = data.students.map((st) => {
-      const counts: Record<string, number> = { hadir: 0, telat: 0, sakit: 0, izin: 0, alpa: 0 }
-      const perSess = data.sessions.map((s) => { const v = statusOf(s.id, st.id); counts[v]++; return label(v) })
+      const counts: Record<string, number> = { hadir: 0, sakit: 0, izin: 0, alpa: 0 }
+      const perSess = data.sessions.map((s) => { const v = statusOf(s.id, st.id); if (v in counts) counts[v]++; return label(v) })
       return [st.name, ...perSess, ...STATUSES.map((x) => counts[x.v])]
     })
     const csv = [head, ...lines].map((row) => row.map(cell).join(',')).join('\r\n')
@@ -492,8 +534,8 @@ function PerHariAbsensi() {
             </Table.Row></Table.Header>
             <Table.Body>
               {data.students.map((st) => {
-                const counts: Record<string, number> = { hadir: 0, telat: 0, sakit: 0, izin: 0, alpa: 0 }
-                data.sessions.forEach((s) => { counts[statusOf(s.id, st.id)]++ })
+                const counts: Record<string, number> = { hadir: 0, sakit: 0, izin: 0, alpa: 0 }
+                data.sessions.forEach((s) => { const v = statusOf(s.id, st.id); if (v in counts) counts[v]++ })
                 return (
                   <Table.Row key={st.id}>
                     <Table.Cell fontWeight="medium">{st.name}</Table.Cell>
@@ -564,9 +606,9 @@ function ExportAbsensi() {
   }
   const download = () => {
     if (!rows || rows.length === 0) return
-    const head = ['Nama', 'Kelas', 'Jurusan', 'Hadir', 'Telat', 'Sakit', 'Izin', 'Alpa', 'Total']
+    const head = ['Nama', 'Kelas', 'Jurusan', 'Hadir', 'Sakit', 'Izin', 'Alpa', 'Total']
     const cell = (v: string | number) => `"${String(v).replace(/"/g, '""')}"`
-    const csv = [head, ...rows.map((r) => [r.studentName, r.kelas, r.jurusan, r.hadir, r.telat, r.sakit, r.izin, r.alpa, r.total])]
+    const csv = [head, ...rows.map((r) => [r.studentName, r.kelas, r.jurusan, r.hadir, r.sakit, r.izin, r.alpa, r.total])]
       .map((row) => row.map(cell).join(',')).join('\r\n')
     const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' })
     const a = document.createElement('a')
@@ -628,7 +670,7 @@ function ExportAbsensi() {
           <Table.Header><Table.Row>
             <Table.ColumnHeader>Nama</Table.ColumnHeader><Table.ColumnHeader>Kelas</Table.ColumnHeader>
             <Table.ColumnHeader>Jurusan</Table.ColumnHeader>
-            <Table.ColumnHeader>Hadir</Table.ColumnHeader><Table.ColumnHeader>Telat</Table.ColumnHeader><Table.ColumnHeader>Sakit</Table.ColumnHeader>
+            <Table.ColumnHeader>Hadir</Table.ColumnHeader><Table.ColumnHeader>Sakit</Table.ColumnHeader>
             <Table.ColumnHeader>Izin</Table.ColumnHeader><Table.ColumnHeader>Alpa</Table.ColumnHeader>
             <Table.ColumnHeader>Total</Table.ColumnHeader>
           </Table.Row></Table.Header>
@@ -637,7 +679,7 @@ function ExportAbsensi() {
               <Table.Row key={i}>
                 <Table.Cell fontWeight="medium">{r.studentName}</Table.Cell>
                 <Table.Cell>{r.kelas}</Table.Cell><Table.Cell>{r.jurusan}</Table.Cell>
-                <Table.Cell>{r.hadir}</Table.Cell><Table.Cell>{r.telat}</Table.Cell><Table.Cell>{r.sakit}</Table.Cell>
+                <Table.Cell>{r.hadir}</Table.Cell><Table.Cell>{r.sakit}</Table.Cell>
                 <Table.Cell>{r.izin}</Table.Cell><Table.Cell>{r.alpa}</Table.Cell>
                 <Table.Cell fontWeight="700">{r.total}</Table.Cell>
               </Table.Row>
@@ -906,7 +948,7 @@ function StudentAbsensi() {
         <Heading size="sm" mb="10px">Hari Ini — {today ? `${hariOf(today.tanggal)}, ${today.tanggal}` : todayStr()}</Heading>
         <SimpleGrid columns={{ base: 3, sm: 5 }} gap="8px" mb="12px">
           {STATUSES.map((s) => {
-            const n = today ? (today[s.v as 'hadir' | 'telat' | 'sakit' | 'izin' | 'alpa']) : 0
+            const n = today ? (today[s.v as 'hadir' | 'sakit' | 'izin' | 'alpa']) : 0
             return (
               <Box key={s.v} textAlign="center" border="1px solid" borderColor={COLORS.border} borderRadius="8px" py="10px">
                 <Text fontSize="22px" fontWeight="800" color={`${s.color}.500`}>{n}</Text>

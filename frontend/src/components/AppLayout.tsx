@@ -6,7 +6,9 @@ import { Role } from '@/gen/user/v1/user_pb'
 import Sidebar from './Sidebar'
 import TopNav from './TopNav'
 import Footer from './Footer'
-import { COLORS, SIDEBAR_WIDTH } from '@/theme/tokens'
+import { COLORS, SIDEBAR_WIDTH, SIDEBAR_COLLAPSED_WIDTH } from '@/theme/tokens'
+
+const COLLAPSE_KEY = 'lms_sidebar_collapsed'
 
 interface AppLayoutProps {
   title: ReactNode
@@ -36,6 +38,15 @@ function PageHeader({ title, subtitle, actions }: Pick<AppLayoutProps, 'title' |
 export default function AppLayout({ title, subtitle, actions, children }: AppLayoutProps) {
   const { user, token, loadingProfile } = useAuth()
   const [open, setOpen] = useState(false)
+  // Desktop sidebar collapse (icon-only rail). Persisted so it survives navigation.
+  const [collapsed, setCollapsed] = useState(() => {
+    try { return localStorage.getItem(COLLAPSE_KEY) === '1' } catch { return false }
+  })
+  const toggleCollapse = () => setCollapsed((c) => {
+    const next = !c
+    try { localStorage.setItem(COLLAPSE_KEY, next ? '1' : '0') } catch { /* ignore */ }
+    return next
+  })
 
   // Wait until the profile is known before choosing a layout, otherwise a
   // refresh briefly flashes the teacher sidebar before the student top-nav.
@@ -66,7 +77,7 @@ export default function AppLayout({ title, subtitle, actions, children }: AppLay
   // ── Teacher/admin: responsive sidebar ──
   return (
     <Box minH="100vh" bg={COLORS.bg} color={COLORS.text}>
-      <Sidebar mobileOpen={open} onNavigate={() => setOpen(false)} />
+      <Sidebar mobileOpen={open} onNavigate={() => setOpen(false)} collapsed={collapsed} onToggleCollapse={toggleCollapse} />
 
       {/* Mobile backdrop */}
       {open && (
@@ -74,7 +85,7 @@ export default function AppLayout({ title, subtitle, actions, children }: AppLay
           onClick={() => setOpen(false)} />
       )}
 
-      <Box ml={{ base: 0, md: `${SIDEBAR_WIDTH}px` }}>
+      <Box ml={{ base: 0, md: `${collapsed ? SIDEBAR_COLLAPSED_WIDTH : SIDEBAR_WIDTH}px` }} transition="margin-left .2s ease">
         {/* Mobile top bar with hamburger */}
         <Flex display={{ base: 'flex', md: 'none' }} align="center" gap="10px" h="52px" px="14px"
           bg={COLORS.surface} borderBottom="1px solid" borderColor={COLORS.border}

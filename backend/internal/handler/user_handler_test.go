@@ -98,13 +98,21 @@ func (m *mockRepo) ListStories(ctx context.Context, limit int) ([]*repository.St
 	return args.Get(0).([]*repository.StoryEntry), args.Error(1)
 }
 
-func newTestHandler(repo repository.UserRepository) *handler.UserHandler {
+type fakeCaps struct{ denied map[string]bool }
+
+func (f fakeCaps) IsCapabilityDenied(key string) bool { return f.denied[key] }
+
+func newTestHandlerCaps(repo repository.UserRepository, caps middleware.CapabilityChecker) *handler.UserHandler {
 	jwtSvc := service.NewJWTService("test-secret", 24)
 	userSvc := service.NewUserService(repo, jwtSvc, nil)
 	// courseSvc is only used by CreateUser auto-enroll (student + kelas); these
 	// handler tests never trigger that path, so nil repos are safe here.
 	courseSvc := service.NewCourseService(nil, nil, repo)
-	return handler.NewUserHandler(userSvc, courseSvc)
+	return handler.NewUserHandler(userSvc, courseSvc, caps)
+}
+
+func newTestHandler(repo repository.UserRepository) *handler.UserHandler {
+	return newTestHandlerCaps(repo, fakeCaps{}) // nothing denied
 }
 
 func TestUserHandler_GetProfile(t *testing.T) {
@@ -182,4 +190,25 @@ func TestUserHandler_ListUsers_AdminOnly(t *testing.T) {
 		assert.ErrorAs(t, err, &connectErr)
 		assert.Equal(t, connect.CodePermissionDenied, connectErr.Code())
 	})
+}
+
+func TestUserHandler_ListUsers_TeacherPasswordHidden(t *testing.T) {
+	mkUsers := func() []*repository.User {
+		u := makeRepoUser("u1", "student")
+		u.PasswordPlain = "secret123"
+		return []*repository.User{u}
+	}
+	list := func(caps middleware.CapabilityChecker, role string) string {
+		repo := &mockRepo{}
+		repo.On("List", mock.Anything, mock.AnythingOfType("repository.ListFilter")).Return(mkUsers(), 1, nil)
+		h := newTestHandlerCaps(repo, caps)
+		resp, err := h.ListUsers(makeAuthContext("c1", role), connect.NewRequest(&userv1.ListUsersRequest{}))
+		require.NoError(t, err)
+		return resp.Msg.Users[0].PasswordPlain
+	}
+
+	denied := fakeCaps{denied: map[string]bool{"pengguna.password": true}}
+	assert.Equal(t, "secret123", list(fakeCaps{}, "teacher"), "teacher allowed -> password shown")
+	assert.Empty(t, list(denied, "teacher"), "teacher denied -> password hidden")
+	assert.Equal(t, "secret123", list(denied, "admin"), "admin never affected")
 }

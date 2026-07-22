@@ -142,6 +142,19 @@ func TestUserService_MutateClass(t *testing.T) {
 	})
 }
 
+func TestUserService_CreateNormalizesNamePhone(t *testing.T) {
+	ctx := context.Background()
+	repo := &mockUserRepository{}
+	svc := service.NewUserService(repo, newTestJWTService(), nil)
+	repo.On("Create", ctx, mock.AnythingOfType("*repository.User")).Return(nil)
+
+	u, err := svc.CreateUser(ctx, "admin", nil, "budi", "b@x.com", "password123",
+		"budi SANTOSO, S.Pd", "teacher", "", "", "Informatika", "L", "81299000", nil)
+	require.NoError(t, err)
+	assert.Equal(t, "Budi Santoso, S.Pd", u.FullName, "Title Case, academic title kept")
+	assert.Equal(t, "081299000", u.Phone, "leading 0 restored")
+}
+
 func TestUserService_UpdateProfile_PhoneGender(t *testing.T) {
 	ctx := context.Background()
 	repo := &mockUserRepository{}
@@ -228,7 +241,7 @@ func TestUserService_CreateUser(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, "student", u.Role)
 		assert.Equal(t, "L", u.Gender)
-		assert.Equal(t, "0812-3456-7890", u.Phone)
+		assert.Equal(t, "081234567890", u.Phone, "phone normalized (dashes stripped)")
 		assert.NotEmpty(t, u.ID)
 	})
 

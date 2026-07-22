@@ -88,7 +88,7 @@ message ExportRow {
   int32 izin = 6;
   int32 alpa = 7;
   int32 total = 8;
-  int32 telat = 9;
+  reserved 9; // was 'telat' (status removed)
 }
 message ExportAttendanceRequest {
   string start = 1;    // 'YYYY-MM-DD'
@@ -128,7 +128,7 @@ message MyTodayResponse {
   int32 izin = 4;
   int32 alpa = 5;
   repeated TodayEntry entries = 6;
-  int32 telat = 7;
+  reserved 7; // was 'telat' (status removed)
 }
 
 // ── Per-day recap grid (teacher) ──

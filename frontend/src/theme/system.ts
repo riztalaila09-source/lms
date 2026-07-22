@@ -44,9 +44,38 @@ const config = defineConfig({
     },
   },
   globalCss: {
+    // Light-mode values for the design tokens consumed via COLORS (tokens.ts).
+    ':root': {
+      '--c-primary': '#2563EB',
+      '--c-primary-dark': '#1D4ED8',
+      '--c-primary-tint': '#EFF6FF',
+      '--c-success': '#16A34A',
+      '--c-warning': '#D97706',
+      '--c-danger': '#DC2626',
+      '--c-bg': '#F8FAFC',
+      '--c-surface': '#FFFFFF',
+      '--c-border': '#E2E8F0',
+      '--c-text': '#0F172A',
+      '--c-muted': '#64748B',
+    },
+    // Dark-mode overrides. next-themes puts `class="dark"` on <html>, so these
+    // win and every COLORS.* usage re-themes automatically.
+    '.dark': {
+      '--c-primary': '#3B82F6', // brand.500 — brighter for contrast on dark
+      '--c-primary-dark': '#2563EB',
+      '--c-primary-tint': 'rgba(59, 130, 246, 0.16)', // translucent active-nav wash
+      '--c-success': '#22C55E',
+      '--c-warning': '#F59E0B',
+      '--c-danger': '#F87171',
+      '--c-bg': '#0B1220', // slate-950-ish page background
+      '--c-surface': '#111827', // panels / sidebar / cards
+      '--c-border': '#1F2937',
+      '--c-text': '#E5E7EB',
+      '--c-muted': '#94A3B8',
+    },
     'html, body': {
-      background: '#F8FAFC',
-      color: '#0F172A',
+      background: 'var(--c-bg)',
+      color: 'var(--c-text)',
     },
   },
 })

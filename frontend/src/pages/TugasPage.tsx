@@ -16,6 +16,7 @@ import AppLayout from '@/components/AppLayout'
 import { Card } from '@/components/Card'
 import Pagination, { usePaged } from '@/components/Pagination'
 import RowActionsMenu from '@/components/RowActionsMenu'
+import DataMenu from '@/components/DataMenu'
 import { encodeLinks } from '@/components/MaterialFormDialog'
 import type { DraftQuestion } from '@/components/MaterialFormDialog'
 import { fileToDataUrl } from '@/lib/image'
@@ -680,11 +681,12 @@ export default function TugasPage() {
                       <Flex justify="space-between" align="center" mb="8px" wrap="wrap" gap="6px">
                         <Text fontSize="13px" fontWeight="600">Soal Pilihan Ganda ({form.questions.length})</Text>
                         <Flex gap="6px" wrap="wrap">
-                          <Button size="2xs" variant="outline" onClick={() => fileRef.current?.click()}>Import CSV</Button>
-                          <input ref={fileRef} type="file" accept=".csv,text/csv" style={{ display: 'none' }}
-                            onChange={(e) => importQuestions(e.target.files?.[0])} />
-                          <Button size="2xs" variant="outline" onClick={() => downloadCSV(questionsToCSV(form.questions), 'soal.csv')} disabled={form.questions.length === 0}>Export CSV</Button>
-                          <Button size="2xs" variant="outline" onClick={() => downloadCSV(QUESTION_TEMPLATE, 'template-soal.csv')}>Template</Button>
+                          <DataMenu size="2xs"
+                            onImportFile={(f) => importQuestions(f)}
+                            onExport={() => downloadCSV(questionsToCSV(form.questions), 'soal.csv')}
+                            onTemplate={() => downloadCSV(QUESTION_TEMPLATE, 'template-soal.csv')}
+                            exportDisabled={form.questions.length === 0}
+                          />
                         </Flex>
                       </Flex>
                       <Text fontSize="11px" color={COLORS.muted} mb="8px">Saat dikerjakan: soal &amp; jawaban diacak; salah &gt;5% otomatis diulang. Skor = benar/total × nilai maksimal.</Text>

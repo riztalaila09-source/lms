@@ -3,7 +3,7 @@ import {
   Badge, Box, Button, Checkbox, Dialog, Field, Flex, Icon, IconButton, Input, NativeSelect, Stack, Table, Text, Textarea,
 } from '@chakra-ui/react'
 import {
-  LuPlus, LuTrash2, LuPencil, LuSearch, LuUpload, LuDownload, LuFileText, LuCopy, LuArrowRightLeft,
+  LuPlus, LuTrash2, LuPencil, LuSearch, LuCopy, LuArrowRightLeft, LuEye, LuEyeOff,
   LuSave, LuCircleCheck, LuBuilding, LuSquare, LuSquareCheck, LuUser,
 } from 'react-icons/lu'
 import { userClient, classClient, jurusanClient, schoolClient, parentClient } from '@/lib/client'
@@ -14,6 +14,9 @@ import type { Jurusan } from '@/gen/jurusan/v1/jurusan_pb'
 import type { Semester } from '@/gen/school/v1/school_pb'
 import type { Parent } from '@/gen/parent/v1/parent_pb'
 import AppLayout from '@/components/AppLayout'
+import PasswordInput from '@/components/PasswordInput'
+import RowActionsMenu from '@/components/RowActionsMenu'
+import DataMenu from '@/components/DataMenu'
 import { Card } from '@/components/Card'
 import ConfirmDialog, { type ConfirmState } from '@/components/ConfirmDialog'
 import Pagination, { usePaged } from '@/components/Pagination'
@@ -178,6 +181,21 @@ function GenderBadge({ g }: { g: string }) {
   if (g === 'L') return <Badge colorPalette="blue">L</Badge>
   if (g === 'P') return <Badge colorPalette="pink">P</Badge>
   return <Text as="span" color={COLORS.muted}>-</Text>
+}
+
+// Password shown in a table cell: masked by default with an eye to reveal + copy.
+// Module-level so the reveal state survives parent re-renders.
+function PasswordReveal({ pwd }: { pwd: string }) {
+  const [show, setShow] = useState(false)
+  if (!pwd) return <Text fontSize="12px" color={COLORS.muted} title="Belum tersimpan / tidak tersedia">– (reset dulu)</Text>
+  return (
+    <Flex gap="2px" align="center">
+      <Text fontSize="12px" fontFamily="mono">{show ? pwd : '••••••••'}</Text>
+      <IconButton size="xs" variant="ghost" p="2px" aria-label={show ? 'Sembunyikan password' : 'Tampilkan password'} title={show ? 'Sembunyikan' : 'Tampilkan'}
+        onClick={() => setShow((s) => !s)}><Icon as={show ? LuEyeOff : LuEye} /></IconButton>
+      <Button size="xs" variant="ghost" p="2px" title="Salin" onClick={() => { navigator.clipboard?.writeText(pwd) }}><Icon as={LuCopy} /></Button>
+    </Flex>
+  )
 }
 
 type Section = 'akademik' | 'guru' | 'siswa' | 'ortu' | 'admin'
@@ -810,20 +828,8 @@ export default function UsersPage({ section = 'guru' }: { section?: Section } = 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [me, tab, section])
 
-  // ── Password cell (shown in plaintext, with a copy button) ──
-  const PwdCell = ({ user }: { user: User }) => {
-    const pwd = user.passwordPlain || passwords[user.id] || ''
-    if (!pwd) return <Text fontSize="12px" color={COLORS.muted} title="Belum tersimpan — Edit untuk mengatur ulang">– (reset dulu)</Text>
-    return (
-      <Flex gap="4px" align="center">
-        <Text fontSize="12px" fontFamily="mono">{pwd}</Text>
-        <Button size="xs" variant="ghost" p="2px" title="Salin"
-          onClick={() => { navigator.clipboard?.writeText(pwd) }}>
-          <Icon as={LuCopy} />
-        </Button>
-      </Flex>
-    )
-  }
+  // Resolve a user's plaintext password (from the list response or typed this session).
+  const pwdOf = (user: User) => user.passwordPlain || passwords[user.id] || ''
 
   const inc = (v: string | undefined, q: string) => (v || '').toLowerCase().includes(q)
   const qGuru = guruSearch.trim().toLowerCase()
@@ -1135,7 +1141,7 @@ export default function UsersPage({ section = 'guru' }: { section?: Section } = 
                   <Field.Root required maxW="200px"><Field.Label>Email</Field.Label>
                     <Input type="email" value={guruForm.email} onChange={(e) => setGuruForm({ ...guruForm, email: e.target.value })} required /></Field.Root>
                   <Field.Root required maxW="150px"><Field.Label>Password</Field.Label>
-                    <Input type="text" value={guruForm.password} onChange={(e) => setGuruForm({ ...guruForm, password: e.target.value })} required minLength={6} /></Field.Root>
+                    <PasswordInput value={guruForm.password} onChange={(e) => setGuruForm({ ...guruForm, password: e.target.value })} required minLength={6} /></Field.Root>
                   <Field.Root maxW="170px"><Field.Label>Mata Pelajaran</Field.Label>
                     <Input value={guruForm.mapel} onChange={(e) => setGuruForm({ ...guruForm, mapel: e.target.value })} placeholder="mis. Matematika" /></Field.Root>
                   <Field.Root maxW="150px"><Field.Label>No. HP</Field.Label>
@@ -1217,12 +1223,12 @@ export default function UsersPage({ section = 'guru' }: { section?: Section } = 
                           {u.kelas ? u.kelas.split(',').map((k) => k.trim()).filter(Boolean).map((k) => <Badge key={k} {...labelColor(k)}>{k}</Badge>) : '-'}
                         </Flex>
                       </Table.Cell>
-                      <Table.Cell><PwdCell user={u} /></Table.Cell>
+                      <Table.Cell><PasswordReveal pwd={pwdOf(u)} /></Table.Cell>
                       <Table.Cell textAlign="right">
-                        <Flex gap="6px" justify="flex-end">
-                          <IconButton size="xs" colorPalette="blue" variant="outline" aria-label="Edit" title="Edit" onClick={() => startEdit(u, 'guru')}><Icon as={LuPencil} /></IconButton>
-                          <IconButton size="xs" colorPalette="red" variant="outline" aria-label="Hapus" title="Hapus" onClick={() => delGuru(u)}><Icon as={LuTrash2} /></IconButton>
-                        </Flex>
+                        <RowActionsMenu actions={[
+                          { label: 'Edit', icon: LuPencil, onClick: () => startEdit(u, 'guru') },
+                          { label: 'Hapus', icon: LuTrash2, danger: true, onClick: () => delGuru(u) },
+                        ]} />
                       </Table.Cell>
                     </Table.Row>
                   ))}
@@ -1246,7 +1252,7 @@ export default function UsersPage({ section = 'guru' }: { section?: Section } = 
                   <Field.Root required maxW="180px"><Field.Label>Email</Field.Label>
                     <Input type="email" value={siswaForm.email} onChange={(e) => setSiswaForm({ ...siswaForm, email: e.target.value })} required /></Field.Root>
                   <Field.Root required maxW="140px"><Field.Label>Password</Field.Label>
-                    <Input type="text" value={siswaForm.password} onChange={(e) => setSiswaForm({ ...siswaForm, password: e.target.value })} required minLength={6} /></Field.Root>
+                    <PasswordInput value={siswaForm.password} onChange={(e) => setSiswaForm({ ...siswaForm, password: e.target.value })} required minLength={6} /></Field.Root>
                   <Field.Root maxW="140px"><Field.Label>Kelas</Field.Label>
                     <NativeSelect.Root>
                       <NativeSelect.Field value={siswaForm.kelas} onChange={(e) => setSiswaForm({ ...siswaForm, kelas: e.target.value })}>
@@ -1292,20 +1298,13 @@ export default function UsersPage({ section = 'guru' }: { section?: Section } = 
                   </NativeSelect.Root>
                 </Box>
                 <Flex gap="6px" align="flex-end" flexWrap="wrap">
-                  <Button size="sm" variant="outline" colorPalette="teal"
-                    onClick={() => importRef.current?.click()} loading={importing}>
-                    <Icon as={LuUpload} /> Import CSV
-                  </Button>
-                  <input ref={importRef} type="file" accept=".csv,text/csv" style={{ display: 'none' }}
-                    onChange={(e) => { const f = e.target.files?.[0]; if (f) handleImport(f) }} />
-                  <Button size="sm" variant="outline" colorPalette="green"
-                    onClick={handleExport} disabled={students.length === 0}>
-                    <Icon as={LuDownload} /> Export CSV
-                  </Button>
-                  <Button size="sm" variant="outline"
-                    onClick={() => downloadCSV(TEMPLATE_CSV, 'template-murid.csv')}>
-                    <Icon as={LuFileText} /> Template
-                  </Button>
+                  <DataMenu
+                    onImportFile={handleImport}
+                    onExport={handleExport}
+                    onTemplate={() => downloadCSV(TEMPLATE_CSV, 'template-murid.csv')}
+                    importing={importing}
+                    exportDisabled={students.length === 0}
+                  />
                   <Button size="sm" bg={COLORS.primary} color="white" _hover={{ bg: COLORS.primaryDark }}
                     onClick={openMutasi}>
                     <Icon as={LuArrowRightLeft} /> Mutasi Kelas
@@ -1396,12 +1395,12 @@ export default function UsersPage({ section = 'guru' }: { section?: Section } = 
                       <Table.Cell>{u.email}</Table.Cell>
                       <Table.Cell>{u.phone || '-'}</Table.Cell>
                       <Table.Cell>{u.kelas ? <Badge {...labelColor(u.kelas)}>{u.kelas}</Badge> : '-'}</Table.Cell>
-                      <Table.Cell><PwdCell user={u} /></Table.Cell>
+                      <Table.Cell><PasswordReveal pwd={pwdOf(u)} /></Table.Cell>
                       <Table.Cell textAlign="right">
-                        <Flex gap="6px" justify="flex-end">
-                          <IconButton size="xs" colorPalette="blue" variant="outline" aria-label="Edit" title="Edit" onClick={() => startEdit(u, 'siswa')}><Icon as={LuPencil} /></IconButton>
-                          <IconButton size="xs" colorPalette="red" variant="outline" aria-label="Hapus" title="Hapus" onClick={() => delSiswa(u)}><Icon as={LuTrash2} /></IconButton>
-                        </Flex>
+                        <RowActionsMenu actions={[
+                          { label: 'Edit', icon: LuPencil, onClick: () => startEdit(u, 'siswa') },
+                          { label: 'Hapus', icon: LuTrash2, danger: true, onClick: () => delSiswa(u) },
+                        ]} />
                       </Table.Cell>
                     </Table.Row>
                   ))}
@@ -1466,17 +1465,13 @@ export default function UsersPage({ section = 'guru' }: { section?: Section } = 
                 </Box>
                 {(ortuFilterKelas || parentSearch) && <Text fontSize="12px" color={COLORS.muted}>{filteredParents.length} hasil</Text>}
                 <Flex gap="6px" align="flex-end" flexWrap="wrap" ml="auto">
-                  <Button size="sm" variant="outline" colorPalette="teal" onClick={() => ortuImportRef.current?.click()} loading={ortuImporting}>
-                    <Icon as={LuUpload} /> Import CSV
-                  </Button>
-                  <input ref={ortuImportRef} type="file" accept=".csv,text/csv" style={{ display: 'none' }}
-                    onChange={(e) => { const f = e.target.files?.[0]; if (f) handleImportOrtu(f) }} />
-                  <Button size="sm" variant="outline" colorPalette="green" onClick={handleExportOrtu} disabled={parents.length === 0}>
-                    <Icon as={LuDownload} /> Export CSV
-                  </Button>
-                  <Button size="sm" variant="outline" onClick={() => downloadCSV(TEMPLATE_ORTU_CSV, 'template-orang-tua.csv')}>
-                    <Icon as={LuFileText} /> Template
-                  </Button>
+                  <DataMenu
+                    onImportFile={handleImportOrtu}
+                    onExport={handleExportOrtu}
+                    onTemplate={() => downloadCSV(TEMPLATE_ORTU_CSV, 'template-orang-tua.csv')}
+                    importing={ortuImporting}
+                    exportDisabled={parents.length === 0}
+                  />
                 </Flex>
               </Flex>
               {ortuImportResult && (
@@ -1552,10 +1547,10 @@ export default function UsersPage({ section = 'guru' }: { section?: Section } = 
                         </Flex>
                       </Table.Cell>
                       <Table.Cell textAlign="right">
-                        <Flex gap="6px" justify="flex-end">
-                          <IconButton size="xs" colorPalette="blue" variant="outline" aria-label="Edit" title="Edit" onClick={() => startEditOrtu(p)}><Icon as={LuPencil} /></IconButton>
-                          <IconButton size="xs" colorPalette="red" variant="outline" aria-label="Hapus" title="Hapus" onClick={() => delOrtu(p)}><Icon as={LuTrash2} /></IconButton>
-                        </Flex>
+                        <RowActionsMenu actions={[
+                          { label: 'Edit', icon: LuPencil, onClick: () => startEditOrtu(p) },
+                          { label: 'Hapus', icon: LuTrash2, danger: true, onClick: () => delOrtu(p) },
+                        ]} />
                       </Table.Cell>
                     </Table.Row>
                   )})}
@@ -1579,7 +1574,7 @@ export default function UsersPage({ section = 'guru' }: { section?: Section } = 
                   <Field.Root required maxW="200px"><Field.Label>Email</Field.Label>
                     <Input type="email" value={adminForm.email} onChange={(e) => setAdminForm({ ...adminForm, email: e.target.value })} required /></Field.Root>
                   <Field.Root required maxW="150px"><Field.Label>Password</Field.Label>
-                    <Input type="text" value={adminForm.password} onChange={(e) => setAdminForm({ ...adminForm, password: e.target.value })} required minLength={6} /></Field.Root>
+                    <PasswordInput value={adminForm.password} onChange={(e) => setAdminForm({ ...adminForm, password: e.target.value })} required minLength={6} /></Field.Root>
                   <Field.Root maxW="150px"><Field.Label>No. HP</Field.Label>
                     <Input value={adminForm.phone} onChange={(e) => setAdminForm({ ...adminForm, phone: e.target.value })} placeholder="08…" /></Field.Root>
                   <Button type="submit" bg={COLORS.primary} color="white" _hover={{ bg: COLORS.primaryDark }} loading={adminSaving}>Tambah Admin</Button>
@@ -1619,12 +1614,12 @@ export default function UsersPage({ section = 'guru' }: { section?: Section } = 
                       <Table.Cell>{u.username}</Table.Cell>
                       <Table.Cell>{u.email}</Table.Cell>
                       <Table.Cell>{u.phone || '-'}</Table.Cell>
-                      <Table.Cell><PwdCell user={u} /></Table.Cell>
+                      <Table.Cell><PasswordReveal pwd={pwdOf(u)} /></Table.Cell>
                       <Table.Cell textAlign="right">
-                        <Flex gap="6px" justify="flex-end">
-                          <IconButton size="xs" colorPalette="blue" variant="outline" aria-label="Edit" title="Edit" onClick={() => startEdit(u, 'admin')}><Icon as={LuPencil} /></IconButton>
-                          <IconButton size="xs" colorPalette="red" variant="outline" aria-label="Hapus" title="Hapus" disabled={u.id === me?.id} onClick={() => delAdmin(u)}><Icon as={LuTrash2} /></IconButton>
-                        </Flex>
+                        <RowActionsMenu actions={[
+                          { label: 'Edit', icon: LuPencil, onClick: () => startEdit(u, 'admin') },
+                          { label: 'Hapus', icon: LuTrash2, danger: true, hidden: u.id === me?.id, onClick: () => delAdmin(u) },
+                        ]} />
                       </Table.Cell>
                     </Table.Row>
                   ))}
@@ -1736,7 +1731,7 @@ export default function UsersPage({ section = 'guru' }: { section?: Section } = 
                     Password Baru{' '}
                     <Text as="span" fontSize="11px" color={COLORS.muted}>(kosongkan jika tidak diubah)</Text>
                   </Field.Label>
-                  <Input type="text" value={editForm.password}
+                  <PasswordInput value={editForm.password}
                     onChange={(e) => setEditForm({ ...editForm, password: e.target.value })}
                     placeholder="Min. 6 karakter" />
                 </Field.Root>

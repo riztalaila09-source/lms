@@ -177,7 +177,7 @@ func (h *AttendanceHandler) ExportAttendance(ctx context.Context, req *connect.R
 	for _, e := range rows {
 		out.Rows = append(out.Rows, &attendancev1.ExportRow{
 			StudentName: e.StudentName, Kelas: e.Kelas, Jurusan: e.Jurusan,
-			Hadir: int32(e.Hadir), Telat: int32(e.Telat), Sakit: int32(e.Sakit), Izin: int32(e.Izin), Alpa: int32(e.Alpa), Total: int32(e.Total),
+			Hadir: int32(e.Hadir), Sakit: int32(e.Sakit), Izin: int32(e.Izin), Alpa: int32(e.Alpa), Total: int32(e.Total),
 		})
 	}
 	return connect.NewResponse(out), nil
@@ -232,7 +232,7 @@ func (h *AttendanceHandler) MyToday(ctx context.Context, req *connect.Request[at
 		return nil, attendanceError(err)
 	}
 	out := &attendancev1.MyTodayResponse{
-		Tanggal: res.Tanggal, Hadir: int32(res.Hadir), Telat: int32(res.Telat), Sakit: int32(res.Sakit),
+		Tanggal: res.Tanggal, Hadir: int32(res.Hadir), Sakit: int32(res.Sakit),
 		Izin: int32(res.Izin), Alpa: int32(res.Alpa),
 	}
 	for _, e := range res.Entries {

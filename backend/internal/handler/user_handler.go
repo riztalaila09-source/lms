@@ -22,11 +22,12 @@ var _ userv1connect.UserServiceHandler = (*UserHandler)(nil)
 type UserHandler struct {
 	userSvc   *service.UserService
 	courseSvc *service.CourseService
+	caps      middleware.CapabilityChecker
 	userv1connect.UnimplementedUserServiceHandler
 }
 
-func NewUserHandler(userSvc *service.UserService, courseSvc *service.CourseService) *UserHandler {
-	return &UserHandler{userSvc: userSvc, courseSvc: courseSvc}
+func NewUserHandler(userSvc *service.UserService, courseSvc *service.CourseService, caps middleware.CapabilityChecker) *UserHandler {
+	return &UserHandler{userSvc: userSvc, courseSvc: courseSvc, caps: caps}
 }
 
 func (h *UserHandler) Login(
@@ -335,12 +336,16 @@ func (h *UserHandler) ListUsers(
 		return nil, mapServiceError(err)
 	}
 
+	// Plaintext password is exposed only here (ListUsers is manager-only), never
+	// in login / profile responses. Admins can additionally deny teachers this
+	// via Pengaturan → Hak Akses ("pengguna.password").
+	hidePwd := claims.Role == "teacher" && h.caps != nil && h.caps.IsCapabilityDenied("pengguna.password")
 	protoUsers := make([]*userv1.User, 0, len(users))
 	for _, u := range users {
 		p := domainToProto(u)
-		// Plaintext password is exposed only here (ListUsers is manager-only),
-		// never in login / profile responses.
-		p.PasswordPlain = u.PasswordPlain
+		if !hidePwd {
+			p.PasswordPlain = u.PasswordPlain
+		}
 		protoUsers = append(protoUsers, p)
 	}
 

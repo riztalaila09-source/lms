@@ -1,17 +1,20 @@
 // Design tokens for the LMS — Royal Blue (brand) on a slate neutral palette.
-// Keep these hex values in sync with the Chakra theme in system.ts.
+// Each value points to a CSS variable (with the light hex as fallback). The
+// variables — and their dark-mode overrides — are declared once in the Chakra
+// `globalCss` in system.ts, so toggling the `.dark` class re-themes every one of
+// the ~900 `COLORS.*` call sites automatically without touching them.
 export const COLORS = {
-  primary: '#2563EB', // brand.600
-  primaryDark: '#1D4ED8', // brand.700
-  primaryTint: '#EFF6FF', // brand.50 — active nav background
-  success: '#16A34A',
-  warning: '#D97706',
-  danger: '#DC2626',
-  bg: '#F8FAFC', // slate.50
-  surface: '#FFFFFF',
-  border: '#E2E8F0', // slate.200
-  text: '#0F172A', // slate.900
-  muted: '#64748B', // slate.500
+  primary: 'var(--c-primary, #2563EB)', // brand.600
+  primaryDark: 'var(--c-primary-dark, #1D4ED8)', // brand.700
+  primaryTint: 'var(--c-primary-tint, #EFF6FF)', // brand.50 — active nav background
+  success: 'var(--c-success, #16A34A)',
+  warning: 'var(--c-warning, #D97706)',
+  danger: 'var(--c-danger, #DC2626)',
+  bg: 'var(--c-bg, #F8FAFC)', // slate.50
+  surface: 'var(--c-surface, #FFFFFF)',
+  border: 'var(--c-border, #E2E8F0)', // slate.200
+  text: 'var(--c-text, #0F172A)', // slate.900
+  muted: 'var(--c-muted, #64748B)', // slate.500
 } as const
 
 // Udemy-flavoured palette — used only on the login page and student-facing
@@ -59,3 +62,5 @@ export function labelColor(seed: string): { bg: string; color: string } {
 }
 
 export const SIDEBAR_WIDTH = 240
+// Width of the collapsed (icon-only) sidebar rail on desktop.
+export const SIDEBAR_COLLAPSED_WIDTH = 64

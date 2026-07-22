@@ -60,7 +60,6 @@ type AttendanceExportRow struct {
 	Kelas       string
 	Jurusan     string
 	Hadir       int
-	Telat       int
 	Sakit       int
 	Izin        int
 	Alpa        int
@@ -80,13 +79,16 @@ type DayCell struct {
 
 type AttendanceRepository interface {
 	CreateSession(ctx context.Context, s *AttendanceSession) error
+	// FindSessionSlot returns an existing session for the same teacher + class +
+	// date + lesson-hour slot (or manual start time when jamKe = 0), so a session
+	// can be reused instead of duplicated. ErrAttendanceNotFound when none.
+	FindSessionSlot(ctx context.Context, createdBy, kelas, tanggal string, jamKe int, startTime string) (*AttendanceSession, error)
 	SetToken(ctx context.Context, sessionID, token, code string, expiresAt time.Time) error
 	GetSession(ctx context.Context, id string) (*AttendanceSession, error)
 	FindByToken(ctx context.Context, token string) (*AttendanceSession, error)
 	FindByCode(ctx context.Context, code string) (*AttendanceSession, error)
 	ListSessions(ctx context.Context, createdBy, tanggal string) ([]*AttendanceSession, error)
-	// MarkPresent inserts a record with the given status ('hadir'/'telat');
-	// returns already=true if one existed.
+	// MarkPresent inserts a 'hadir' record; returns already=true if one existed.
 	MarkPresent(ctx context.Context, sessionID, studentID, status string) (already bool, err error)
 	UpsertRecord(ctx context.Context, sessionID, studentID, status, note string) error
 	GetRecord(ctx context.Context, sessionID, studentID string) (*AttendanceRecord, error)
@@ -95,7 +97,7 @@ type AttendanceRepository interface {
 	DeleteSession(ctx context.Context, id string) error
 	// ExportRecap returns per-student attendance counts within [start,end] for
 	// students in the given scope ("kelas" or "jurusan" = value).
-	ExportRecap(ctx context.Context, start, end, scope, value string) ([]*AttendanceExportRow, error)
+	ExportRecap(ctx context.Context, start, end, scope, value, today, now string) ([]*AttendanceExportRow, error)
 	// Per-day recap grid helpers.
 	ListSessionsByKelas(ctx context.Context, kelas, tanggal string) ([]*AttendanceSession, error)
 	RosterForDay(ctx context.Context, kelas string, sessionIDs []string) ([]*DayStudent, error)
@@ -153,6 +155,13 @@ func (r *sqliteAttendanceRepository) CreateSession(ctx context.Context, s *Atten
 		return fmt.Errorf("create attendance session: %w", err)
 	}
 	return nil
+}
+
+func (r *sqliteAttendanceRepository) FindSessionSlot(ctx context.Context, createdBy, kelas, tanggal string, jamKe int, startTime string) (*AttendanceSession, error) {
+	if jamKe > 0 {
+		return r.getSessionWhere(ctx, "s.created_by = ? AND s.kelas = ? AND s.tanggal = ? AND s.jam_ke = ?", createdBy, kelas, tanggal, jamKe)
+	}
+	return r.getSessionWhere(ctx, "s.created_by = ? AND s.kelas = ? AND s.tanggal = ? AND s.jam_ke = 0 AND s.start_time = ?", createdBy, kelas, tanggal, startTime)
 }
 
 func (r *sqliteAttendanceRepository) SetToken(ctx context.Context, sessionID, token, code string, expiresAt time.Time) error {
@@ -344,27 +353,37 @@ func (r *sqliteAttendanceRepository) ListRecords(ctx context.Context, sessionID 
 	return out, rows.Err()
 }
 
-func (r *sqliteAttendanceRepository) ExportRecap(ctx context.Context, start, end, scope, value string) ([]*AttendanceExportRow, error) {
+func (r *sqliteAttendanceRepository) ExportRecap(ctx context.Context, start, end, scope, value, today, now string) ([]*AttendanceExportRow, error) {
 	col, ok := attendanceScopeCol(scope)
 	if !ok {
 		return nil, fmt.Errorf("invalid export scope: %q", scope)
 	}
-	// Only records whose session falls in [start,end] are counted (s.id becomes
-	// NULL for out-of-range records via the join condition).
+	// A (session, student) pair is COUNTED when the student has a record for it, OR
+	// the session has already ENDED (past date, or today before which end_time passed).
+	// A counted pair's status is the record's status, or 'alpa' when there is none
+	// (auto-alpa: no action taken by the time the session ended). Sessions still in
+	// progress with no record yet are NOT counted (the murid may still check in).
+	// Each session is matched to the students of its class.
 	rows, err := r.db.QueryContext(ctx, `
-		SELECT u.full_name, u.kelas, u.jurusan,
-		       COUNT(CASE WHEN s.id IS NOT NULL AND rec.status='hadir' THEN 1 END),
-		       COUNT(CASE WHEN s.id IS NOT NULL AND rec.status='telat' THEN 1 END),
-		       COUNT(CASE WHEN s.id IS NOT NULL AND rec.status='sakit' THEN 1 END),
-		       COUNT(CASE WHEN s.id IS NOT NULL AND rec.status='izin'  THEN 1 END),
-		       COUNT(CASE WHEN s.id IS NOT NULL AND rec.status='alpa'  THEN 1 END),
-		       COUNT(CASE WHEN s.id IS NOT NULL THEN 1 END)
-		FROM users u
-		LEFT JOIN attendance_records rec ON rec.student_id = u.id
-		LEFT JOIN attendance_sessions s ON s.id = rec.session_id AND s.tanggal >= ? AND s.tanggal <= ?
-		WHERE u.role='student' AND u.`+col+` = ?
-		GROUP BY u.id
-		ORDER BY u.full_name ASC`, start, end, value)
+		SELECT full_name, kelas, jurusan,
+		       SUM(CASE WHEN counted AND status='hadir' THEN 1 ELSE 0 END),
+		       SUM(CASE WHEN counted AND status='sakit' THEN 1 ELSE 0 END),
+		       SUM(CASE WHEN counted AND status='izin'  THEN 1 ELSE 0 END),
+		       SUM(CASE WHEN counted AND status='alpa'  THEN 1 ELSE 0 END),
+		       SUM(CASE WHEN counted THEN 1 ELSE 0 END)
+		FROM (
+			SELECT u.id AS id, u.full_name AS full_name, u.kelas AS kelas, u.jurusan AS jurusan,
+			       COALESCE(rec.status,'alpa') AS status,
+			       (s.id IS NOT NULL AND (rec.status IS NOT NULL
+			            OR s.tanggal < ? OR (s.tanggal = ? AND s.end_time <= ?))) AS counted
+			FROM users u
+			LEFT JOIN attendance_sessions s
+			       ON s.kelas = u.kelas AND s.tanggal >= ? AND s.tanggal <= ?
+			LEFT JOIN attendance_records rec ON rec.session_id = s.id AND rec.student_id = u.id
+			WHERE u.role='student' AND u.`+col+` = ?
+		)
+		GROUP BY id
+		ORDER BY full_name ASC`, today, today, now, start, end, value)
 	if err != nil {
 		return nil, fmt.Errorf("export recap: %w", err)
 	}
@@ -372,7 +391,7 @@ func (r *sqliteAttendanceRepository) ExportRecap(ctx context.Context, start, end
 	var out []*AttendanceExportRow
 	for rows.Next() {
 		e := &AttendanceExportRow{}
-		if err := rows.Scan(&e.StudentName, &e.Kelas, &e.Jurusan, &e.Hadir, &e.Telat, &e.Sakit, &e.Izin, &e.Alpa, &e.Total); err != nil {
+		if err := rows.Scan(&e.StudentName, &e.Kelas, &e.Jurusan, &e.Hadir, &e.Sakit, &e.Izin, &e.Alpa, &e.Total); err != nil {
 			return nil, err
 		}
 		out = append(out, e)

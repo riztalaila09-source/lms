@@ -42,6 +42,16 @@ func TestParentService_CreateLinksChildren(t *testing.T) {
 	assert.Len(t, p.Children, 2)
 }
 
+func TestParentService_CreateNormalizes(t *testing.T) {
+	svc, _, ctx := setupParentSvc(t)
+	p, err := svc.CreateParent(ctx, "admin", service.ParentInput{
+		NamaOrtu: "IBU sri wahyuni", Hubungan: "Ibu", Phone: "628123456",
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "Ibu Sri Wahyuni", p.NamaOrtu)
+	assert.Equal(t, "08123456", p.Phone)
+}
+
 func TestParentService_GetMyParent(t *testing.T) {
 	svc, ur, ctx := setupParentSvc(t)
 	child := mkStudentSvc(t, ur, ctx, "Anak", "student")

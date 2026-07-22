@@ -12,7 +12,7 @@ interface ProviderProps {
 export function Provider({ children }: ProviderProps) {
   return (
     <ChakraProvider value={system}>
-      <ThemeProvider attribute="class" disableTransitionOnChange>
+      <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false} disableTransitionOnChange>
         {children}
         <Toaster />
       </ThemeProvider>

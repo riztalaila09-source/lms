@@ -41,6 +41,42 @@ func mkSession(t *testing.T, ctx context.Context, svc *service.AttendanceService
 	return sess, tok
 }
 
+// Re-creating a session for the same teacher/class/date/lesson-hour must REUSE
+// the existing session (refreshing the token) instead of piling up duplicates.
+func TestAttendanceService_CreateSessionReusesSlot(t *testing.T) {
+	ctx, svc, attRepo, teacher, student := attSetup(t)
+	in := service.CreateSessionInput{Mapel: "Matematika", Kelas: "X-TKJ-1", Tanggal: "2030-08-01", JamKe: 1, JamKeAkhir: 3, StartTime: "07:00", EndTime: "09:15"}
+
+	s1, tok1, err := svc.CreateSession(ctx, teacher.ID, "teacher", in)
+	require.NoError(t, err)
+
+	// A student checks in on the first session.
+	_, _, err = svc.Scan(ctx, student.ID, "student", "", tok1.Code)
+	require.NoError(t, err)
+
+	// Re-creating the same slot returns the SAME session (not a new one).
+	s2, tok2, err := svc.CreateSession(ctx, teacher.ID, "teacher", in)
+	require.NoError(t, err)
+	assert.Equal(t, s1.ID, s2.ID, "same session reused")
+	assert.Equal(t, 3, s2.JamKeAkhir, "the jam 1 s/d 3 range is preserved")
+	assert.NotEqual(t, tok1.Code, tok2.Code, "token refreshed on reuse")
+	assert.Equal(t, 1, s2.HadirCount, "existing check-ins are kept")
+
+	// Only one session exists for that day.
+	sessions, err := attRepo.ListSessions(ctx, teacher.ID, "2030-08-01")
+	require.NoError(t, err)
+	assert.Len(t, sessions, 1)
+
+	// A different lesson-hour is a distinct session.
+	in4 := in
+	in4.JamKe, in4.JamKeAkhir, in4.StartTime = 4, 6, "10:00"
+	s3, _, err := svc.CreateSession(ctx, teacher.ID, "teacher", in4)
+	require.NoError(t, err)
+	assert.NotEqual(t, s1.ID, s3.ID, "different slot -> new session")
+	sessions, _ = attRepo.ListSessions(ctx, teacher.ID, "2030-08-01")
+	assert.Len(t, sessions, 2)
+}
+
 func TestAttendanceService_ScanFlow(t *testing.T) {
 	ctx, svc, _, teacher, student := attSetup(t)
 	_, tok := mkSession(t, ctx, svc, teacher.ID)
@@ -141,14 +177,15 @@ func TestAttendanceService_Export(t *testing.T) {
 		require.NoError(t, err)
 		return sess
 	}
-	// Statuses set explicitly (deterministic; independent of the clock).
-	// In range (Aug): Alice hadir on the 10th, telat on the 11th, izin on the 12th.
+	// Statuses set explicitly (deterministic; independent of the clock). Explicit
+	// records are counted even for sessions that have not ended yet.
+	// In range (Aug): Alice hadir on the 10th, sakit on the 11th, izin on the 12th.
 	set := func(sessID, status string) {
 		_, err := svc.SetRecordStatus(ctx, teacher.ID, "teacher", sessID, alice.ID, status, "")
 		require.NoError(t, err)
 	}
 	set(mkSess("2026-08-10").ID, "hadir")
-	set(mkSess("2026-08-11").ID, "telat")
+	set(mkSess("2026-08-11").ID, "sakit")
 	set(mkSess("2026-08-12").ID, "izin")
 	// Out of range (Jan): must NOT be counted in the August export.
 	set(mkSess("2026-01-05").ID, "hadir")
@@ -163,7 +200,7 @@ func TestAttendanceService_Export(t *testing.T) {
 	require.Contains(t, byName, "Bob")
 	assert.NotContains(t, byName, "Eve", "other class excluded")
 	assert.Equal(t, 1, byName["Alice"].Hadir)
-	assert.Equal(t, 1, byName["Alice"].Telat)
+	assert.Equal(t, 1, byName["Alice"].Sakit)
 	assert.Equal(t, 1, byName["Alice"].Izin)
 	assert.Equal(t, 3, byName["Alice"].Total, "Jan session excluded")
 	assert.Equal(t, 0, byName["Bob"].Total)
@@ -201,9 +238,10 @@ func TestAttendanceService_DeleteSession(t *testing.T) {
 	assert.Equal(t, 0, today.Hadir)
 }
 
-func TestAttendanceService_ScanTelat(t *testing.T) {
+func TestAttendanceService_ScanLateIsStillHadir(t *testing.T) {
 	ctx, svc, _, teacher, student := attSetup(t)
-	// Session dated far in the past → scanning now is well past start → telat.
+	// Session dated far in the past → scanning now is well past start time. There is
+	// no "telat" status anymore: any valid scan within the window counts as hadir.
 	_, tok, err := svc.CreateSession(ctx, teacher.ID, "teacher", service.CreateSessionInput{
 		Mapel: "X", Kelas: "Lab", Tanggal: "2020-01-01", StartTime: "07:00", EndTime: "08:00",
 	})
@@ -213,8 +251,49 @@ func TestAttendanceService_ScanTelat(t *testing.T) {
 
 	today, err := svc.MyToday(ctx, student.ID, "student", "2020-01-01")
 	require.NoError(t, err)
-	assert.Equal(t, 1, today.Telat)
-	assert.Equal(t, 0, today.Hadir)
+	assert.Equal(t, 1, today.Hadir)
+	assert.Equal(t, 0, today.Alpa)
+}
+
+// A student who is never marked is auto-alpa in the recap ONLY after the session
+// ends; an ongoing session with no record is not counted yet.
+func TestAttendanceService_ExportAutoAlpa(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	ctx := context.Background()
+	userRepo := repository.NewUserRepository(db)
+	svc := service.NewAttendanceService(repository.NewAttendanceRepository(db), repository.NewCourseRepository(db))
+	now := time.Now().UTC().Truncate(time.Second)
+	mk := func(name, role, kelas string) *repository.User {
+		u := &repository.User{ID: testutil.NewUserID(), Username: "aa_" + name, Email: name + "@aa.com", PasswordHash: "x",
+			Role: role, FullName: name, IsActive: true, Kelas: kelas, CreatedAt: now, UpdatedAt: now}
+		require.NoError(t, userRepo.Create(ctx, u))
+		return u
+	}
+	teacher := mk("Guru", "teacher", "")
+	mk("Zoe", "student", "AUTO-1") // never marked
+
+	// An ENDED session (yesterday) with no record → Zoe is auto-alpa.
+	yesterday := time.Now().In(time.FixedZone("WIB", 7*3600)).AddDate(0, 0, -1).Format("2006-01-02")
+	_, _, err := svc.CreateSession(ctx, teacher.ID, "teacher", service.CreateSessionInput{
+		Mapel: "X", Kelas: "AUTO-1", Tanggal: yesterday, StartTime: "07:00", EndTime: "08:00",
+	})
+	require.NoError(t, err)
+
+	// A FUTURE session (not ended) with no record → not counted yet.
+	tomorrow := time.Now().In(time.FixedZone("WIB", 7*3600)).AddDate(0, 0, 1).Format("2006-01-02")
+	_, _, err = svc.CreateSession(ctx, teacher.ID, "teacher", service.CreateSessionInput{
+		Mapel: "X", Kelas: "AUTO-1", Tanggal: tomorrow, StartTime: "07:00", EndTime: "08:00",
+	})
+	require.NoError(t, err)
+
+	rows, err := svc.ExportAttendance(ctx, "teacher", yesterday, tomorrow, "AUTO-1", "")
+	require.NoError(t, err)
+	require.Len(t, rows, 1)
+	zoe := rows[0]
+	assert.Equal(t, "Zoe", zoe.StudentName)
+	assert.Equal(t, 1, zoe.Alpa, "ended session with no record is auto-alpa")
+	assert.Equal(t, 1, zoe.Total, "future session not counted yet")
+	assert.Equal(t, 0, zoe.Hadir)
 }
 
 func TestAttendanceService_DayGrid(t *testing.T) {

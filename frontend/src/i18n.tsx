@@ -49,6 +49,59 @@ const DICT: Record<string, { id: string; en: string }> = {
   'footer.privacy': { id: 'Kebijakan Privasi', en: 'Privacy Policy' },
   'footer.terms': { id: 'Ketentuan', en: 'Terms' },
   'footer.lang': { id: 'Bahasa', en: 'Language' },
+
+  // --- Management shell: sidebar (admin/teacher) ---
+  'sb.panel.admin': { id: 'Panel Admin', en: 'Admin Panel' },
+  'sb.panel.teacher': { id: 'Panel Guru', en: 'Teacher Panel' },
+  'sb.panel.student': { id: 'Panel Murid', en: 'Student Panel' },
+  'sb.panel.default': { id: 'Portal Belajar', en: 'Learning Portal' },
+  'sb.learning': { id: 'Pembelajaran', en: 'Learning' },
+  'sb.courses': { id: 'Daftar Mapel', en: 'Subjects' },
+  'sb.submissions': { id: 'Pengumpulan', en: 'Submissions' },
+  'sb.log': { id: 'Log Aktivitas', en: 'Activity Log' },
+  'sb.academicData': { id: 'Data Akademik', en: 'Academic Data' },
+  'sb.schoolProfile': { id: 'Profil Sekolah', en: 'School Profile' },
+  'sb.sp.home': { id: 'Beranda', en: 'Home' },
+  'sb.sp.ppdb': { id: 'PPDB', en: 'Admissions' },
+  'sb.sp.gallery': { id: 'Galeri', en: 'Gallery' },
+  'sb.sp.news': { id: 'Berita', en: 'News' },
+  'sb.sp.academic': { id: 'Akademik', en: 'Academic' },
+  'sb.users': { id: 'Pengguna', en: 'Users' },
+  'sb.teachers': { id: 'Guru', en: 'Teachers' },
+  'sb.students': { id: 'Murid', en: 'Students' },
+  'sb.parents': { id: 'Orang Tua', en: 'Parents' },
+  'sb.admins': { id: 'Admin', en: 'Admins' },
+  'sb.collapse': { id: 'Ciutkan menu', en: 'Collapse menu' },
+  'sb.expand': { id: 'Buka menu', en: 'Expand menu' },
+  'sb.logoutConfirm': { id: 'Yakin ingin keluar?', en: 'Are you sure you want to log out?' },
+
+  'role.admin': { id: 'Admin', en: 'Admin' },
+  'role.teacher': { id: 'Guru', en: 'Teacher' },
+  'role.student': { id: 'Murid', en: 'Student' },
+
+  'common.user': { id: 'Pengguna', en: 'User' },
+  'common.save': { id: 'Simpan', en: 'Save' },
+  'common.saving': { id: 'Menyimpan…', en: 'Saving…' },
+
+  // --- Appearance / theme + language controls ---
+  'appear.theme': { id: 'Tema', en: 'Theme' },
+  'appear.light': { id: 'Terang', en: 'Light' },
+  'appear.dark': { id: 'Gelap', en: 'Dark' },
+  'appear.language': { id: 'Bahasa', en: 'Language' },
+  'appear.langId': { id: 'Bahasa Indonesia', en: 'Indonesian' },
+  'appear.langEn': { id: 'Bahasa Inggris', en: 'English' },
+
+  // --- Settings page (Pengaturan) shell ---
+  'settings.title': { id: 'Pengaturan', en: 'Settings' },
+  'settings.subtitle': { id: 'Kelola profil, keamanan, dan preferensi akun Anda.', en: 'Manage your profile, security, and account preferences.' },
+  'settings.tab.profile': { id: 'Profil', en: 'Profile' },
+  'settings.tab.password': { id: 'Password', en: 'Password' },
+  'settings.tab.story': { id: 'Cerita', en: 'Story' },
+  'settings.tab.appearance': { id: 'Tampilan', en: 'Appearance' },
+  'settings.tab.access': { id: 'Hak Akses', en: 'Access Rights' },
+  'settings.tab.backup': { id: 'Backup', en: 'Backup' },
+  'settings.appearance.title': { id: 'Tampilan', en: 'Appearance' },
+  'settings.appearance.desc': { id: 'Sesuaikan tema warna dan bahasa antarmuka.', en: 'Customize the color theme and interface language.' },
 }
 
 interface LangCtx { lang: Lang; setLang: (l: Lang) => void; t: (key: string) => string }

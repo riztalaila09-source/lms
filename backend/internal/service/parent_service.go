@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"lms/backend/internal/normalize"
 	"lms/backend/internal/repository"
 )
 
@@ -65,9 +66,9 @@ func (s *ParentService) CreateParent(ctx context.Context, callerRole string, in 
 
 	p := &repository.Parent{
 		ID:       uuid.New().String(),
-		NamaOrtu: in.NamaOrtu,
+		NamaOrtu: normalize.Name(in.NamaOrtu),
 		Hubungan: in.Hubungan,
-		Phone:    in.Phone,
+		Phone:    normalize.PhoneID(in.Phone),
 		Alamat:   in.Alamat,
 	}
 	if err := s.repo.Create(ctx, p); err != nil {
@@ -97,9 +98,9 @@ func (s *ParentService) UpdateParent(ctx context.Context, callerRole, id string,
 		return nil, err
 	}
 
-	p.NamaOrtu = in.NamaOrtu
+	p.NamaOrtu = normalize.Name(in.NamaOrtu)
 	p.Hubungan = in.Hubungan
-	p.Phone = in.Phone
+	p.Phone = normalize.PhoneID(in.Phone)
 	p.Alamat = in.Alamat
 	if err := s.repo.Update(ctx, p); err != nil {
 		return nil, fmt.Errorf("update parent: %w", err)
