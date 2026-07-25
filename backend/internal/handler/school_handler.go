@@ -326,3 +326,15 @@ func (h *SchoolHandler) DeletePpdbRegistration(ctx context.Context, req *connect
 	}
 	return connect.NewResponse(&schoolv1.DeletePpdbRegistrationResponse{}), nil
 }
+
+func (h *SchoolHandler) PublishPpdbAnnouncement(ctx context.Context, req *connect.Request[schoolv1.PublishPpdbAnnouncementRequest]) (*connect.Response[schoolv1.PublishPpdbAnnouncementResponse], error) {
+	claims, ok := middleware.ClaimsFromContext(ctx)
+	if !ok {
+		return nil, connect.NewError(connect.CodeUnauthenticated, nil)
+	}
+	n, err := h.svc.PublishPpdbAnnouncement(ctx, claims.Role, req.Msg.TahunAjaran)
+	if err != nil {
+		return nil, mapSchoolError(err)
+	}
+	return connect.NewResponse(&schoolv1.PublishPpdbAnnouncementResponse{Count: int32(n)}), nil
+}

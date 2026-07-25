@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math/rand"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -253,6 +254,9 @@ func (s *SchoolService) SubmitPpdbTest(ctx context.Context, callerRole, regID st
 	if err := s.repo.SavePpdbTest(ctx, regID, score, saved); err != nil {
 		return 0, 0, 0, err
 	}
+	if b, e := s.repo.GetPpdbBatch(ctx, reg.BatchID); e == nil {
+		s.refreshPpdbAnnouncement(ctx, b.TahunAjaran) // best-effort auto-refresh
+	}
 	return score, correct, total, nil
 }
 
@@ -310,4 +314,105 @@ func (s *SchoolService) GetMyPpdb(ctx context.Context, callerRole, regID string)
 		return nil, ppdbNotFound(err)
 	}
 	return reg, nil
+}
+
+// ── pengumuman hasil seleksi (konten type 'pengumuman') ──
+
+func ppdbAnnouncementTitle(tahun string) string { return "Hasil Seleksi PPDB — TA " + tahun }
+
+func (s *SchoolService) buildPpdbAnnouncementItem(tahun string, rows []*repository.PpdbRegistration) *repository.ContentItem {
+	var b strings.Builder
+	for i, r := range rows {
+		fmt.Fprintf(&b, "%d. %s — %s — Nilai %d\n", i+1, r.Nama, r.Jurusan, r.TestScore)
+	}
+	body := strings.TrimRight(b.String(), "\n")
+	if body == "" {
+		body = "Belum ada peserta yang diterima & sudah memiliki nilai ujian."
+	}
+	now := time.Now().In(wib).Format("02-01-2006 15:04")
+	return &repository.ContentItem{
+		Type:     "pengumuman",
+		Title:    ppdbAnnouncementTitle(tahun),
+		Subtitle: fmt.Sprintf("Diurutkan berdasar nilai ujian · %d peserta diterima · diperbarui %s WIB", len(rows), now),
+		Body:     body,
+	}
+}
+
+// mergePpdbAnnouncement prepends the announcement into the 'pengumuman' content,
+// replacing any previous auto-generated item (same title). Manual items are kept.
+func (s *SchoolService) mergePpdbAnnouncement(ctx context.Context, item *repository.ContentItem) error {
+	cur, err := s.repo.ListContent(ctx, "pengumuman")
+	if err != nil {
+		return err
+	}
+	out := make([]*repository.ContentItem, 0, len(cur)+1)
+	out = append(out, item)
+	for _, c := range cur {
+		if c.Title != item.Title {
+			out = append(out, c)
+		}
+	}
+	_, err = s.repo.SetContent(ctx, "pengumuman", out)
+	return err
+}
+
+// PublishPpdbAnnouncement generates/refreshes the ranked acceptance announcement
+// for a school year (all gelombang combined). Admin-only.
+func (s *SchoolService) PublishPpdbAnnouncement(ctx context.Context, callerRole, tahunAjaran string) (int, error) {
+	if !isManager(callerRole) {
+		return 0, ErrPermissionDenied
+	}
+	tahunAjaran = strings.TrimSpace(tahunAjaran)
+	if tahunAjaran == "" {
+		return 0, fmt.Errorf("%w: tahun ajaran wajib", ErrInvalidArgument)
+	}
+	rows, err := s.repo.ListPpdbAcceptedByYear(ctx, tahunAjaran)
+	if err != nil {
+		return 0, err
+	}
+	if err := s.mergePpdbAnnouncement(ctx, s.buildPpdbAnnouncementItem(tahunAjaran, rows)); err != nil {
+		return 0, err
+	}
+	return len(rows), nil
+}
+
+// refreshPpdbAnnouncement re-generates the announcement ONLY if one was already
+// published for that year (title present). Best-effort, no role check (internal).
+func (s *SchoolService) refreshPpdbAnnouncement(ctx context.Context, tahunAjaran string) {
+	if strings.TrimSpace(tahunAjaran) == "" {
+		return
+	}
+	cur, err := s.repo.ListContent(ctx, "pengumuman")
+	if err != nil {
+		return
+	}
+	title := ppdbAnnouncementTitle(tahunAjaran)
+	published := false
+	for _, c := range cur {
+		if c.Title == title {
+			published = true
+			break
+		}
+	}
+	if !published {
+		return
+	}
+	rows, err := s.repo.ListPpdbAcceptedByYear(ctx, tahunAjaran)
+	if err != nil {
+		return
+	}
+	_ = s.mergePpdbAnnouncement(ctx, s.buildPpdbAnnouncementItem(tahunAjaran, rows))
+}
+
+// ppdbTahunOf resolves a registration id → its batch's school year ("" on error).
+func (s *SchoolService) ppdbTahunOf(ctx context.Context, regID string) string {
+	reg, err := s.repo.GetPpdbRegistration(ctx, regID)
+	if err != nil {
+		return ""
+	}
+	b, err := s.repo.GetPpdbBatch(ctx, reg.BatchID)
+	if err != nil {
+		return ""
+	}
+	return b.TahunAjaran
 }

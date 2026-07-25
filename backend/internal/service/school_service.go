@@ -330,6 +330,9 @@ func (s *SchoolService) UpdatePpdbStatus(ctx context.Context, callerRole, id, st
 		}
 		return nil, err
 	}
+	if b, e := s.repo.GetPpdbBatch(ctx, p.BatchID); e == nil {
+		s.refreshPpdbAnnouncement(ctx, b.TahunAjaran) // best-effort auto-refresh
+	}
 	return p, nil
 }
 

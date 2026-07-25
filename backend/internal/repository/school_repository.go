@@ -128,6 +128,8 @@ type SchoolRepository interface {
 	SetPpdbDocLink(ctx context.Context, id, docLink string) error
 	AddPpdbDocument(ctx context.Context, regID, name, dataURL string) (string, error)
 	ListPpdbDocuments(ctx context.Context, regID string) ([]PpdbDoc, error)
+	// PPDB pengumuman: peserta diterima+bernilai dalam satu tahun ajaran (urut skor desc).
+	ListPpdbAcceptedByYear(ctx context.Context, tahunAjaran string) ([]*PpdbRegistration, error)
 }
 
 // PpdbPhone is one labeled contact number of a PPDB applicant.

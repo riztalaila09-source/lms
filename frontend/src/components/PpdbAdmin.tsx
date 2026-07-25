@@ -3,7 +3,7 @@ import {
   Badge, Box, Button, Checkbox, Dialog, Field, Flex, Icon, IconButton, Image, Input, NativeSelect, SimpleGrid, Stack, Switch, Table, Tabs, Text, Textarea,
 } from '@chakra-ui/react'
 import {
-  LuPlus, LuTrash2, LuDownload, LuPrinter, LuEye, LuRefreshCw, LuSave, LuStar, LuUpload, LuLayers, LuClipboardList, LuUsers, LuX, LuExternalLink, LuCheck, LuBan,
+  LuPlus, LuTrash2, LuDownload, LuPrinter, LuEye, LuRefreshCw, LuSave, LuStar, LuUpload, LuLayers, LuClipboardList, LuUsers, LuX, LuExternalLink, LuCheck, LuBan, LuMegaphone,
 } from 'react-icons/lu'
 import { timestampDate } from '@bufbuild/protobuf/wkt'
 import { schoolClient } from '@/lib/client'
@@ -266,6 +266,7 @@ function RegistrantTable({ batch }: { batch: Batch }) {
   const [saving, setSaving] = useState(false)
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [bulking, setBulking] = useState(false)
+  const [publishing, setPublishing] = useState(false)
   const [school, setSchool] = useState<School | null>(null)
   const [confirm, setConfirm] = useState<ConfirmState | null>(null)
   const paged = usePaged(rows, 15)
@@ -316,6 +317,17 @@ function RegistrantTable({ batch }: { batch: Batch }) {
     const body = rows.map((r) => [r.noPendaftaran, r.nama, r.jenisKelamin, r.jurusan, r.asalSekolah, r.testScore < 0 ? '' : r.testScore, PPDB_STATUS[r.status]?.label ?? r.status, r.password, r.phones.map((p) => `${p.label}:${p.number}`).join(' | '), fmtDate(r)])
     const csv = [head, ...body].map((row) => row.map(csvCell).join(',')).join('\r\n')
     const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' })); a.download = `pendaftar_${batch.tahunAjaran.replace('/', '-')}_G${batch.gelombang}.csv`; a.click(); URL.revokeObjectURL(a.href)
+  }
+
+  const publishAnnouncement = async () => {
+    setPublishing(true)
+    try {
+      const r = await schoolClient.publishPpdbAnnouncement({ tahunAjaran: batch.tahunAjaran })
+      toaster.create({
+        description: `Pengumuman hasil seleksi TA ${batch.tahunAjaran} diterbitkan (${r.count} peserta). Tampil di Beranda → Akademik & slideshow, dan diperbarui otomatis.`,
+        type: 'success', duration: 6000,
+      })
+    } catch (e) { errShow(e) } finally { setPublishing(false) }
   }
 
   const printCards = () => {
@@ -378,6 +390,7 @@ function RegistrantTable({ batch }: { batch: Batch }) {
         <Text fontSize="12px" color={COLORS.muted}>{rows.length} pendaftar</Text>
         <Flex gap="6px" ml="auto">
           <Button size="sm" variant="outline" onClick={load} loading={loading}><Icon as={LuRefreshCw} /></Button>
+          <Button size="sm" variant="outline" colorPalette="orange" onClick={publishAnnouncement} loading={publishing}><Icon as={LuMegaphone} /> Terbitkan Pengumuman</Button>
           <Button size="sm" variant="outline" onClick={printCards} disabled={!rows.length}><Icon as={LuPrinter} /> Cetak Kartu</Button>
           <Button size="sm" bg={COLORS.primary} color="white" _hover={{ bg: COLORS.primaryDark }} onClick={exportCSV} disabled={!rows.length}><Icon as={LuDownload} /> Export CSV</Button>
         </Flex>

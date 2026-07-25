@@ -236,6 +236,29 @@ func (r *sqliteSchoolRepository) SetPpdbQuestions(ctx context.Context, batchID s
 	return tx.Commit()
 }
 
+// ListPpdbAcceptedByYear returns accepted, exam-scored applicants across all
+// gelombang of a school year, ranked by score desc (majors mixed).
+func (r *sqliteSchoolRepository) ListPpdbAcceptedByYear(ctx context.Context, tahunAjaran string) ([]*PpdbRegistration, error) {
+	rows, err := r.db.QueryContext(ctx, `
+		SELECT reg.nama, reg.jurusan, reg.test_score, COALESCE(b.gelombang, 0)
+		FROM ppdb_registrations reg JOIN ppdb_batches b ON b.id = reg.batch_id
+		WHERE b.tahun_ajaran = ? AND reg.status = 'diterima' AND reg.test_submitted = 1
+		ORDER BY reg.test_score DESC, reg.created_at ASC`, tahunAjaran)
+	if err != nil {
+		return nil, fmt.Errorf("list ppdb accepted: %w", err)
+	}
+	defer rows.Close()
+	var out []*PpdbRegistration
+	for rows.Next() {
+		p := &PpdbRegistration{}
+		if err := rows.Scan(&p.Nama, &p.Jurusan, &p.TestScore, &p.Gelombang); err != nil {
+			return nil, err
+		}
+		out = append(out, p)
+	}
+	return out, rows.Err()
+}
+
 // ── registrations (extra) ──
 
 func (r *sqliteSchoolRepository) GetPpdbRegistration(ctx context.Context, id string) (*PpdbRegistration, error) {

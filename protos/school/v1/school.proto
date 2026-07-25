@@ -197,6 +197,8 @@ message ListPpdbRegistrationsResponse { repeated PpdbRegistration items = 1; }
 message UpdatePpdbStatusRequest { string id = 1; string status = 2; string catatan = 3; }
 message DeletePpdbRegistrationRequest { string id = 1; }
 message DeletePpdbRegistrationResponse {}
+message PublishPpdbAnnouncementRequest { string tahun_ajaran = 1; }
+message PublishPpdbAnnouncementResponse { int32 count = 1; }
 
 // ── PPDB gelombang (per tahun ajaran) ──
 message PpdbBatch {
@@ -284,6 +286,7 @@ service SchoolService {
   rpc ListPpdbRegistrations(ListPpdbRegistrationsRequest) returns (ListPpdbRegistrationsResponse); // kelola_sekolah
   rpc UpdatePpdbStatus(UpdatePpdbStatusRequest) returns (PpdbRegistration);    // kelola_sekolah
   rpc DeletePpdbRegistration(DeletePpdbRegistrationRequest) returns (DeletePpdbRegistrationResponse); // kelola_sekolah
+  rpc PublishPpdbAnnouncement(PublishPpdbAnnouncementRequest) returns (PublishPpdbAnnouncementResponse); // kelola_sekolah
 
   // PPDB gelombang (admin), + active batch (public)
   rpc GetActivePpdbBatch(GetActivePpdbBatchRequest) returns (PpdbBatch);       // public
