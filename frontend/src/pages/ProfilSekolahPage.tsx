@@ -21,7 +21,7 @@ const fileToDataURL = (file: File) => new Promise<string>((resolve, reject) => {
 
 const empty = {
   appName: '', logo: '', name: '', npsn: '', status: '', akreditasi: '', jenjang: '', tahunBerdiri: '', address: '',
-  profil: '', profilImage: '', profilVideo: '', kepalaSekolah: '', kepalaSekolahFoto: '', visi: '', misi: '', email: '', whatsapp: '', mapsUrl: '',
+  profil: '', profilImage: '', profilVideo: '', kepalaSekolah: '', kepalaSekolahFoto: '', kepalaSekolahTtd: '', visi: '', misi: '', email: '', whatsapp: '', mapsUrl: '',
   ppdbAktif: '', ppdbInfo: '', ppdbBrosur: '', ppdbDaftarUrl: '', ppdbPengumuman: '',
 }
 type SchoolForm = typeof empty
@@ -47,6 +47,7 @@ export default function ProfilSekolahPage({ section }: { section: PSSection }) {
   const imgRef = useRef<HTMLInputElement>(null)
   const brosurRef = useRef<HTMLInputElement>(null)
   const kepalaRef = useRef<HTMLInputElement>(null)
+  const ttdRef = useRef<HTMLInputElement>(null)
   const [staff, setStaff] = useState<StaffRow[]>([])
 
   // The Beranda page now hosts the Profil tab too, so it needs the staff list.
@@ -56,7 +57,7 @@ export default function ProfilSekolahPage({ section }: { section: PSSection }) {
     schoolClient.getSchool({}).then((s) => setForm({
       appName: s.appName, logo: s.logo, name: s.name, npsn: s.npsn, status: s.status, akreditasi: s.akreditasi,
       jenjang: s.jenjang, tahunBerdiri: s.tahunBerdiri, address: s.address, profil: s.profil, profilImage: s.profilImage,
-      profilVideo: s.profilVideo, kepalaSekolah: s.kepalaSekolah, kepalaSekolahFoto: s.kepalaSekolahFoto, visi: s.visi, misi: s.misi, email: s.email,
+      profilVideo: s.profilVideo, kepalaSekolah: s.kepalaSekolah, kepalaSekolahFoto: s.kepalaSekolahFoto, kepalaSekolahTtd: s.kepalaSekolahTtd, visi: s.visi, misi: s.misi, email: s.email,
       whatsapp: s.whatsapp, mapsUrl: s.mapsUrl, ppdbAktif: s.ppdbAktif, ppdbInfo: s.ppdbInfo, ppdbBrosur: s.ppdbBrosur,
       ppdbDaftarUrl: s.ppdbDaftarUrl, ppdbPengumuman: s.ppdbPengumuman,
     })).catch(() => {})
@@ -138,6 +139,7 @@ export default function ProfilSekolahPage({ section }: { section: PSSection }) {
       <Input value={f.profilVideo} onChange={(e) => set('profilVideo', e.target.value)} placeholder="https://youtube.com/watch?v=…" /></Field.Root>
     <Flex gap="16px" wrap="wrap" align="flex-start">
       <ImgField label="Foto Kepala Sekolah" k="kepalaSekolahFoto" r={kepalaRef} />
+      <ImgField label="Tanda Tangan Kepala Sekolah (kartu PPDB)" k="kepalaSekolahTtd" r={ttdRef} />
       <Field.Root flex={1} minW="220px"><Field.Label fontSize="12px">Nama Kepala Sekolah</Field.Label>
         <Input value={f.kepalaSekolah} onChange={(e) => set('kepalaSekolah', e.target.value)} /></Field.Root>
     </Flex>

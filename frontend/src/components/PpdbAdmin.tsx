@@ -1,15 +1,18 @@
 import { useCallback, useEffect, useState } from 'react'
 import {
-  Badge, Box, Button, Dialog, Field, Flex, Icon, IconButton, Image, Input, NativeSelect, SimpleGrid, Stack, Switch, Table, Tabs, Text, Textarea,
+  Badge, Box, Button, Checkbox, Dialog, Field, Flex, Icon, IconButton, Image, Input, NativeSelect, SimpleGrid, Stack, Switch, Table, Tabs, Text, Textarea,
 } from '@chakra-ui/react'
 import {
-  LuPlus, LuTrash2, LuDownload, LuPrinter, LuEye, LuRefreshCw, LuSave, LuStar, LuUpload, LuLayers, LuClipboardList, LuUsers, LuX, LuExternalLink,
+  LuPlus, LuTrash2, LuDownload, LuPrinter, LuEye, LuRefreshCw, LuSave, LuStar, LuUpload, LuLayers, LuClipboardList, LuUsers, LuX, LuExternalLink, LuCheck, LuBan,
 } from 'react-icons/lu'
 import { timestampDate } from '@bufbuild/protobuf/wkt'
 import { schoolClient } from '@/lib/client'
+import type { School } from '@/gen/school/v1/school_pb'
 import { PPDB_JURUSAN, PPDB_STATUS } from '@/lib/ppdb'
 import { fileToDataUrl } from '@/lib/image'
 import ConfirmDialog, { type ConfirmState } from '@/components/ConfirmDialog'
+import RowActionsMenu from '@/components/RowActionsMenu'
+import Pagination, { usePaged } from '@/components/Pagination'
 import { toaster } from '@/components/ui/toaster'
 import { COLORS } from '@/theme/tokens'
 
@@ -261,14 +264,38 @@ function RegistrantTable({ batch }: { batch: Batch }) {
   const [status, setStatus] = useState('baru')
   const [catatan, setCatatan] = useState('')
   const [saving, setSaving] = useState(false)
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [bulking, setBulking] = useState(false)
+  const [school, setSchool] = useState<School | null>(null)
   const [confirm, setConfirm] = useState<ConfirmState | null>(null)
+  const paged = usePaged(rows, 15)
 
   const load = useCallback(async () => {
     setLoading(true)
-    try { const r = await schoolClient.listPpdbRegistrations({ batchId: batch.id, jurusan, search }); setRows(r.items) }
+    try { const r = await schoolClient.listPpdbRegistrations({ batchId: batch.id, jurusan, search }); setRows(r.items); setSelected(new Set()) }
     catch (e) { errShow(e) } finally { setLoading(false) }
   }, [batch.id, jurusan, search])
   useEffect(() => { const t = setTimeout(load, 250); return () => clearTimeout(t) }, [load])
+  useEffect(() => { schoolClient.getSchool({}).then(setSchool).catch(() => {}) }, [])
+
+  const toggle = (id: string) => setSelected((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n })
+  const allChecked = rows.length > 0 && selected.size === rows.length
+  const toggleAll = () => setSelected(allChecked ? new Set() : new Set(rows.map((r) => r.id)))
+  const bulkStatus = (newStatus: string) => setConfirm({
+    title: newStatus === 'diterima' ? 'Terima Pendaftar' : 'Tolak Pendaftar',
+    message: `Ubah status ${selected.size} pendaftar terpilih menjadi "${PPDB_STATUS[newStatus]?.label}"?`,
+    confirmLabel: 'Ya', variant: newStatus === 'ditolak' ? 'danger' : undefined,
+    onConfirm: async () => {
+      setBulking(true)
+      try {
+        for (const id of selected) {
+          const row = rows.find((r) => r.id === id)
+          await schoolClient.updatePpdbStatus({ id, status: newStatus, catatan: row?.catatan || '' })
+        }
+        load()
+      } catch (e) { errShow(e) } finally { setBulking(false) }
+    },
+  })
 
   const fmtDate = (r: Reg) => (r.createdAt ? timestampDate(r.createdAt).toLocaleDateString('id-ID') : '—')
   const openDetail = (r: Reg) => {
@@ -293,18 +320,49 @@ function RegistrantTable({ batch }: { batch: Batch }) {
 
   const printCards = () => {
     if (!rows.length) return
-    const cards = rows.map((r) => `<div class="card"><div class="sch">${batch.tahunAjaran} · ${batch.nama} · PPDB SMK Islam 2 Wlingi</div><div class="nm">${r.nama}</div><div class="jr">Jurusan: <b>${r.jurusan}</b></div><table><tr><td>No. Pendaftaran</td><td><b>${r.noPendaftaran}</b></td></tr><tr><td>Password Ujian</td><td><b>${r.password}</b></td></tr></table><div class="ft">Login ujian di halaman PPDB → "Login Ujian"</div></div>`).join('')
+    const esc = (s: unknown) => String(s ?? '').replace(/[<>&"]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[c] || c))
+    const logo = school?.logo || ''
+    const ttd = school?.kepalaSekolahTtd || ''
+    const namaSekolah = school?.name || 'SMK Islam 2 Wlingi'
+    const alamat = school?.address || ''
+    const kepala = school?.kepalaSekolah || ''
+    const cards = rows.map((r) => `
+      <div class="card">
+        <div class="hd">
+          ${logo ? `<img class="logo" src="${logo}"/>` : '<div class="logo"></div>'}
+          <div class="hdt"><div class="sn">${esc(namaSekolah)}</div><div class="al">${esc(alamat)}</div></div>
+        </div>
+        <div class="gel">KARTU UJIAN PPDB &middot; ${esc(batch.nama)} &middot; TA ${esc(batch.tahunAjaran)}</div>
+        <table>
+          <tr><td>Nama</td><td><b>${esc(r.nama)}</b></td></tr>
+          <tr><td>No. Pendaftaran</td><td><b>${esc(r.noPendaftaran)}</b></td></tr>
+          <tr><td>Jurusan</td><td><b>${esc(r.jurusan)}</b></td></tr>
+          <tr><td>Password Ujian</td><td><b>${esc(r.password)}</b></td></tr>
+        </table>
+        <div class="sign">
+          <div class="sl">Kepala Sekolah,</div>
+          ${ttd ? `<img class="ttd" src="${ttd}"/>` : '<div class="ttd"></div>'}
+          <div class="kn">${esc(kepala) || '&nbsp;'}</div>
+        </div>
+      </div>`).join('')
     const w = window.open('', '_blank')
     if (!w) return
     w.document.write(`<html><head><title>Kartu Ujian PPDB</title><style>
       body{font-family:Arial,sans-serif;margin:12px}
-      .grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-      .card{border:1px dashed #666;border-radius:8px;padding:10px 12px}
-      .sch{font-size:10px;color:#555}.nm{font-size:16px;font-weight:800;margin:2px 0}.jr{font-size:12px;margin-bottom:6px}
-      table{width:100%;font-size:13px;border-collapse:collapse}td{padding:2px 0}td:first-child{color:#555;width:45%}
-      .ft{font-size:10px;color:#777;margin-top:6px}
+      .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+      .card{border:1px solid #333;border-radius:8px;padding:12px 14px}
+      .hd{display:flex;align-items:center;gap:10px}
+      .logo{width:50px;height:50px;object-fit:contain;flex-shrink:0}
+      .hdt{flex:1;text-align:center}
+      .sn{font-size:15px;font-weight:800;line-height:1.2}.al{font-size:10px;color:#444}
+      .gel{text-align:center;font-size:11px;font-weight:700;color:#7A2FB0;margin:8px 0;border-top:1px solid #ddd;border-bottom:1px solid #ddd;padding:4px 0}
+      table{width:100%;font-size:12px;border-collapse:collapse}td{padding:2px 0}td:first-child{color:#555;width:40%}
+      .sign{width:170px;margin:12px 0 0 auto;text-align:center}
+      .sl{font-size:11px;color:#333}
+      .ttd{height:46px;object-fit:contain;display:block;margin:2px auto}
+      .kn{font-size:12px;font-weight:700;border-top:1px solid #333;padding-top:2px;min-height:16px}
       @media print{.card{page-break-inside:avoid}}
-    </style></head><body><h3>Kartu Ujian PPDB — ${batch.tahunAjaran} ${batch.nama}</h3><div class="grid">${cards}</div><script>window.onload=()=>window.print()</script></body></html>`)
+    </style></head><body><div class="grid">${cards}</div><script>window.onload=()=>window.print()</script></body></html>`)
     w.document.close()
   }
 
@@ -325,31 +383,49 @@ function RegistrantTable({ batch }: { batch: Batch }) {
         </Flex>
       </Flex>
 
+      {selected.size > 0 && (
+        <Flex align="center" gap="8px" bg={COLORS.primaryTint} borderRadius="8px" px="12px" py="8px" wrap="wrap">
+          <Text fontSize="13px" fontWeight="600">{selected.size} dipilih</Text>
+          <Button size="xs" colorPalette="green" loading={bulking} onClick={() => bulkStatus('diterima')}><Icon as={LuCheck} /> Terima Semua</Button>
+          <Button size="xs" variant="outline" colorPalette="red" loading={bulking} onClick={() => bulkStatus('ditolak')}><Icon as={LuBan} /> Tolak</Button>
+          <Button size="xs" variant="ghost" onClick={() => setSelected(new Set())}>Batal pilih</Button>
+        </Flex>
+      )}
+
       {rows.length === 0 ? <Text fontSize="13px" color={COLORS.muted}>{loading ? 'Memuat…' : 'Belum ada pendaftar.'}</Text> : (
+        <>
         <Box overflowX="auto"><Table.Root size="sm">
           <Table.Header><Table.Row>
+            <Table.ColumnHeader w="36px"><Checkbox.Root size="sm" checked={allChecked} onCheckedChange={toggleAll}><Checkbox.HiddenInput /><Checkbox.Control /></Checkbox.Root></Table.ColumnHeader>
             <Table.ColumnHeader>#</Table.ColumnHeader><Table.ColumnHeader>No. Daftar</Table.ColumnHeader><Table.ColumnHeader>Nama</Table.ColumnHeader>
             <Table.ColumnHeader>Jurusan</Table.ColumnHeader><Table.ColumnHeader>Nilai</Table.ColumnHeader><Table.ColumnHeader>Password</Table.ColumnHeader>
             <Table.ColumnHeader>Status</Table.ColumnHeader><Table.ColumnHeader textAlign="right">Aksi</Table.ColumnHeader>
           </Table.Row></Table.Header>
           <Table.Body>
-            {rows.map((r, i) => (
-              <Table.Row key={r.id}>
-                <Table.Cell fontWeight="700">{i + 1}</Table.Cell>
+            {paged.pageItems.map((r, i) => (
+              <Table.Row key={r.id} bg={selected.has(r.id) ? COLORS.primaryTint : undefined}>
+                <Table.Cell><Checkbox.Root size="sm" checked={selected.has(r.id)} onCheckedChange={() => toggle(r.id)}><Checkbox.HiddenInput /><Checkbox.Control /></Checkbox.Root></Table.Cell>
+                <Table.Cell fontWeight="700">{(paged.page - 1) * paged.pageSize + i + 1}</Table.Cell>
                 <Table.Cell fontSize="12px">{r.noPendaftaran}</Table.Cell>
                 <Table.Cell fontWeight="medium">{r.nama}</Table.Cell>
                 <Table.Cell><Badge colorPalette="purple" variant="subtle">{r.jurusan}</Badge></Table.Cell>
                 <Table.Cell fontWeight="800">{r.testScore < 0 ? '—' : r.testScore}</Table.Cell>
                 <Table.Cell fontFamily="mono" fontSize="12px">{r.password}</Table.Cell>
                 <Table.Cell><Badge colorPalette={PPDB_STATUS[r.status]?.color ?? 'gray'}>{PPDB_STATUS[r.status]?.label ?? r.status}</Badge></Table.Cell>
-                <Table.Cell textAlign="right"><Flex gap="4px" justify="flex-end">
-                  <IconButton aria-label="Detail" size="xs" variant="outline" colorPalette="blue" onClick={() => openDetail(r)}><Icon as={LuEye} /></IconButton>
-                  <IconButton aria-label="Hapus" size="xs" variant="outline" colorPalette="red" onClick={() => askDelete(r)}><Icon as={LuTrash2} /></IconButton>
-                </Flex></Table.Cell>
+                <Table.Cell textAlign="right">
+                  <RowActionsMenu actions={[
+                    { label: 'Detail', icon: LuEye, onClick: () => openDetail(r) },
+                    { label: 'Terima', icon: LuCheck, onClick: () => schoolClient.updatePpdbStatus({ id: r.id, status: 'diterima', catatan: r.catatan || '' }).then(load).catch(errShow) },
+                    { label: 'Tolak', icon: LuBan, onClick: () => schoolClient.updatePpdbStatus({ id: r.id, status: 'ditolak', catatan: r.catatan || '' }).then(load).catch(errShow) },
+                    { label: 'Hapus', icon: LuTrash2, onClick: () => askDelete(r), danger: true },
+                  ]} />
+                </Table.Cell>
               </Table.Row>
             ))}
           </Table.Body>
         </Table.Root></Box>
+        <Pagination page={paged.page} pageSize={paged.pageSize} total={paged.total} onPageChange={paged.setPage} />
+        </>
       )}
 
       <Dialog.Root open={!!detail} onOpenChange={(e) => { if (!e.open) setDetail(null) }} scrollBehavior="inside" size="lg">

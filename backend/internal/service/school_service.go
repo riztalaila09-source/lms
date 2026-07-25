@@ -115,7 +115,7 @@ type UpdateSchoolInput struct {
 	Name, Address, AppName, Logo, Profil, Visi, Misi, KepalaSekolah,
 	TahunBerdiri, Email, Whatsapp, Npsn, Status, Akreditasi, Jenjang,
 	ProfilImage, ProfilVideo, MapsURL, PpdbAktif, PpdbInfo, PpdbBrosur, PpdbDaftarURL, PpdbPengumuman,
-	KepalaSekolahFoto,
+	KepalaSekolahFoto, KepalaSekolahTtd,
 	GameMusicData, GameMusicName *string // audio data URL ("" clears) + display name
 }
 
@@ -160,6 +160,7 @@ func (s *SchoolService) UpdateSchool(ctx context.Context, callerRole string, in 
 	apply(&cur.PpdbDaftarURL, in.PpdbDaftarURL, true)
 	apply(&cur.PpdbPengumuman, in.PpdbPengumuman, false)
 	apply(&cur.KepalaSekolahFoto, in.KepalaSekolahFoto, true)
+	apply(&cur.KepalaSekolahTtd, in.KepalaSekolahTtd, false)
 	out, err := s.repo.UpdateSchool(ctx, cur)
 	if err != nil {
 		return nil, err

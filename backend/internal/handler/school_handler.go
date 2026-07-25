@@ -46,7 +46,7 @@ func (h *SchoolHandler) UpdateSchool(ctx context.Context, req *connect.Request[s
 		Email: m.Email, Whatsapp: m.Whatsapp, Npsn: m.Npsn, Status: m.Status, Akreditasi: m.Akreditasi, Jenjang: m.Jenjang,
 		ProfilImage: m.ProfilImage, ProfilVideo: m.ProfilVideo, MapsURL: m.MapsUrl, PpdbAktif: m.PpdbAktif,
 		PpdbInfo: m.PpdbInfo, PpdbBrosur: m.PpdbBrosur, PpdbDaftarURL: m.PpdbDaftarUrl, PpdbPengumuman: m.PpdbPengumuman,
-		KepalaSekolahFoto: m.KepalaSekolahFoto,
+		KepalaSekolahFoto: m.KepalaSekolahFoto, KepalaSekolahTtd: m.KepalaSekolahTtd,
 		GameMusicData:     m.GameMusicData, GameMusicName: m.GameMusicName,
 	})
 	if err != nil {
@@ -62,7 +62,7 @@ func schoolToProto(s *repository.School) *schoolv1.School {
 		Email: s.Email, Whatsapp: s.Whatsapp, Npsn: s.Npsn, Status: s.Status, Akreditasi: s.Akreditasi, Jenjang: s.Jenjang,
 		ProfilImage: s.ProfilImage, ProfilVideo: s.ProfilVideo, MapsUrl: s.MapsURL, PpdbAktif: s.PpdbAktif,
 		PpdbInfo: s.PpdbInfo, PpdbBrosur: s.PpdbBrosur, PpdbDaftarUrl: s.PpdbDaftarURL, PpdbPengumuman: s.PpdbPengumuman,
-		KepalaSekolahFoto: s.KepalaSekolahFoto,
+		KepalaSekolahFoto: s.KepalaSekolahFoto, KepalaSekolahTtd: s.KepalaSekolahTtd,
 		HasGameMusic:      s.HasGameMusic, GameMusicName: s.GameMusicName,
 	}
 }

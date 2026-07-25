@@ -41,6 +41,7 @@ type School struct {
 	PpdbDaftarURL string
 	PpdbPengumuman string
 	KepalaSekolahFoto string
+	KepalaSekolahTtd  string
 	// Game soundtrack — read-only summary (the audio blob is never loaded here;
 	// it is streamed by /game-music). Set via SetGameMusic.
 	HasGameMusic  bool
@@ -55,18 +56,18 @@ type Staff struct {
 	Foto    string
 }
 
-const schoolCols = `name, address, app_name, logo, profil, visi, misi, kepala_sekolah, tahun_berdiri, email, whatsapp, npsn, status, akreditasi, jenjang, profil_image, profil_video, maps_url, ppdb_aktif, ppdb_info, ppdb_brosur, ppdb_daftar_url, ppdb_pengumuman, kepala_sekolah_foto`
+const schoolCols = `name, address, app_name, logo, profil, visi, misi, kepala_sekolah, tahun_berdiri, email, whatsapp, npsn, status, akreditasi, jenjang, profil_image, profil_video, maps_url, ppdb_aktif, ppdb_info, ppdb_brosur, ppdb_daftar_url, ppdb_pengumuman, kepala_sekolah_foto, kepala_sekolah_ttd`
 
 func schoolScanDest(s *School) []any {
 	return []any{&s.Name, &s.Address, &s.AppName, &s.Logo, &s.Profil, &s.Visi, &s.Misi, &s.KepalaSekolah,
 		&s.TahunBerdiri, &s.Email, &s.Whatsapp, &s.Npsn, &s.Status, &s.Akreditasi, &s.Jenjang,
-		&s.ProfilImage, &s.ProfilVideo, &s.MapsURL, &s.PpdbAktif, &s.PpdbInfo, &s.PpdbBrosur, &s.PpdbDaftarURL, &s.PpdbPengumuman, &s.KepalaSekolahFoto}
+		&s.ProfilImage, &s.ProfilVideo, &s.MapsURL, &s.PpdbAktif, &s.PpdbInfo, &s.PpdbBrosur, &s.PpdbDaftarURL, &s.PpdbPengumuman, &s.KepalaSekolahFoto, &s.KepalaSekolahTtd}
 }
 
 func schoolValues(s *School) []any {
 	return []any{s.Name, s.Address, s.AppName, s.Logo, s.Profil, s.Visi, s.Misi, s.KepalaSekolah,
 		s.TahunBerdiri, s.Email, s.Whatsapp, s.Npsn, s.Status, s.Akreditasi, s.Jenjang,
-		s.ProfilImage, s.ProfilVideo, s.MapsURL, s.PpdbAktif, s.PpdbInfo, s.PpdbBrosur, s.PpdbDaftarURL, s.PpdbPengumuman, s.KepalaSekolahFoto}
+		s.ProfilImage, s.ProfilVideo, s.MapsURL, s.PpdbAktif, s.PpdbInfo, s.PpdbBrosur, s.PpdbDaftarURL, s.PpdbPengumuman, s.KepalaSekolahFoto, s.KepalaSekolahTtd}
 }
 
 type Semester struct {
@@ -202,7 +203,7 @@ func (r *sqliteSchoolRepository) GetSchool(ctx context.Context) (*School, error)
 func (r *sqliteSchoolRepository) UpdateSchool(ctx context.Context, s *School) (*School, error) {
 	_, err := r.db.ExecContext(ctx,
 		`INSERT INTO school_settings (id, `+schoolCols+`)
-		 VALUES ('default', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		 VALUES ('default', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		 ON CONFLICT(id) DO UPDATE SET
 		   name=excluded.name, address=excluded.address, app_name=excluded.app_name, logo=excluded.logo,
 		   profil=excluded.profil, visi=excluded.visi, misi=excluded.misi, kepala_sekolah=excluded.kepala_sekolah,
@@ -211,7 +212,7 @@ func (r *sqliteSchoolRepository) UpdateSchool(ctx context.Context, s *School) (*
 		   profil_image=excluded.profil_image, profil_video=excluded.profil_video, maps_url=excluded.maps_url,
 		   ppdb_aktif=excluded.ppdb_aktif, ppdb_info=excluded.ppdb_info, ppdb_brosur=excluded.ppdb_brosur,
 		   ppdb_daftar_url=excluded.ppdb_daftar_url, ppdb_pengumuman=excluded.ppdb_pengumuman,
-		   kepala_sekolah_foto=excluded.kepala_sekolah_foto`,
+		   kepala_sekolah_foto=excluded.kepala_sekolah_foto, kepala_sekolah_ttd=excluded.kepala_sekolah_ttd`,
 		schoolValues(s)...)
 	if err != nil {
 		return nil, fmt.Errorf("update school: %w", err)

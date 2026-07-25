@@ -1,10 +1,9 @@
 import { useEffect, useState } from 'react'
 import { Box, Button, Dialog, Field, Flex, Icon, IconButton, Input, NativeSelect, SimpleGrid, Stack, Text, Textarea } from '@chakra-ui/react'
-import { LuUserPlus, LuPlus, LuX, LuCircleCheck, LuPhone, LuExternalLink, LuFileText, LuUpload, LuLink, LuSend } from 'react-icons/lu'
+import { LuUserPlus, LuPlus, LuX, LuCircleCheck, LuPhone, LuExternalLink, LuFileText, LuLink, LuSend } from 'react-icons/lu'
 import { ConnectError } from '@connectrpc/connect'
 import { schoolClient } from '@/lib/client'
 import { PPDB_JURUSAN } from '@/lib/ppdb'
-import { fileToDataUrlRaw } from '@/lib/image'
 import { COLORS, UDEMY } from '@/theme/tokens'
 
 const errMsg = (e: unknown) => (e instanceof ConnectError ? e.rawMessage : e instanceof Error ? e.message : 'Terjadi kesalahan')
@@ -22,14 +21,13 @@ export default function PpdbRegisterDialog({ open, onClose, batch }: { open: boo
   const [regId, setRegId] = useState('')
   const [err, setErr] = useState('')
   const done = !!no
-  // documents (success screen): Drive link + uploaded files
+  // documents (success screen): Google Drive link
   const [docLink, setDocLink] = useState('')
-  const [files, setFiles] = useState<File[]>([])
   const [docBusy, setDocBusy] = useState(false)
   const [docMsg, setDocMsg] = useState('')
   const [docErr, setDocErr] = useState('')
 
-  useEffect(() => { if (open) { setF(EMPTY); setPhones(DEFAULT_PHONES); setNo(''); setRegId(''); setErr(''); setDocLink(''); setFiles([]); setDocMsg(''); setDocErr('') } }, [open])
+  useEffect(() => { if (open) { setF(EMPTY); setPhones(DEFAULT_PHONES); setNo(''); setRegId(''); setErr(''); setDocLink(''); setDocMsg(''); setDocErr('') } }, [open])
 
   const upd = (k: keyof typeof EMPTY, v: string) => setF((s) => ({ ...s, [k]: v }))
   const setPhone = (i: number, patch: Partial<{ label: string; number: string }>) =>
@@ -47,13 +45,11 @@ export default function PpdbRegisterDialog({ open, onClose, batch }: { open: boo
   }
 
   const kirimDokumen = async () => {
-    if (!docLink.trim() && files.length === 0) { setDocErr('Tempel link dokumen atau pilih file dulu.'); return }
+    if (!docLink.trim()) { setDocErr('Tempel link Google Drive dokumen Anda dulu.'); return }
     setDocBusy(true); setDocErr(''); setDocMsg('')
     try {
-      const payload = await Promise.all(files.map(async (file) => ({ name: file.name, data: await fileToDataUrlRaw(file, 4 * 1024 * 1024) })))
-      const res = await schoolClient.submitPpdbDocuments({ registrationId: regId, docLink: docLink.trim(), files: payload })
-      setDocMsg(`Berhasil dikirim${res.uploaded ? ` (${res.uploaded} file terunggah)` : ''}. Terima kasih!`)
-      setFiles([])
+      await schoolClient.submitPpdbDocuments({ registrationId: regId, docLink: docLink.trim(), files: [] })
+      setDocMsg('Link dokumen berhasil dikirim. Terima kasih!')
     } catch (e) { setDocErr(errMsg(e)) }
     finally { setDocBusy(false) }
   }
@@ -95,35 +91,19 @@ export default function PpdbRegisterDialog({ open, onClose, batch }: { open: boo
                 </Box>
 
                 <Box bg={COLORS.surface} border="1px solid" borderColor={UDEMY.accent} borderRadius="12px" p="16px">
-                  <Text fontSize="14px" fontWeight="800" mb="4px"><Icon as={LuSend} color={UDEMY.accent} /> Kirim Dokumen Anda</Text>
+                  <Text fontSize="14px" fontWeight="800" mb="4px"><Icon as={LuSend} color={UDEMY.accent} /> Kirim Link Dokumen Anda</Text>
                   <Text fontSize="12px" color={COLORS.muted} mb="10px">
-                    Setelah dokumen diunggah ke Google Drive Anda, salin link folder-nya dan tempel di bawah, ATAU langsung unggah file di sini. Cara mendapatkan link:
-                    buka folder Drive → klik kanan → <b>Bagikan</b> → ubah akses ke <b>“Siapa saja yang memiliki link”</b> → <b>Salin link</b>.
+                    Unggah semua dokumen ke Google Drive Anda, lalu tempel link folder-nya di sini. Cara mendapatkan link:
+                    buka folder Drive → klik kanan → <b>Bagikan</b> → ubah akses ke <b>“Siapa saja yang memiliki link”</b> → <b>Salin link</b> → tempel di bawah.
                   </Text>
                   <Field.Root mb="10px">
                     <Field.Label fontSize="12px"><Icon as={LuLink} /> Link Google Drive Dokumen</Field.Label>
                     <Input value={docLink} onChange={(e) => setDocLink(e.target.value)} placeholder="https://drive.google.com/drive/folders/…" />
                   </Field.Root>
-                  <Flex align="center" gap="8px" mb="8px" wrap="wrap">
-                    <Button as="label" size="sm" variant="outline" cursor="pointer"><Icon as={LuUpload} /> Pilih File (gambar/PDF)
-                      <input type="file" accept="image/*,application/pdf" multiple hidden onChange={(e) => { setFiles((prev) => [...prev, ...Array.from(e.target.files ?? [])]); e.currentTarget.value = '' }} />
-                    </Button>
-                    <Text fontSize="11px" color={COLORS.muted}>maks 4MB / file</Text>
-                  </Flex>
-                  {files.length > 0 && (
-                    <Stack gap="4px" mb="8px">
-                      {files.map((file, i) => (
-                        <Flex key={i} align="center" gap="8px" fontSize="12px">
-                          <Icon as={LuFileText} color={UDEMY.accent} /><Text flex="1" lineClamp={1}>{file.name}</Text>
-                          <IconButton aria-label="hapus" size="2xs" variant="ghost" colorPalette="red" onClick={() => setFiles((a) => a.filter((_, j) => j !== i))}><Icon as={LuX} /></IconButton>
-                        </Flex>
-                      ))}
-                    </Stack>
-                  )}
                   {docErr && <Text color={COLORS.danger} fontSize="12px" mb="6px">{docErr}</Text>}
                   {docMsg && <Text color={COLORS.success} fontSize="13px" fontWeight="600" mb="6px">{docMsg}</Text>}
                   <Button size="sm" loading={docBusy} onClick={kirimDokumen} bg={UDEMY.accent} color="white" _hover={{ bg: UDEMY.accentDark }}>
-                    <Icon as={LuSend} /> Kirim Dokumen
+                    <Icon as={LuSend} /> Kirim Link Dokumen
                   </Button>
                 </Box>
               </Stack>
