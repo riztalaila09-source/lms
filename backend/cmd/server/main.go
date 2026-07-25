@@ -129,7 +129,7 @@ func main() {
 	dashboardSvc := service.NewDashboardService(dashboardRepo)
 	classSvc := service.NewClassService(classRepo, userRepo)
 	jurusanSvc := service.NewJurusanService(jurusanRepo)
-	schoolSvc := service.NewSchoolService(schoolRepo)
+	schoolSvc := service.NewSchoolService(schoolRepo, jwtSvc)
 	attendanceSvc := service.NewAttendanceService(attendanceRepo, courseRepo)
 	pklSvc := service.NewPklService(pklRepo)
 	classroomSvc := service.NewClassroomService(classroomRepo)
@@ -252,6 +252,70 @@ func main() {
 		}
 		w.Header().Set("Content-Type", mime)
 		w.Header().Set("Cache-Control", "no-cache") // may change when admin re-uploads
+		_, _ = w.Write(raw)
+	})
+
+	// PPDB gelombang brochure image (public), streamed like /covers.
+	mux.HandleFunc("/ppdb-brosur", func(w http.ResponseWriter, r *http.Request) {
+		id := r.URL.Query().Get("batch")
+		if id == "" {
+			http.NotFound(w, r)
+			return
+		}
+		var dataURL string
+		if err := db.QueryRowContext(r.Context(),
+			`SELECT brosur FROM ppdb_batches WHERE id = ?`, id).Scan(&dataURL); err != nil || dataURL == "" {
+			http.NotFound(w, r)
+			return
+		}
+		comma := strings.IndexByte(dataURL, ',')
+		if comma < 0 || !strings.HasPrefix(dataURL, "data:") {
+			http.NotFound(w, r)
+			return
+		}
+		mime := dataURL[len("data:"):comma]
+		if semi := strings.IndexByte(mime, ';'); semi >= 0 {
+			mime = mime[:semi]
+		}
+		raw, err := base64.StdEncoding.DecodeString(dataURL[comma+1:])
+		if err != nil {
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set("Content-Type", mime)
+		w.Header().Set("Cache-Control", "no-cache")
+		_, _ = w.Write(raw)
+	})
+
+	// PPDB applicant document files (admin views via opaque id), streamed like /covers.
+	mux.HandleFunc("/ppdb-doc", func(w http.ResponseWriter, r *http.Request) {
+		id := r.URL.Query().Get("id")
+		if id == "" {
+			http.NotFound(w, r)
+			return
+		}
+		var dataURL string
+		if err := db.QueryRowContext(r.Context(),
+			`SELECT data FROM ppdb_documents WHERE id = ?`, id).Scan(&dataURL); err != nil || dataURL == "" {
+			http.NotFound(w, r)
+			return
+		}
+		comma := strings.IndexByte(dataURL, ',')
+		if comma < 0 || !strings.HasPrefix(dataURL, "data:") {
+			http.NotFound(w, r)
+			return
+		}
+		mime := dataURL[len("data:"):comma]
+		if semi := strings.IndexByte(mime, ';'); semi >= 0 {
+			mime = mime[:semi]
+		}
+		raw, err := base64.StdEncoding.DecodeString(dataURL[comma+1:])
+		if err != nil {
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set("Content-Type", mime)
+		w.Header().Set("Cache-Control", "no-cache")
 		_, _ = w.Write(raw)
 	})
 

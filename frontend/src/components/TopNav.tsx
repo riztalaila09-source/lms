@@ -167,7 +167,7 @@ export default function TopNav() {
                   <MenuItem icon={LuSettings} label={t('nav.settings')} onClick={() => go('/pengaturan')} />
                   <MenuItem icon={LuBriefcase} label={t('nav.pkl')} onClick={() => go('/mitra-pkl')} />
                   <MenuItem icon={LuQrCode} label={t('nav.attendance')} onClick={() => go('/absensi')} />
-                  <MenuItem icon={LuLogOut} label={t('nav.logout')} danger onClick={() => { if (confirm('Yakin ingin keluar?')) { logout(); navigate('/login', { replace: true }) } }} />
+                  <MenuItem icon={LuLogOut} label={t('nav.logout')} danger onClick={() => { if (confirm('Yakin ingin keluar?')) { logout(); navigate('/', { replace: true }) } }} />
                 </Box>
               </>
             )}
@@ -203,7 +203,7 @@ export default function TopNav() {
             <MenuItem icon={LuSettings} label={t('nav.settings')} onClick={() => go('/pengaturan')} />
             <MenuItem icon={LuBriefcase} label={t('nav.pkl')} onClick={() => go('/mitra-pkl')} />
             <MenuItem icon={LuQrCode} label={t('nav.attendance')} onClick={() => go('/absensi')} />
-            <MenuItem icon={LuLogOut} label={t('nav.logout')} danger onClick={() => { if (confirm('Yakin ingin keluar?')) { logout(); navigate('/login', { replace: true }) } }} />
+            <MenuItem icon={LuLogOut} label={t('nav.logout')} danger onClick={() => { if (confirm('Yakin ingin keluar?')) { logout(); navigate('/', { replace: true }) } }} />
           </Box>
         )}
       </Box>

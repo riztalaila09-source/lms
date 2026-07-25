@@ -8,9 +8,11 @@ import {
   LuImages, LuNewspaper, LuCalendarDays, LuPlay, LuEye, LuEyeOff,
 } from 'react-icons/lu'
 import { schoolClient } from '@/lib/client'
-import type { School, Staff, ContentItem } from '@/gen/school/v1/school_pb'
+import type { School, Staff, ContentItem, PpdbBatch } from '@/gen/school/v1/school_pb'
 import { useAuth } from '@/hooks/useAuth'
 import LandingSlideshow, { type Slide } from '@/components/LandingSlideshow'
+import PpdbRegisterDialog from '@/components/PpdbRegisterDialog'
+import { PPDB_JURUSAN } from '@/lib/ppdb'
 import { COLORS, UDEMY } from '@/theme/tokens'
 
 const waLink = (no: string) => {
@@ -36,6 +38,8 @@ const FEATURES = [
 export default function LandingPage() {
   const { isAuthenticated, login } = useAuth()
   const navigate = useNavigate()
+  const [regOpen, setRegOpen] = useState(false)
+  const [activeBatch, setActiveBatch] = useState<PpdbBatch | null>(null)
   const [s, setS] = useState<School | null>(null)
   const [staff, setStaff] = useState<Staff[]>([])
   const [galFoto, setGalFoto] = useState<ContentItem[]>([])
@@ -59,6 +63,7 @@ export default function LandingPage() {
     // refresh shows a loader instead of the empty "no data" fallback flashing in.
     Promise.allSettled([
       schoolClient.getSchool({}).then(setS),
+      schoolClient.getActivePpdbBatch({}).then((b) => setActiveBatch(b.id ? b : null)).catch(() => {}),
       schoolClient.listStaff({}).then((r) => setStaff(r.staff)),
       load('galeri_foto', setGalFoto),
       load('galeri_video', setGalVideo),
@@ -356,16 +361,37 @@ export default function LandingPage() {
       )}
 
       {/* PPDB */}
-      {ppdbAktif && (
+      {(ppdbAktif || activeBatch) && (
         <Section id="ppdb">
           <SectionHead icon={LuMegaphone} kicker="Penerimaan Peserta Didik Baru" title="PPDB" />
           <Flex gap="24px" direction={{ base: 'column', md: 'row' }} align="flex-start">
             <Stack gap="16px" flex={1}>
+              {activeBatch ? (
+                <Box bg={UDEMY.accentTint} border="1px solid" borderColor={UDEMY.accent} borderRadius="12px" p="14px">
+                  <Text fontWeight="800" fontSize="16px" color={UDEMY.accent}>{activeBatch.nama} — TA {activeBatch.tahunAjaran}</Text>
+                  {(activeBatch.buka || activeBatch.tutup) && <Text fontSize="13px" color={COLORS.muted}>Pendaftaran dibuka: {activeBatch.buka || '—'} s/d {activeBatch.tutup || '—'}</Text>}
+                  <Flex gap="6px" wrap="wrap" mt="8px">
+                    {PPDB_JURUSAN.map((j) => activeBatch.kuota[j] ? <Badge key={j} colorPalette="purple" variant="subtle">{j}: kuota {activeBatch.kuota[j]}</Badge> : <Badge key={j} colorPalette="purple" variant="outline">{j}</Badge>)}
+                  </Flex>
+                </Box>
+              ) : (
+                <Text fontSize="14px" color={COLORS.muted}>Pendaftaran gelombang belum dibuka. Nantikan informasi berikutnya.</Text>
+              )}
               {s?.ppdbInfo && <Text color={COLORS.text} whiteSpace="pre-wrap" lineHeight="1.8">{s.ppdbInfo}</Text>}
+
+              {activeBatch && ((activeBatch.requiredDocs?.length ?? 0) > 0 || activeBatch.driveLink || activeBatch.panduan) && (
+                <Box bg={COLORS.surface} border="1px solid" borderColor={COLORS.border} borderRadius="12px" p="16px">
+                  <Text fontWeight="700" fontSize="14px" mb="6px"><Icon as={LuFileText} /> Dokumen yang Perlu Diunggah</Text>
+                  {activeBatch.requiredDocs?.map((d, i) => <Text key={i} fontSize="13px" color={COLORS.text}>• {d}</Text>)}
+                  {activeBatch.panduan && <Text fontSize="12px" color={COLORS.muted} whiteSpace="pre-wrap" mt="6px">{activeBatch.panduan}</Text>}
+                  {activeBatch.driveLink && <Button as="a" mt="10px" size="sm" variant="outline" colorPalette="purple" {...{ href: activeBatch.driveLink, target: '_blank', rel: 'noopener' }}><Icon as={LuExternalLink} /> Unggah Dokumen ke Google Drive</Button>}
+                </Box>
+              )}
+
               <Flex gap="10px" wrap="wrap">
-                {s?.ppdbDaftarUrl && <Button as="a" bg={UDEMY.accent} color="white" _hover={{ bg: UDEMY.accentDark }} {...{ href: s.ppdbDaftarUrl, target: '_blank', rel: 'noopener' }}><Icon as={LuExternalLink} /> Daftar Sekarang</Button>}
-                {s?.ppdbBrosur && <Button as="a" variant="outline" {...{ href: s.ppdbBrosur, target: '_blank', rel: 'noopener' }}><Icon as={LuFileText} /> Lihat Brosur</Button>}
-                {s?.ppdbPengumuman && isUrl(s.ppdbPengumuman) && <Button as="a" variant="outline" colorPalette="green" {...{ href: s.ppdbPengumuman, target: '_blank', rel: 'noopener' }}><Icon as={LuMegaphone} /> Pengumuman Penerimaan</Button>}
+                <Button bg={UDEMY.accent} color="white" _hover={{ bg: UDEMY.accentDark }} disabled={!activeBatch} onClick={() => setRegOpen(true)}><Icon as={LuUser} /> Daftar Sekarang</Button>
+                <Button variant="outline" colorPalette="green" onClick={() => navigate('/ppdb-ujian')}><Icon as={LuLogIn} /> Login Ujian</Button>
+                {s?.ppdbPengumuman && isUrl(s.ppdbPengumuman) && <Button as="a" variant="outline" {...{ href: s.ppdbPengumuman, target: '_blank', rel: 'noopener' }}><Icon as={LuMegaphone} /> Pengumuman Penerimaan</Button>}
               </Flex>
               {s?.ppdbPengumuman && !isUrl(s.ppdbPengumuman) && (
                 <Box bg={COLORS.surface} border="1px solid" borderColor={COLORS.border} borderRadius="12px" p="16px">
@@ -374,17 +400,18 @@ export default function LandingPage() {
                 </Box>
               )}
             </Stack>
-            {s?.ppdbBrosur && (
+            {(activeBatch?.hasBrosur || s?.ppdbBrosur) && (
               <Box w={{ base: 'full', md: '320px' }} flexShrink={0}>
-                <a href={s.ppdbBrosur} target="_blank" rel="noopener noreferrer">
-                  <Image src={s.ppdbBrosur} alt="Brosur PPDB" w="full" borderRadius="14px" border="1px solid" borderColor={COLORS.border} cursor="pointer" />
-                </a>
-                <Text fontSize="11px" color={COLORS.muted} mt="6px" textAlign="center">Klik brosur untuk memperbesar</Text>
+                <Image src={activeBatch?.hasBrosur ? `/ppdb-brosur?batch=${activeBatch.id}` : s!.ppdbBrosur} alt="Brosur PPDB" w="full" borderRadius="14px" border="1px solid" borderColor={COLORS.border} />
+                <Text fontSize="11px" color={COLORS.muted} mt="6px" textAlign="center">Brosur PPDB</Text>
               </Box>
             )}
           </Flex>
         </Section>
       )}
+
+      <PpdbRegisterDialog open={regOpen} onClose={() => setRegOpen(false)}
+        batch={activeBatch ? { driveLink: activeBatch.driveLink, panduan: activeBatch.panduan, requiredDocs: activeBatch.requiredDocs } : undefined} />
 
       {/* Visi & Misi */}
       {hasVisiMisi && (

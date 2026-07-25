@@ -244,3 +244,85 @@ func mapSchoolError(err error) error {
 		return connect.NewError(connect.CodeInternal, err)
 	}
 }
+
+// ── PPDB ──
+
+func ppdbToProto(p *repository.PpdbRegistration) *schoolv1.PpdbRegistration {
+	out := &schoolv1.PpdbRegistration{
+		Id: p.ID, Nama: p.Nama, TempatLahir: p.TempatLahir, TanggalLahir: p.TanggalLahir,
+		JenisKelamin: p.JenisKelamin, AsalSekolah: p.AsalSekolah, Jurusan: p.Jurusan, NamaOrtu: p.NamaOrtu,
+		Alamat: p.Alamat, Email: p.Email, Nisn: p.Nisn, NoKk: p.NoKK, Status: p.Status, Catatan: p.Catatan,
+		BatchId: p.BatchID, NoPendaftaran: p.NoPendaftaran, Password: p.Password, TestScore: int32(p.TestScore),
+		TestSubmitted: p.TestSubmitted, TahunAjaran: p.TahunAjaran, Gelombang: int32(p.Gelombang), DocLink: p.DocLink,
+	}
+	for _, ph := range p.Phones {
+		out.Phones = append(out.Phones, &schoolv1.PpdbPhone{Label: ph.Label, Number: ph.Number})
+	}
+	for _, d := range p.Docs {
+		out.Docs = append(out.Docs, &schoolv1.PpdbDoc{Id: d.ID, Name: d.Name})
+	}
+	if !p.CreatedAt.IsZero() {
+		out.CreatedAt = timestamppb.New(p.CreatedAt)
+	}
+	return out
+}
+
+// SubmitPpdbRegistration is PUBLIC (exempt from auth) — a prospective student
+// registers from the landing page.
+func (h *SchoolHandler) SubmitPpdbRegistration(ctx context.Context, req *connect.Request[schoolv1.SubmitPpdbRegistrationRequest]) (*connect.Response[schoolv1.PpdbRegistration], error) {
+	m := req.Msg
+	reg := &repository.PpdbRegistration{
+		Nama: m.Nama, TempatLahir: m.TempatLahir, TanggalLahir: m.TanggalLahir, JenisKelamin: m.JenisKelamin,
+		AsalSekolah: m.AsalSekolah, Jurusan: m.Jurusan, NamaOrtu: m.NamaOrtu, Alamat: m.Alamat,
+		Email: m.Email, Nisn: m.Nisn, NoKK: m.NoKk,
+	}
+	for _, ph := range m.Phones {
+		reg.Phones = append(reg.Phones, repository.PpdbPhone{Label: ph.Label, Number: ph.Number})
+	}
+	saved, err := h.svc.SubmitPpdbRegistration(ctx, reg)
+	if err != nil {
+		return nil, mapSchoolError(err)
+	}
+	out := ppdbToProto(saved)
+	out.Password = "" // exam password is admin-only (printed later), never returned to applicant
+	return connect.NewResponse(out), nil
+}
+
+func (h *SchoolHandler) ListPpdbRegistrations(ctx context.Context, req *connect.Request[schoolv1.ListPpdbRegistrationsRequest]) (*connect.Response[schoolv1.ListPpdbRegistrationsResponse], error) {
+	claims, ok := middleware.ClaimsFromContext(ctx)
+	if !ok {
+		return nil, connect.NewError(connect.CodeUnauthenticated, nil)
+	}
+	list, err := h.svc.ListPpdbRegistrations(ctx, claims.Role, req.Msg.BatchId, req.Msg.Jurusan, req.Msg.Search)
+	if err != nil {
+		return nil, mapSchoolError(err)
+	}
+	out := &schoolv1.ListPpdbRegistrationsResponse{}
+	for _, p := range list {
+		out.Items = append(out.Items, ppdbToProto(p))
+	}
+	return connect.NewResponse(out), nil
+}
+
+func (h *SchoolHandler) UpdatePpdbStatus(ctx context.Context, req *connect.Request[schoolv1.UpdatePpdbStatusRequest]) (*connect.Response[schoolv1.PpdbRegistration], error) {
+	claims, ok := middleware.ClaimsFromContext(ctx)
+	if !ok {
+		return nil, connect.NewError(connect.CodeUnauthenticated, nil)
+	}
+	p, err := h.svc.UpdatePpdbStatus(ctx, claims.Role, req.Msg.Id, req.Msg.Status, req.Msg.Catatan)
+	if err != nil {
+		return nil, mapSchoolError(err)
+	}
+	return connect.NewResponse(ppdbToProto(p)), nil
+}
+
+func (h *SchoolHandler) DeletePpdbRegistration(ctx context.Context, req *connect.Request[schoolv1.DeletePpdbRegistrationRequest]) (*connect.Response[schoolv1.DeletePpdbRegistrationResponse], error) {
+	claims, ok := middleware.ClaimsFromContext(ctx)
+	if !ok {
+		return nil, connect.NewError(connect.CodeUnauthenticated, nil)
+	}
+	if err := h.svc.DeletePpdbRegistration(ctx, claims.Role, req.Msg.Id); err != nil {
+		return nil, mapSchoolError(err)
+	}
+	return connect.NewResponse(&schoolv1.DeletePpdbRegistrationResponse{}), nil
+}

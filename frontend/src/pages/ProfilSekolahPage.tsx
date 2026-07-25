@@ -5,6 +5,7 @@ import { schoolClient } from '@/lib/client'
 import AppLayout from '@/components/AppLayout'
 import { Card } from '@/components/Card'
 import ContentListEditor from '@/components/ContentListEditor'
+import PpdbAdmin from '@/components/PpdbAdmin'
 import { COLORS } from '@/theme/tokens'
 
 type StaffRow = { nama: string; jabatan: string; foto: string }
@@ -315,6 +316,7 @@ export default function ProfilSekolahPage({ section }: { section: PSSection }) {
   return (
     <AppLayout title={<><Icon as={meta.icon} /> {meta.title}</>} subtitle={meta.sub}>
       {formCard(body)}
+      {section === 'ppdb' && <PpdbAdmin />}
     </AppLayout>
   )
 }

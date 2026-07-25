@@ -118,7 +118,7 @@ export default function Sidebar({ mobileOpen = false, onNavigate, collapsed = fa
   const handleLogout = () => {
     if (!confirm(t('sb.logoutConfirm'))) return
     logout()
-    navigate('/login', { replace: true })
+    navigate('/', { replace: true })
   }
 
   const userInitials = (user?.fullName || user?.username || 'U')

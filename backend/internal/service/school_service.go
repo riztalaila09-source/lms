@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"strings"
@@ -20,13 +21,14 @@ var (
 
 type SchoolService struct {
 	repo repository.SchoolRepository
+	jwt  *JWTService // issues exam tokens for PPDB applicants
 	// deniedCaps caches the set of capability keys denied to teachers, so the
 	// permission interceptor can check it without a DB hit per request.
 	deniedCaps atomic.Pointer[map[string]bool]
 }
 
-func NewSchoolService(repo repository.SchoolRepository) *SchoolService {
-	s := &SchoolService{repo: repo}
+func NewSchoolService(repo repository.SchoolRepository, jwt *JWTService) *SchoolService {
+	s := &SchoolService{repo: repo, jwt: jwt}
 	empty := map[string]bool{}
 	s.deniedCaps.Store(&empty)
 	return s
@@ -258,4 +260,81 @@ func (s *SchoolService) DeleteSemester(ctx context.Context, callerRole, id strin
 		return fmt.Errorf("delete semester: %w", err)
 	}
 	return nil
+}
+
+// ── PPDB registrations ──
+
+var ppdbStatuses = map[string]bool{"baru": true, "diterima": true, "ditolak": true}
+
+// SubmitPpdbRegistration is PUBLIC (no auth): a prospective student submits the
+// admission form from the landing page.
+func (s *SchoolService) SubmitPpdbRegistration(ctx context.Context, in *repository.PpdbRegistration) (*repository.PpdbRegistration, error) {
+	in.Nama = strings.TrimSpace(in.Nama)
+	if in.Nama == "" {
+		return nil, fmt.Errorf("%w: nama calon murid wajib diisi", ErrInvalidArgument)
+	}
+	// Drop empty phone rows.
+	clean := in.Phones[:0]
+	for _, p := range in.Phones {
+		if strings.TrimSpace(p.Number) != "" {
+			clean = append(clean, repository.PpdbPhone{Label: strings.TrimSpace(p.Label), Number: strings.TrimSpace(p.Number)})
+		}
+	}
+	in.Phones = clean
+	if !PpdbJurusanValid[in.Jurusan] {
+		return nil, fmt.Errorf("%w: pilih jurusan (TKJ/TKR/TPM/TSM)", ErrInvalidArgument)
+	}
+	// Registration must land in the currently open gelombang.
+	batch, err := s.repo.GetActivePpdbBatch(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("%w: pendaftaran belum dibuka", ErrInvalidArgument)
+	}
+	seq, _ := s.repo.CountPpdbInBatch(ctx, batch.ID)
+	in.ID = uuid.New().String()
+	in.BatchID = batch.ID
+	in.NoPendaftaran = ppdbNoPendaftaran(batch, seq+1)
+	in.Password = ppdbPassword()
+	in.Status = "baru"
+	in.TestScore = -1
+	in.CreatedAt = time.Now().UTC()
+	if err := s.repo.CreatePpdbRegistration(ctx, in); err != nil {
+		return nil, err
+	}
+	return in, nil
+}
+
+func (s *SchoolService) ListPpdbRegistrations(ctx context.Context, callerRole, batchID, jurusan, search string) ([]*repository.PpdbRegistration, error) {
+	if !isManager(callerRole) {
+		return nil, ErrPermissionDenied
+	}
+	if batchID == "" {
+		if b, err := s.repo.GetActivePpdbBatch(ctx); err == nil {
+			batchID = b.ID
+		}
+	}
+	return s.repo.ListPpdbRegistrations(ctx, batchID, strings.TrimSpace(jurusan), strings.TrimSpace(search))
+}
+
+func (s *SchoolService) UpdatePpdbStatus(ctx context.Context, callerRole, id, status, catatan string) (*repository.PpdbRegistration, error) {
+	if !isManager(callerRole) {
+		return nil, ErrPermissionDenied
+	}
+	if !ppdbStatuses[status] {
+		return nil, fmt.Errorf("%w: status tidak valid", ErrInvalidArgument)
+	}
+	p, err := s.repo.UpdatePpdbStatus(ctx, id, status, strings.TrimSpace(catatan))
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrNotFound
+		}
+		return nil, err
+	}
+	return p, nil
+}
+
+func (s *SchoolService) DeletePpdbRegistration(ctx context.Context, callerRole, id string) error {
+	if !isManager(callerRole) {
+		return ErrPermissionDenied
+	}
+	return s.repo.DeletePpdbRegistration(ctx, id)
 }

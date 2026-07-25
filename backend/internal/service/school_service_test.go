@@ -17,7 +17,7 @@ func sp(v string) *string { return &v }
 func TestSchoolService_UpdateMerge(t *testing.T) {
 	db := testutil.SetupTestDB(t)
 	ctx := context.Background()
-	svc := service.NewSchoolService(repository.NewSchoolRepository(db))
+	svc := service.NewSchoolService(repository.NewSchoolRepository(db), service.NewJWTService("test-secret", 24))
 
 	// Non-manager is denied.
 	_, err := svc.UpdateSchool(ctx, "student", service.UpdateSchoolInput{Name: sp("X")})
@@ -41,7 +41,7 @@ func TestSchoolService_UpdateMerge(t *testing.T) {
 func TestSchoolService_Staff(t *testing.T) {
 	db := testutil.SetupTestDB(t)
 	ctx := context.Background()
-	svc := service.NewSchoolService(repository.NewSchoolRepository(db))
+	svc := service.NewSchoolService(repository.NewSchoolRepository(db), service.NewJWTService("test-secret", 24))
 
 	// Non-manager can't set staff.
 	_, err := svc.SetStaff(ctx, "student", []*repository.Staff{{Nama: "A"}})
@@ -74,7 +74,7 @@ func TestSchoolService_Staff(t *testing.T) {
 func TestSchoolService_AccessPolicy(t *testing.T) {
 	db := testutil.SetupTestDB(t)
 	ctx := context.Background()
-	svc := service.NewSchoolService(repository.NewSchoolRepository(db))
+	svc := service.NewSchoolService(repository.NewSchoolRepository(db), service.NewJWTService("test-secret", 24))
 
 	// Default: nothing denied, cache empty.
 	require.NoError(t, svc.LoadAccessPolicy(ctx))
@@ -105,7 +105,7 @@ func TestSchoolService_AccessPolicy(t *testing.T) {
 	assert.False(t, svc.IsCapabilityDenied("materi.delete"))
 
 	// A fresh service loading from the same DB sees the (now empty) policy.
-	svc2 := service.NewSchoolService(repository.NewSchoolRepository(db))
+	svc2 := service.NewSchoolService(repository.NewSchoolRepository(db), service.NewJWTService("test-secret", 24))
 	require.NoError(t, svc2.LoadAccessPolicy(ctx))
 	assert.False(t, svc2.IsCapabilityDenied("materi.delete"))
 }
@@ -113,7 +113,7 @@ func TestSchoolService_AccessPolicy(t *testing.T) {
 func TestSchoolService_ExportBackup(t *testing.T) {
 	db := testutil.SetupTestDB(t)
 	ctx := context.Background()
-	svc := service.NewSchoolService(repository.NewSchoolRepository(db))
+	svc := service.NewSchoolService(repository.NewSchoolRepository(db), service.NewJWTService("test-secret", 24))
 
 	// Non-admin denied.
 	_, _, err := svc.ExportBackup(ctx, "teacher")
@@ -131,7 +131,7 @@ func TestSchoolService_ExportBackup(t *testing.T) {
 func TestSchoolService_Content(t *testing.T) {
 	db := testutil.SetupTestDB(t)
 	ctx := context.Background()
-	svc := service.NewSchoolService(repository.NewSchoolRepository(db))
+	svc := service.NewSchoolService(repository.NewSchoolRepository(db), service.NewJWTService("test-secret", 24))
 
 	// Non-manager denied; empty type rejected.
 	_, err := svc.SetContent(ctx, "student", "berita", []*repository.ContentItem{{Title: "X"}})
@@ -165,7 +165,7 @@ func TestSchoolService_Content(t *testing.T) {
 func TestSchoolService_GameMusic(t *testing.T) {
 	db := testutil.SetupTestDB(t)
 	ctx := context.Background()
-	svc := service.NewSchoolService(repository.NewSchoolRepository(db))
+	svc := service.NewSchoolService(repository.NewSchoolRepository(db), service.NewJWTService("test-secret", 24))
 
 	// Set some regular fields first.
 	_, err := svc.UpdateSchool(ctx, "admin", service.UpdateSchoolInput{Name: sp("SMK Musik"), Visi: sp("Visi")})
@@ -200,3 +200,99 @@ func TestSchoolService_GameMusic(t *testing.T) {
 	assert.Equal(t, "", s.GameMusicName)
 	assert.Equal(t, "SMK Musik", s.Name)
 }
+
+// PPDB: public submit stores the applicant (status 'baru'); admin can list,
+// change status+catatan, and delete. Non-managers are denied.
+func TestSchoolService_Ppdb(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	ctx := context.Background()
+	svc := service.NewSchoolService(repository.NewSchoolRepository(db), service.NewJWTService("test-secret", 24))
+
+	// No active batch yet → registration is refused.
+	_, err := svc.SubmitPpdbRegistration(ctx, &repository.PpdbRegistration{Nama: "Budi", Jurusan: "TKJ"})
+	assert.ErrorIs(t, err, service.ErrInvalidArgument)
+
+	// Admin creates + activates gelombang 1 of 2026/2027.
+	batch, err := svc.CreatePpdbBatch(ctx, "admin", "2026/2027", 1)
+	require.NoError(t, err)
+	_, err = svc.CreatePpdbBatch(ctx, "student", "2026/2027", 2) // non-manager denied
+	assert.ErrorIs(t, err, service.ErrPermissionDenied)
+	_, err = svc.CreatePpdbBatch(ctx, "admin", "2026/2027", 1) // duplicate gelombang
+	assert.ErrorIs(t, err, service.ErrInvalidArgument)
+	_, err = svc.SetActivePpdbBatch(ctx, "admin", batch.ID)
+	require.NoError(t, err)
+
+	// Nama wajib + jurusan must be one of TKJ/TKR/TPM/TSM.
+	_, err = svc.SubmitPpdbRegistration(ctx, &repository.PpdbRegistration{Nama: "  ", Jurusan: "TKJ"})
+	assert.ErrorIs(t, err, service.ErrInvalidArgument)
+	_, err = svc.SubmitPpdbRegistration(ctx, &repository.PpdbRegistration{Nama: "X", Jurusan: "XXX"})
+	assert.ErrorIs(t, err, service.ErrInvalidArgument)
+
+	// Submit two applicants; each gets a No. Pendaftaran + password, empty phones dropped.
+	reg1, err := svc.SubmitPpdbRegistration(ctx, &repository.PpdbRegistration{
+		Nama: "Budi", Jurusan: "TKJ", NoKK: "123",
+		Phones: []repository.PpdbPhone{{Label: "Calon Murid", Number: "0812"}, {Label: "Ortu", Number: "  "}},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "baru", reg1.Status)
+	assert.Len(t, reg1.Phones, 1, "empty phone dropped")
+	assert.Equal(t, "2627-G1-0001", reg1.NoPendaftaran)
+	assert.NotEmpty(t, reg1.Password)
+	reg2, err := svc.SubmitPpdbRegistration(ctx, &repository.PpdbRegistration{Nama: "Ani", Jurusan: "TKR"})
+	require.NoError(t, err)
+	assert.Equal(t, "2627-G1-0002", reg2.NoPendaftaran)
+
+	// Admin sets the exam question bank (2 soal) and opens the exam.
+	require.NoError(t, svc.SetPpdbQuestions(ctx, "admin", batch.ID, []*repository.PpdbQuestion{
+		{Question: "1+1?", Options: []string{"2", "3"}, CorrectIndex: 0},
+		{Question: "Ibukota?", Options: []string{"Bandung", "Jakarta"}, CorrectIndex: 1},
+	}))
+	_, err = svc.UpdatePpdbBatch(ctx, "admin", service.PpdbBatchUpdate{ID: batch.ID, TestActive: ptrBool(true)})
+	require.NoError(t, err)
+
+	// Applicant login (wrong password rejected), then take the test.
+	_, err = svc.PpdbLogin(ctx, reg1.NoPendaftaran, "WRONG")
+	assert.ErrorIs(t, err, service.ErrPermissionDenied)
+	login, err := svc.PpdbLogin(ctx, reg1.NoPendaftaran, reg1.Password)
+	require.NoError(t, err)
+	assert.NotEmpty(t, login.Token)
+
+	// Questions hidden correct index is applied at handler; here score the service.
+	sc, correct, total, err := svc.SubmitPpdbTest(ctx, "ppdb", reg1.ID, map[int]int{0: 0, 1: 1}) // both correct
+	require.NoError(t, err)
+	assert.Equal(t, 100, sc)
+	assert.Equal(t, 2, correct)
+	assert.Equal(t, 2, total)
+	// Second submit rejected (once only).
+	_, _, _, err = svc.SubmitPpdbTest(ctx, "ppdb", reg1.ID, map[int]int{0: 0, 1: 1})
+	assert.ErrorIs(t, err, service.ErrInvalidArgument)
+	// reg2 answers one wrong → 50.
+	sc2, _, _, err := svc.SubmitPpdbTest(ctx, "ppdb", reg2.ID, map[int]int{0: 0, 1: 0})
+	require.NoError(t, err)
+	assert.Equal(t, 50, sc2)
+
+	// Ranking: highest score first; filter by jurusan works.
+	all, err := svc.ListPpdbRegistrations(ctx, "admin", batch.ID, "", "")
+	require.NoError(t, err)
+	require.Len(t, all, 2)
+	assert.Equal(t, "Budi", all[0].Nama, "score 100 ranks first")
+	assert.Equal(t, 100, all[0].TestScore)
+	tkj, err := svc.ListPpdbRegistrations(ctx, "admin", batch.ID, "TKJ", "")
+	require.NoError(t, err)
+	assert.Len(t, tkj, 1)
+	byName, err := svc.ListPpdbRegistrations(ctx, "admin", batch.ID, "", "ani")
+	require.NoError(t, err)
+	assert.Len(t, byName, 1)
+	_, err = svc.ListPpdbRegistrations(ctx, "student", batch.ID, "", "")
+	assert.ErrorIs(t, err, service.ErrPermissionDenied)
+
+	// Status update + delete still work.
+	updated, err := svc.UpdatePpdbStatus(ctx, "admin", reg1.ID, "diterima", "lolos")
+	require.NoError(t, err)
+	assert.Equal(t, "diterima", updated.Status)
+	require.NoError(t, svc.DeletePpdbRegistration(ctx, "admin", reg2.ID))
+	all, _ = svc.ListPpdbRegistrations(ctx, "admin", batch.ID, "", "")
+	assert.Len(t, all, 1)
+}
+
+func ptrBool(b bool) *bool { return &b }

@@ -22,7 +22,7 @@ func schoolClaims(role string) context.Context {
 
 func TestSchoolHandler_GetIsPublic(t *testing.T) {
 	db := testutil.SetupTestDB(t)
-	h := handler.NewSchoolHandler(service.NewSchoolService(repository.NewSchoolRepository(db)))
+	h := handler.NewSchoolHandler(service.NewSchoolService(repository.NewSchoolRepository(db), service.NewJWTService("test-secret", 24)))
 
 	// GetSchool works WITHOUT any auth claims (public landing page).
 	res, err := h.GetSchool(context.Background(), connect.NewRequest(&schoolv1.GetSchoolRequest{}))

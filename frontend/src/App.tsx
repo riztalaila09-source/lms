@@ -1,7 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from '@/hooks/useAuth'
-import LoginPage from '@/pages/LoginPage'
 import LandingPage from '@/pages/LandingPage'
+import PpdbUjianPage from '@/pages/PpdbUjianPage'
 import ProfilSekolahPage from '@/pages/ProfilSekolahPage'
 import DashboardPage from '@/pages/DashboardPage'
 import UsersPage from '@/pages/UsersPage'
@@ -18,14 +18,14 @@ import { Role } from '@/gen/user/v1/user_pb'
 
 function AuthGuard({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuth()
-  if (!isAuthenticated) return <Navigate to="/login" replace />
+  if (!isAuthenticated) return <Navigate to="/" replace />
   return <>{children}</>
 }
 
 // Teacher (or legacy admin) only — full-control roles.
 function StaffGuard({ children }: { children: React.ReactNode }) {
   const { user, isAuthenticated, loadingProfile } = useAuth()
-  if (!isAuthenticated) return <Navigate to="/login" replace />
+  if (!isAuthenticated) return <Navigate to="/" replace />
   // Wait for the profile before deciding, so we don't bounce to /dashboard.
   if (!user || loadingProfile) return null
   if (user.role !== Role.ADMIN && user.role !== Role.TEACHER) {
@@ -40,7 +40,9 @@ export default function App() {
       <BrowserRouter>
         <Routes>
         <Route path="/" element={<LandingPage />} />
-        <Route path="/login" element={<LoginPage />} />
+        {/* Login lives on the landing page now; keep /login as a redirect for old links. */}
+        <Route path="/login" element={<Navigate to="/" replace />} />
+        <Route path="/ppdb-ujian" element={<PpdbUjianPage />} />
         <Route path="/dashboard" element={<AuthGuard><DashboardPage /></AuthGuard>} />
         <Route path="/akademik" element={<StaffGuard><UsersPage section="akademik" /></StaffGuard>} />
         <Route path="/pengguna/guru" element={<StaffGuard><UsersPage section="guru" /></StaffGuard>} />

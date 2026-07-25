@@ -21,7 +21,11 @@ func NewAuthInterceptor(jwtSvc *service.JWTService) connect.UnaryInterceptorFunc
 			case "/user.v1.UserService/Login",
 				"/school.v1.SchoolService/GetSchool", // landing page reads these pre-login
 				"/school.v1.SchoolService/ListStaff",
-				"/school.v1.SchoolService/ListContent":
+				"/school.v1.SchoolService/ListContent",
+				"/school.v1.SchoolService/SubmitPpdbRegistration", // public PPDB form
+				"/school.v1.SchoolService/SubmitPpdbDocuments",    // applicant submits doc link/files
+				"/school.v1.SchoolService/GetActivePpdbBatch",     // landing reads active gelombang
+				"/school.v1.SchoolService/PpdbLogin":              // applicant exam login
 				return next(ctx, req)
 			}
 

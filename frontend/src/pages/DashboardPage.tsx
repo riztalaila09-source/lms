@@ -154,7 +154,7 @@ export default function DashboardPage() {
 
   useEffect(() => {
     if (isAuthenticated && !user) {
-      loadProfile().catch(() => { logout(); navigate('/login', { replace: true }) })
+      loadProfile().catch(() => { logout(); navigate('/', { replace: true }) })
     }
   }, [isAuthenticated, user, loadProfile, logout, navigate])
 

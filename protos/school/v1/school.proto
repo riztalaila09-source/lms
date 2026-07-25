@@ -33,6 +33,7 @@ message School {
   string kepala_sekolah_foto = 24; // URL / data URL
   bool has_game_music = 25;        // an uploaded game soundtrack exists (served at /game-music)
   string game_music_name = 26;     // display name of the uploaded track
+  string kepala_sekolah_ttd = 27;  // headmaster signature image (URL / data URL)
 }
 
 // A staff member (guru / tata usaha) shown on the landing page.
@@ -86,6 +87,7 @@ message UpdateSchoolRequest {
   optional string kepala_sekolah_foto = 24;
   optional string game_music_data = 25; // audio data URL; "" clears, absent = unchanged
   optional string game_music_name = 26;
+  optional string kepala_sekolah_ttd = 27;
 }
 
 message ListStaffRequest {}
@@ -133,6 +135,137 @@ message SetActiveSemesterRequest { string id = 1; }
 message DeleteSemesterRequest { string id = 1; }
 message DeleteSemesterResponse {}
 
+// ── PPDB: pendaftaran calon murid (submit publik, kelola oleh admin) ──
+message PpdbPhone { string label = 1; string number = 2; }
+message PpdbRegistration {
+  string id = 1;
+  string nama = 2;
+  string tempat_lahir = 3;
+  string tanggal_lahir = 4;  // 'YYYY-MM-DD'
+  string jenis_kelamin = 5;  // 'L' | 'P'
+  string asal_sekolah = 6;
+  string jurusan = 7;
+  string nama_ortu = 8;      // nama orang tua / wali
+  string alamat = 9;
+  string email = 10;
+  string nisn = 11;
+  string no_kk = 12;         // nomor kartu keluarga
+  repeated PpdbPhone phones = 13;
+  string status = 14;        // 'baru' | 'diterima' | 'ditolak'
+  string catatan = 15;       // catatan admin
+  google.protobuf.Timestamp created_at = 16;
+  string batch_id = 17;
+  string no_pendaftaran = 18;
+  string password = 19;      // exam credential (admin-only; blanked for applicant/public)
+  int32 test_score = 20;     // -1 = belum ujian
+  bool test_submitted = 21;
+  string tahun_ajaran = 22;  // from batch (convenience)
+  int32 gelombang = 23;
+  string doc_link = 24;      // applicant-submitted Google Drive link
+  repeated PpdbDoc docs = 25; // uploaded document files (metadata only)
+}
+message PpdbDoc { string id = 1; string name = 2; }
+message PpdbDocFile { string name = 1; string data = 2; } // data URL for upload
+message SubmitPpdbDocumentsRequest {
+  string registration_id = 1;
+  string doc_link = 2;
+  repeated PpdbDocFile files = 3;
+}
+message SubmitPpdbDocumentsResponse { int32 uploaded = 1; }
+message ListPpdbDocumentsRequest { string registration_id = 1; }
+message ListPpdbDocumentsResponse { repeated PpdbDoc docs = 1; }
+message SubmitPpdbRegistrationRequest {
+  string nama = 1;
+  string tempat_lahir = 2;
+  string tanggal_lahir = 3;
+  string jenis_kelamin = 4;
+  string asal_sekolah = 5;
+  string jurusan = 6;
+  string nama_ortu = 7;
+  string alamat = 8;
+  string email = 9;
+  string nisn = 10;
+  string no_kk = 11;
+  repeated PpdbPhone phones = 12;
+}
+message ListPpdbRegistrationsRequest {
+  string batch_id = 1;  // "" = active batch
+  string jurusan = 2;   // "" = all
+  string search = 3;    // name substring
+}
+message ListPpdbRegistrationsResponse { repeated PpdbRegistration items = 1; }
+message UpdatePpdbStatusRequest { string id = 1; string status = 2; string catatan = 3; }
+message DeletePpdbRegistrationRequest { string id = 1; }
+message DeletePpdbRegistrationResponse {}
+
+// ── PPDB gelombang (per tahun ajaran) ──
+message PpdbBatch {
+  string id = 1;
+  string tahun_ajaran = 2;
+  int32 gelombang = 3;
+  string nama = 4;
+  bool is_active = 5;
+  string buka = 6;
+  string tutup = 7;
+  bool has_brosur = 8;              // streamed at /ppdb-brosur?batch=<id>
+  string drive_link = 9;
+  string panduan = 10;
+  repeated string required_docs = 11;
+  map<string, int32> kuota = 12;    // {TKJ,TKR,TPM,TSM}
+  bool test_active = 13;
+  int32 test_duration_minutes = 14;
+  int32 pendaftar_count = 15;       // admin view
+}
+message ListPpdbBatchesRequest {}
+message ListPpdbBatchesResponse { repeated PpdbBatch batches = 1; }
+message GetActivePpdbBatchRequest {}                 // public
+message CreatePpdbBatchRequest { string tahun_ajaran = 1; int32 gelombang = 2; }
+message UpdatePpdbBatchRequest {
+  string id = 1;
+  optional string buka = 2;
+  optional string tutup = 3;
+  optional string brosur = 4;       // data URL; "" clears; absent = unchanged
+  optional string drive_link = 5;
+  optional string panduan = 6;
+  repeated string required_docs = 7; // full replace
+  map<string, int32> kuota = 8;      // full replace
+  optional bool test_active = 9;
+  optional int32 test_duration_minutes = 10;
+  optional string nama = 11;
+}
+message SetActivePpdbBatchRequest { string id = 1; }
+message DeletePpdbBatchRequest { string id = 1; }
+message DeletePpdbBatchResponse {}
+
+// ── PPDB bank soal (pilihan ganda) ──
+message PpdbQuestion {
+  string id = 1;
+  string question = 2;
+  repeated string options = 3;
+  int32 correct_index = 4;   // -1 for applicants
+}
+message PpdbQuestionInput { string question = 1; repeated string options = 2; int32 correct_index = 3; }
+message ListPpdbQuestionsRequest { string batch_id = 1; }
+message ListPpdbQuestionsResponse { repeated PpdbQuestion questions = 1; }
+message SetPpdbQuestionsRequest { string batch_id = 1; repeated PpdbQuestionInput questions = 2; }
+message SetPpdbQuestionsResponse {}
+
+// ── PPDB ujian (pendaftar login + tes) ──
+message PpdbLoginRequest { string no_pendaftaran = 1; string password = 2; }
+message PpdbLoginResponse {
+  string token = 1;
+  string nama = 2;
+  bool test_active = 3;
+  bool test_submitted = 4;
+  int32 duration_minutes = 5;
+}
+message GetPpdbTestRequest {}
+message GetPpdbTestResponse { repeated PpdbQuestion questions = 1; int32 duration_minutes = 2; bool submitted = 3; }
+message PpdbTestAnswerInput { int32 question_index = 1; int32 option_index = 2; }
+message SubmitPpdbTestRequest { repeated PpdbTestAnswerInput answers = 1; }
+message SubmitPpdbTestResponse { int32 score = 1; int32 correct = 2; int32 total = 3; }
+message GetMyPpdbRequest {}
+
 service SchoolService {
   rpc GetSchool(GetSchoolRequest) returns (School);
   rpc UpdateSchool(UpdateSchoolRequest) returns (School);
@@ -147,4 +280,30 @@ service SchoolService {
   rpc GetAccessPolicy(GetAccessPolicyRequest) returns (AccessPolicyResponse);  // admin
   rpc SetAccessPolicy(SetAccessPolicyRequest) returns (AccessPolicyResponse);  // admin
   rpc ExportBackup(ExportBackupRequest) returns (ExportBackupResponse);        // admin
+  rpc SubmitPpdbRegistration(SubmitPpdbRegistrationRequest) returns (PpdbRegistration);   // public
+  rpc ListPpdbRegistrations(ListPpdbRegistrationsRequest) returns (ListPpdbRegistrationsResponse); // kelola_sekolah
+  rpc UpdatePpdbStatus(UpdatePpdbStatusRequest) returns (PpdbRegistration);    // kelola_sekolah
+  rpc DeletePpdbRegistration(DeletePpdbRegistrationRequest) returns (DeletePpdbRegistrationResponse); // kelola_sekolah
+
+  // PPDB gelombang (admin), + active batch (public)
+  rpc GetActivePpdbBatch(GetActivePpdbBatchRequest) returns (PpdbBatch);       // public
+  rpc ListPpdbBatches(ListPpdbBatchesRequest) returns (ListPpdbBatchesResponse); // kelola_sekolah
+  rpc CreatePpdbBatch(CreatePpdbBatchRequest) returns (PpdbBatch);             // kelola_sekolah
+  rpc UpdatePpdbBatch(UpdatePpdbBatchRequest) returns (PpdbBatch);             // kelola_sekolah
+  rpc SetActivePpdbBatch(SetActivePpdbBatchRequest) returns (PpdbBatch);       // kelola_sekolah
+  rpc DeletePpdbBatch(DeletePpdbBatchRequest) returns (DeletePpdbBatchResponse); // kelola_sekolah
+
+  // PPDB bank soal (admin)
+  rpc ListPpdbQuestions(ListPpdbQuestionsRequest) returns (ListPpdbQuestionsResponse); // kelola_sekolah
+  rpc SetPpdbQuestions(SetPpdbQuestionsRequest) returns (SetPpdbQuestionsResponse);     // kelola_sekolah
+
+  // PPDB ujian (pendaftar; login public, test needs role 'ppdb')
+  rpc PpdbLogin(PpdbLoginRequest) returns (PpdbLoginResponse);                 // public
+  rpc GetPpdbTest(GetPpdbTestRequest) returns (GetPpdbTestResponse);           // role 'ppdb'
+  rpc SubmitPpdbTest(SubmitPpdbTestRequest) returns (SubmitPpdbTestResponse);  // role 'ppdb'
+  rpc GetMyPpdb(GetMyPpdbRequest) returns (PpdbRegistration);                  // role 'ppdb'
+
+  // PPDB dokumen: pendaftar kirim link/upload (public); admin lihat
+  rpc SubmitPpdbDocuments(SubmitPpdbDocumentsRequest) returns (SubmitPpdbDocumentsResponse); // public
+  rpc ListPpdbDocuments(ListPpdbDocumentsRequest) returns (ListPpdbDocumentsResponse);       // kelola_sekolah
 }

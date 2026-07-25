@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -99,6 +100,74 @@ type SchoolRepository interface {
 	SetDeniedCaps(ctx context.Context, keys []string) error
 	// ExportBackup returns a consistent snapshot of the SQLite database file.
 	ExportBackup(ctx context.Context) ([]byte, error)
+	// PPDB applicant registrations.
+	CreatePpdbRegistration(ctx context.Context, p *PpdbRegistration) error
+	ListPpdbRegistrations(ctx context.Context, batchID, jurusan, search string) ([]*PpdbRegistration, error)
+	UpdatePpdbStatus(ctx context.Context, id, status, catatan string) (*PpdbRegistration, error)
+	DeletePpdbRegistration(ctx context.Context, id string) error
+	GetPpdbRegistration(ctx context.Context, id string) (*PpdbRegistration, error)
+	GetPpdbRegistrationByNo(ctx context.Context, no string) (*PpdbRegistration, error)
+	CountPpdbInBatch(ctx context.Context, batchID string) (int, error)
+	SetPpdbTestStarted(ctx context.Context, id string) error
+	SavePpdbTest(ctx context.Context, id string, score int, answers []PpdbTestAnswer) error
+	// PPDB gelombang (batches).
+	CreatePpdbBatch(ctx context.Context, b *PpdbBatch) error
+	UpdatePpdbBatch(ctx context.Context, b *PpdbBatch) error
+	SetPpdbBrosur(ctx context.Context, id, dataURL string) error
+	ListPpdbBatches(ctx context.Context) ([]*PpdbBatch, error)
+	GetPpdbBatch(ctx context.Context, id string) (*PpdbBatch, error)
+	GetActivePpdbBatch(ctx context.Context) (*PpdbBatch, error)
+	SetActivePpdbBatch(ctx context.Context, id string) error
+	DeletePpdbBatch(ctx context.Context, id string) error
+	PpdbBrosur(ctx context.Context, batchID string) (string, error)
+	// PPDB bank soal.
+	ListPpdbQuestions(ctx context.Context, batchID string) ([]*PpdbQuestion, error)
+	SetPpdbQuestions(ctx context.Context, batchID string, qs []*PpdbQuestion) error
+	// PPDB dokumen pendaftar.
+	SetPpdbDocLink(ctx context.Context, id, docLink string) error
+	AddPpdbDocument(ctx context.Context, regID, name, dataURL string) (string, error)
+	ListPpdbDocuments(ctx context.Context, regID string) ([]PpdbDoc, error)
+}
+
+// PpdbPhone is one labeled contact number of a PPDB applicant.
+type PpdbPhone struct {
+	Label  string `json:"label"`
+	Number string `json:"number"`
+}
+
+// PpdbRegistration is a prospective-student admission form submission.
+type PpdbRegistration struct {
+	ID           string
+	Nama         string
+	TempatLahir  string
+	TanggalLahir string
+	JenisKelamin string
+	AsalSekolah  string
+	Jurusan      string
+	NamaOrtu     string
+	Alamat       string
+	Email        string
+	Nisn         string
+	NoKK         string
+	Phones        []PpdbPhone
+	Status        string
+	Catatan       string
+	CreatedAt     time.Time
+	BatchID       string
+	NoPendaftaran string
+	Password      string // exam credential (password_plain)
+	TestScore     int    // -1 = belum ujian
+	TestSubmitted bool
+	TahunAjaran   string // from batch (filled by list join)
+	Gelombang     int
+	DocLink       string
+	Docs          []PpdbDoc // uploaded document files (metadata; loaded on demand)
+}
+
+// PpdbDoc is one uploaded document file's metadata (data streamed at /ppdb-doc).
+type PpdbDoc struct {
+	ID   string
+	Name string
 }
 
 // ContentItem is a generic public-site content row (galeri/jurusan/berita/…).
@@ -157,6 +226,91 @@ func (r *sqliteSchoolRepository) SetGameMusic(ctx context.Context, dataURL, name
 		dataURL, name)
 	if err != nil {
 		return fmt.Errorf("set game music: %w", err)
+	}
+	return nil
+}
+
+const ppdbCols = `id, nama, tempat_lahir, tanggal_lahir, jenis_kelamin, asal_sekolah, jurusan, nama_ortu, alamat, email, nisn, no_kk, phones, status, catatan, created_at, batch_id, no_pendaftaran, password_plain, test_score, test_submitted, doc_link`
+
+func scanPpdb(row interface{ Scan(...any) error }) (*PpdbRegistration, error) {
+	p := &PpdbRegistration{}
+	var phonesJSON string
+	if err := row.Scan(&p.ID, &p.Nama, &p.TempatLahir, &p.TanggalLahir, &p.JenisKelamin, &p.AsalSekolah,
+		&p.Jurusan, &p.NamaOrtu, &p.Alamat, &p.Email, &p.Nisn, &p.NoKK, &phonesJSON, &p.Status, &p.Catatan, &p.CreatedAt,
+		&p.BatchID, &p.NoPendaftaran, &p.Password, &p.TestScore, &p.TestSubmitted, &p.DocLink); err != nil {
+		return nil, err
+	}
+	_ = json.Unmarshal([]byte(phonesJSON), &p.Phones)
+	return p, nil
+}
+
+func (r *sqliteSchoolRepository) CreatePpdbRegistration(ctx context.Context, p *PpdbRegistration) error {
+	phones, _ := json.Marshal(p.Phones)
+	_, err := r.db.ExecContext(ctx, `
+		INSERT INTO ppdb_registrations (id, nama, tempat_lahir, tanggal_lahir, jenis_kelamin, asal_sekolah, jurusan, nama_ortu, alamat, email, nisn, no_kk, phones, status, catatan, batch_id, no_pendaftaran, password_plain)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'baru', '', ?, ?, ?)`,
+		p.ID, p.Nama, p.TempatLahir, p.TanggalLahir, p.JenisKelamin, p.AsalSekolah, p.Jurusan, p.NamaOrtu, p.Alamat, p.Email, p.Nisn, p.NoKK, string(phones),
+		p.BatchID, p.NoPendaftaran, p.Password)
+	if err != nil {
+		return fmt.Errorf("create ppdb registration: %w", err)
+	}
+	return nil
+}
+
+// ListPpdbRegistrations returns registrations of a batch (or all if batchID==""),
+// filtered by jurusan/name, ranked by test score desc then registration order.
+func (r *sqliteSchoolRepository) ListPpdbRegistrations(ctx context.Context, batchID, jurusan, search string) ([]*PpdbRegistration, error) {
+	q := `SELECT reg.id, reg.nama, reg.tempat_lahir, reg.tanggal_lahir, reg.jenis_kelamin, reg.asal_sekolah, reg.jurusan, reg.nama_ortu, reg.alamat, reg.email, reg.nisn, reg.no_kk, reg.phones, reg.status, reg.catatan, reg.created_at, reg.batch_id, reg.no_pendaftaran, reg.password_plain, reg.test_score, reg.test_submitted, reg.doc_link, COALESCE(b.tahun_ajaran,''), COALESCE(b.gelombang,0)
+		FROM ppdb_registrations reg LEFT JOIN ppdb_batches b ON b.id = reg.batch_id WHERE 1=1`
+	args := []any{}
+	if batchID != "" {
+		q += ` AND reg.batch_id = ?`
+		args = append(args, batchID)
+	}
+	if jurusan != "" {
+		q += ` AND reg.jurusan = ?`
+		args = append(args, jurusan)
+	}
+	if search != "" {
+		q += ` AND reg.nama LIKE ?`
+		args = append(args, "%"+search+"%")
+	}
+	q += ` ORDER BY reg.test_score DESC, reg.created_at ASC`
+	rows, err := r.db.QueryContext(ctx, q, args...)
+	if err != nil {
+		return nil, fmt.Errorf("list ppdb: %w", err)
+	}
+	defer rows.Close()
+	var out []*PpdbRegistration
+	for rows.Next() {
+		p := &PpdbRegistration{}
+		var phonesJSON string
+		if err := rows.Scan(&p.ID, &p.Nama, &p.TempatLahir, &p.TanggalLahir, &p.JenisKelamin, &p.AsalSekolah,
+			&p.Jurusan, &p.NamaOrtu, &p.Alamat, &p.Email, &p.Nisn, &p.NoKK, &phonesJSON, &p.Status, &p.Catatan, &p.CreatedAt,
+			&p.BatchID, &p.NoPendaftaran, &p.Password, &p.TestScore, &p.TestSubmitted, &p.DocLink, &p.TahunAjaran, &p.Gelombang); err != nil {
+			return nil, err
+		}
+		_ = json.Unmarshal([]byte(phonesJSON), &p.Phones)
+		out = append(out, p)
+	}
+	return out, rows.Err()
+}
+
+func (r *sqliteSchoolRepository) UpdatePpdbStatus(ctx context.Context, id, status, catatan string) (*PpdbRegistration, error) {
+	res, err := r.db.ExecContext(ctx, `UPDATE ppdb_registrations SET status = ?, catatan = ? WHERE id = ?`, status, catatan, id)
+	if err != nil {
+		return nil, fmt.Errorf("update ppdb status: %w", err)
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return nil, sql.ErrNoRows
+	}
+	return scanPpdb(r.db.QueryRowContext(ctx, `SELECT `+ppdbCols+` FROM ppdb_registrations WHERE id = ?`, id))
+}
+
+func (r *sqliteSchoolRepository) DeletePpdbRegistration(ctx context.Context, id string) error {
+	_, err := r.db.ExecContext(ctx, `DELETE FROM ppdb_registrations WHERE id = ?`, id)
+	if err != nil {
+		return fmt.Errorf("delete ppdb: %w", err)
 	}
 	return nil
 }
