@@ -1,0 +1,32 @@
+syntax = "proto3";
+
+package notification.v1;
+
+option go_package = "lms/backend/gen/notification/v1;notificationv1";
+
+import "google/protobuf/timestamp.proto";
+
+message Notification {
+  string id = 1;
+  string type = 2;   // 'tugas_baru' | 'nilai' | 'pengumuman' | ...
+  string title = 3;
+  string body = 4;
+  string link = 5;   // in-app route to open (e.g. '/tugas')
+  google.protobuf.Timestamp created_at = 6;
+  bool read = 7;     // computed vs the caller's last-seen timestamp
+}
+
+message ListNotificationsRequest { int32 limit = 1; }
+message ListNotificationsResponse {
+  repeated Notification items = 1;
+  int32 unread_count = 2;
+}
+
+message MarkAllReadRequest {}
+message MarkAllReadResponse {}
+
+// All RPCs require authentication (any signed-in user).
+service NotificationService {
+  rpc ListNotifications(ListNotificationsRequest) returns (ListNotificationsResponse);
+  rpc MarkAllRead(MarkAllReadRequest) returns (MarkAllReadResponse);
+}

@@ -316,6 +316,14 @@ func (s *SchoolService) GetMyPpdb(ctx context.Context, callerRole, regID string)
 	return reg, nil
 }
 
+// MarkPpdbWa marks registrations as contacted (or not) via WhatsApp. Admin-only.
+func (s *SchoolService) MarkPpdbWa(ctx context.Context, callerRole string, ids []string, sent bool) error {
+	if !isManager(callerRole) {
+		return ErrPermissionDenied
+	}
+	return s.repo.SetPpdbWaSent(ctx, ids, sent)
+}
+
 // ── pengumuman hasil seleksi (konten type 'pengumuman') ──
 
 func ppdbAnnouncementTitle(tahun string) string { return "Hasil Seleksi PPDB — TA " + tahun }

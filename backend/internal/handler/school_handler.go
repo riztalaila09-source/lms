@@ -170,6 +170,18 @@ func (h *SchoolHandler) ExportBackup(ctx context.Context, _ *connect.Request[sch
 	return connect.NewResponse(&schoolv1.ExportBackupResponse{Data: data, Filename: filename}), nil
 }
 
+func (h *SchoolHandler) RestoreBackup(ctx context.Context, req *connect.Request[schoolv1.RestoreBackupRequest]) (*connect.Response[schoolv1.RestoreBackupResponse], error) {
+	claims, ok := middleware.ClaimsFromContext(ctx)
+	if !ok {
+		return nil, connect.NewError(connect.CodeUnauthenticated, nil)
+	}
+	msg, err := h.svc.RestoreBackup(ctx, claims.Role, req.Msg.Data)
+	if err != nil {
+		return nil, mapSchoolError(err)
+	}
+	return connect.NewResponse(&schoolv1.RestoreBackupResponse{Message: msg}), nil
+}
+
 func (h *SchoolHandler) CreateSemester(ctx context.Context, req *connect.Request[schoolv1.CreateSemesterRequest]) (*connect.Response[schoolv1.Semester], error) {
 	claims, ok := middleware.ClaimsFromContext(ctx)
 	if !ok {
@@ -254,6 +266,7 @@ func ppdbToProto(p *repository.PpdbRegistration) *schoolv1.PpdbRegistration {
 		Alamat: p.Alamat, Email: p.Email, Nisn: p.Nisn, NoKk: p.NoKK, Status: p.Status, Catatan: p.Catatan,
 		BatchId: p.BatchID, NoPendaftaran: p.NoPendaftaran, Password: p.Password, TestScore: int32(p.TestScore),
 		TestSubmitted: p.TestSubmitted, TahunAjaran: p.TahunAjaran, Gelombang: int32(p.Gelombang), DocLink: p.DocLink,
+		WaSent: p.WaSent,
 	}
 	for _, ph := range p.Phones {
 		out.Phones = append(out.Phones, &schoolv1.PpdbPhone{Label: ph.Label, Number: ph.Number})
@@ -337,4 +350,15 @@ func (h *SchoolHandler) PublishPpdbAnnouncement(ctx context.Context, req *connec
 		return nil, mapSchoolError(err)
 	}
 	return connect.NewResponse(&schoolv1.PublishPpdbAnnouncementResponse{Count: int32(n)}), nil
+}
+
+func (h *SchoolHandler) MarkPpdbWa(ctx context.Context, req *connect.Request[schoolv1.MarkPpdbWaRequest]) (*connect.Response[schoolv1.MarkPpdbWaResponse], error) {
+	claims, ok := middleware.ClaimsFromContext(ctx)
+	if !ok {
+		return nil, connect.NewError(connect.CodeUnauthenticated, nil)
+	}
+	if err := h.svc.MarkPpdbWa(ctx, claims.Role, req.Msg.Ids, req.Msg.Sent); err != nil {
+		return nil, mapSchoolError(err)
+	}
+	return connect.NewResponse(&schoolv1.MarkPpdbWaResponse{}), nil
 }

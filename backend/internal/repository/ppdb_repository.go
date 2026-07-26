@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -257,6 +258,29 @@ func (r *sqliteSchoolRepository) ListPpdbAcceptedByYear(ctx context.Context, tah
 		out = append(out, p)
 	}
 	return out, rows.Err()
+}
+
+// SetPpdbWaSent marks the given registrations as contacted (or not) via WhatsApp.
+func (r *sqliteSchoolRepository) SetPpdbWaSent(ctx context.Context, ids []string, sent bool) error {
+	if len(ids) == 0 {
+		return nil
+	}
+	v := 0
+	if sent {
+		v = 1
+	}
+	ph := make([]string, len(ids))
+	args := make([]any, 0, len(ids)+1)
+	args = append(args, v)
+	for i, id := range ids {
+		ph[i] = "?"
+		args = append(args, id)
+	}
+	_, err := r.db.ExecContext(ctx, `UPDATE ppdb_registrations SET wa_sent = ? WHERE id IN (`+strings.Join(ph, ",")+`)`, args...)
+	if err != nil {
+		return fmt.Errorf("set ppdb wa_sent: %w", err)
+	}
+	return nil
 }
 
 // ── registrations (extra) ──

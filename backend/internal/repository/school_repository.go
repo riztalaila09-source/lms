@@ -130,6 +130,8 @@ type SchoolRepository interface {
 	ListPpdbDocuments(ctx context.Context, regID string) ([]PpdbDoc, error)
 	// PPDB pengumuman: peserta diterima+bernilai dalam satu tahun ajaran (urut skor desc).
 	ListPpdbAcceptedByYear(ctx context.Context, tahunAjaran string) ([]*PpdbRegistration, error)
+	// PPDB WhatsApp: tandai pendaftar sudah/belum dihubungi.
+	SetPpdbWaSent(ctx context.Context, ids []string, sent bool) error
 }
 
 // PpdbPhone is one labeled contact number of a PPDB applicant.
@@ -165,6 +167,7 @@ type PpdbRegistration struct {
 	Gelombang     int
 	DocLink       string
 	Docs          []PpdbDoc // uploaded document files (metadata; loaded on demand)
+	WaSent        bool      // admin sudah menghubungi via WhatsApp
 }
 
 // PpdbDoc is one uploaded document file's metadata (data streamed at /ppdb-doc).
@@ -233,14 +236,14 @@ func (r *sqliteSchoolRepository) SetGameMusic(ctx context.Context, dataURL, name
 	return nil
 }
 
-const ppdbCols = `id, nama, tempat_lahir, tanggal_lahir, jenis_kelamin, asal_sekolah, jurusan, nama_ortu, alamat, email, nisn, no_kk, phones, status, catatan, created_at, batch_id, no_pendaftaran, password_plain, test_score, test_submitted, doc_link`
+const ppdbCols = `id, nama, tempat_lahir, tanggal_lahir, jenis_kelamin, asal_sekolah, jurusan, nama_ortu, alamat, email, nisn, no_kk, phones, status, catatan, created_at, batch_id, no_pendaftaran, password_plain, test_score, test_submitted, doc_link, wa_sent`
 
 func scanPpdb(row interface{ Scan(...any) error }) (*PpdbRegistration, error) {
 	p := &PpdbRegistration{}
 	var phonesJSON string
 	if err := row.Scan(&p.ID, &p.Nama, &p.TempatLahir, &p.TanggalLahir, &p.JenisKelamin, &p.AsalSekolah,
 		&p.Jurusan, &p.NamaOrtu, &p.Alamat, &p.Email, &p.Nisn, &p.NoKK, &phonesJSON, &p.Status, &p.Catatan, &p.CreatedAt,
-		&p.BatchID, &p.NoPendaftaran, &p.Password, &p.TestScore, &p.TestSubmitted, &p.DocLink); err != nil {
+		&p.BatchID, &p.NoPendaftaran, &p.Password, &p.TestScore, &p.TestSubmitted, &p.DocLink, &p.WaSent); err != nil {
 		return nil, err
 	}
 	_ = json.Unmarshal([]byte(phonesJSON), &p.Phones)
@@ -263,7 +266,7 @@ func (r *sqliteSchoolRepository) CreatePpdbRegistration(ctx context.Context, p *
 // ListPpdbRegistrations returns registrations of a batch (or all if batchID==""),
 // filtered by jurusan/name, ranked by test score desc then registration order.
 func (r *sqliteSchoolRepository) ListPpdbRegistrations(ctx context.Context, batchID, jurusan, search string) ([]*PpdbRegistration, error) {
-	q := `SELECT reg.id, reg.nama, reg.tempat_lahir, reg.tanggal_lahir, reg.jenis_kelamin, reg.asal_sekolah, reg.jurusan, reg.nama_ortu, reg.alamat, reg.email, reg.nisn, reg.no_kk, reg.phones, reg.status, reg.catatan, reg.created_at, reg.batch_id, reg.no_pendaftaran, reg.password_plain, reg.test_score, reg.test_submitted, reg.doc_link, COALESCE(b.tahun_ajaran,''), COALESCE(b.gelombang,0)
+	q := `SELECT reg.id, reg.nama, reg.tempat_lahir, reg.tanggal_lahir, reg.jenis_kelamin, reg.asal_sekolah, reg.jurusan, reg.nama_ortu, reg.alamat, reg.email, reg.nisn, reg.no_kk, reg.phones, reg.status, reg.catatan, reg.created_at, reg.batch_id, reg.no_pendaftaran, reg.password_plain, reg.test_score, reg.test_submitted, reg.doc_link, reg.wa_sent, COALESCE(b.tahun_ajaran,''), COALESCE(b.gelombang,0)
 		FROM ppdb_registrations reg LEFT JOIN ppdb_batches b ON b.id = reg.batch_id WHERE 1=1`
 	args := []any{}
 	if batchID != "" {
@@ -290,7 +293,7 @@ func (r *sqliteSchoolRepository) ListPpdbRegistrations(ctx context.Context, batc
 		var phonesJSON string
 		if err := rows.Scan(&p.ID, &p.Nama, &p.TempatLahir, &p.TanggalLahir, &p.JenisKelamin, &p.AsalSekolah,
 			&p.Jurusan, &p.NamaOrtu, &p.Alamat, &p.Email, &p.Nisn, &p.NoKK, &phonesJSON, &p.Status, &p.Catatan, &p.CreatedAt,
-			&p.BatchID, &p.NoPendaftaran, &p.Password, &p.TestScore, &p.TestSubmitted, &p.DocLink, &p.TahunAjaran, &p.Gelombang); err != nil {
+			&p.BatchID, &p.NoPendaftaran, &p.Password, &p.TestScore, &p.TestSubmitted, &p.DocLink, &p.WaSent, &p.TahunAjaran, &p.Gelombang); err != nil {
 			return nil, err
 		}
 		_ = json.Unmarshal([]byte(phonesJSON), &p.Phones)

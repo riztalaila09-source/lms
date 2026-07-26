@@ -3,7 +3,7 @@ import {
   Badge, Box, Button, Checkbox, Dialog, Field, Flex, Icon, IconButton, Image, Input, NativeSelect, SimpleGrid, Stack, Switch, Table, Tabs, Text, Textarea,
 } from '@chakra-ui/react'
 import {
-  LuPlus, LuTrash2, LuDownload, LuPrinter, LuEye, LuRefreshCw, LuSave, LuStar, LuUpload, LuLayers, LuClipboardList, LuUsers, LuX, LuExternalLink, LuCheck, LuBan, LuMegaphone,
+  LuPlus, LuTrash2, LuDownload, LuPrinter, LuEye, LuRefreshCw, LuSave, LuStar, LuUpload, LuLayers, LuClipboardList, LuUsers, LuX, LuExternalLink, LuCheck, LuBan, LuMegaphone, LuMessageCircle,
 } from 'react-icons/lu'
 import { timestampDate } from '@bufbuild/protobuf/wkt'
 import { schoolClient } from '@/lib/client'
@@ -22,6 +22,33 @@ type Q = { question: string; options: string[]; correctIndex: number }
 
 const errShow = (e: unknown) => toaster.create({ description: e instanceof Error ? e.message : 'Gagal', type: 'error' })
 const csvCell = (v: unknown) => `"${String(v ?? '').replace(/"/g, '""')}"`
+
+// waNumber picks the first usable phone and normalizes it to international (62…) form.
+const waNumber = (r: Reg): string => {
+  for (const p of r.phones) {
+    const d = (p.number || '').replace(/\D/g, '')
+    if (!d) continue
+    if (d.startsWith('62')) return d
+    if (d.startsWith('0')) return '62' + d.slice(1)
+    if (d.startsWith('8')) return '62' + d
+    return d
+  }
+  return ''
+}
+
+const waMessage = (r: Reg, sekolah: string): string => {
+  const lines = [
+    "Assalamu'alaikum Wr. Wb.",
+    `Halo ${r.nama}, terima kasih telah mendaftar PPDB ${sekolah}.`,
+    `No. Pendaftaran: ${r.noPendaftaran}`,
+  ]
+  if (r.status === 'diterima') lines.push('Selamat! Anda dinyatakan DITERIMA. Mohon segera melakukan daftar ulang.')
+  else if (r.status === 'ditolak') lines.push('Mohon maaf, berdasarkan hasil seleksi Anda belum dapat kami terima.')
+  else lines.push('Informasi seleksi akan kami sampaikan melalui nomor ini.')
+  return lines.join('\n')
+}
+
+const waLink = (r: Reg, sekolah: string) => `https://wa.me/${waNumber(r)}?text=${encodeURIComponent(waMessage(r, sekolah))}`
 
 export default function PpdbAdmin() {
   const [batches, setBatches] = useState<Batch[]>([])
@@ -330,6 +357,37 @@ function RegistrantTable({ batch }: { batch: Batch }) {
     } catch (e) { errShow(e) } finally { setPublishing(false) }
   }
 
+  const sekolah = school?.name || 'sekolah kami'
+
+  const markWa = async (ids: string[], sent: boolean) => {
+    if (!ids.length) return
+    try {
+      await schoolClient.markPpdbWa({ ids, sent })
+      setRows((rs) => rs.map((x) => (ids.includes(x.id) ? { ...x, waSent: sent } as Reg : x)))
+      setDetail((d) => (d && ids.includes(d.id) ? { ...d, waSent: sent } as Reg : d))
+    } catch (e) { errShow(e) }
+  }
+
+  const sendWa = (r: Reg) => {
+    if (!waNumber(r)) { toaster.create({ description: `${r.nama}: nomor telepon kosong.`, type: 'warning' }); return }
+    window.open(waLink(r, sekolah), '_blank', 'noopener')
+    void markWa([r.id], true)
+  }
+
+  const bulkWa = () => {
+    const targets = rows.filter((r) => selected.has(r.id))
+    const withNum = targets.filter((r) => waNumber(r))
+    if (!withNum.length) { toaster.create({ description: 'Tidak ada nomor telepon pada pilihan.', type: 'warning' }); return }
+    // Open a WhatsApp chat per selected registrant (browser may block extra popups).
+    withNum.forEach((r) => window.open(waLink(r, sekolah), '_blank', 'noopener'))
+    void markWa(withNum.map((r) => r.id), true)
+    const skipped = targets.length - withNum.length
+    toaster.create({
+      description: `${withNum.length} chat WhatsApp dibuka & ditandai "Sudah di WA"${skipped ? ` · ${skipped} dilewati (tanpa nomor)` : ''}. Jika sebagian tab diblokir browser, izinkan popup.`,
+      type: 'success', duration: 6000,
+    })
+  }
+
   const printCards = () => {
     if (!rows.length) return
     const esc = (s: unknown) => String(s ?? '').replace(/[<>&"]/g, (c) => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;' }[c] || c))
@@ -401,6 +459,7 @@ function RegistrantTable({ batch }: { batch: Batch }) {
           <Text fontSize="13px" fontWeight="600">{selected.size} dipilih</Text>
           <Button size="xs" colorPalette="green" loading={bulking} onClick={() => bulkStatus('diterima')}><Icon as={LuCheck} /> Terima Semua</Button>
           <Button size="xs" variant="outline" colorPalette="red" loading={bulking} onClick={() => bulkStatus('ditolak')}><Icon as={LuBan} /> Tolak</Button>
+          <Button size="xs" colorPalette="green" variant="outline" onClick={bulkWa}><Icon as={LuMessageCircle} /> Kirim WhatsApp</Button>
           <Button size="xs" variant="ghost" onClick={() => setSelected(new Set())}>Batal pilih</Button>
         </Flex>
       )}
@@ -412,7 +471,7 @@ function RegistrantTable({ batch }: { batch: Batch }) {
             <Table.ColumnHeader w="36px"><Checkbox.Root size="sm" checked={allChecked} onCheckedChange={toggleAll}><Checkbox.HiddenInput /><Checkbox.Control /></Checkbox.Root></Table.ColumnHeader>
             <Table.ColumnHeader>#</Table.ColumnHeader><Table.ColumnHeader>No. Daftar</Table.ColumnHeader><Table.ColumnHeader>Nama</Table.ColumnHeader>
             <Table.ColumnHeader>Jurusan</Table.ColumnHeader><Table.ColumnHeader>Nilai</Table.ColumnHeader><Table.ColumnHeader>Password</Table.ColumnHeader>
-            <Table.ColumnHeader>Status</Table.ColumnHeader><Table.ColumnHeader textAlign="right">Aksi</Table.ColumnHeader>
+            <Table.ColumnHeader>Status</Table.ColumnHeader><Table.ColumnHeader>WA</Table.ColumnHeader><Table.ColumnHeader textAlign="right">Aksi</Table.ColumnHeader>
           </Table.Row></Table.Header>
           <Table.Body>
             {paged.pageItems.map((r, i) => (
@@ -425,13 +484,20 @@ function RegistrantTable({ batch }: { batch: Batch }) {
                 <Table.Cell fontWeight="800">{r.testScore < 0 ? '—' : r.testScore}</Table.Cell>
                 <Table.Cell fontFamily="mono" fontSize="12px">{r.password}</Table.Cell>
                 <Table.Cell><Badge colorPalette={PPDB_STATUS[r.status]?.color ?? 'gray'}>{PPDB_STATUS[r.status]?.label ?? r.status}</Badge></Table.Cell>
+                <Table.Cell><Badge colorPalette={r.waSent ? 'green' : 'gray'} variant={r.waSent ? 'solid' : 'subtle'}>{r.waSent ? 'Sudah di WA' : 'Belum di WA'}</Badge></Table.Cell>
                 <Table.Cell textAlign="right">
-                  <RowActionsMenu actions={[
-                    { label: 'Detail', icon: LuEye, onClick: () => openDetail(r) },
-                    { label: 'Terima', icon: LuCheck, onClick: () => schoolClient.updatePpdbStatus({ id: r.id, status: 'diterima', catatan: r.catatan || '' }).then(load).catch(errShow) },
-                    { label: 'Tolak', icon: LuBan, onClick: () => schoolClient.updatePpdbStatus({ id: r.id, status: 'ditolak', catatan: r.catatan || '' }).then(load).catch(errShow) },
-                    { label: 'Hapus', icon: LuTrash2, onClick: () => askDelete(r), danger: true },
-                  ]} />
+                  <Flex gap="4px" justify="flex-end" align="center">
+                    <Button size="2xs" colorPalette="green" variant="outline" onClick={() => sendWa(r)} title="Kirim WhatsApp"><Icon as={LuMessageCircle} /> WA</Button>
+                    <RowActionsMenu actions={[
+                      { label: 'Detail', icon: LuEye, onClick: () => openDetail(r) },
+                      { label: 'Terima', icon: LuCheck, onClick: () => schoolClient.updatePpdbStatus({ id: r.id, status: 'diterima', catatan: r.catatan || '' }).then(load).catch(errShow) },
+                      { label: 'Tolak', icon: LuBan, onClick: () => schoolClient.updatePpdbStatus({ id: r.id, status: 'ditolak', catatan: r.catatan || '' }).then(load).catch(errShow) },
+                      r.waSent
+                        ? { label: 'Tandai belum di WA', icon: LuMessageCircle, onClick: () => markWa([r.id], false) }
+                        : { label: 'Tandai sudah di WA', icon: LuMessageCircle, onClick: () => markWa([r.id], true) },
+                      { label: 'Hapus', icon: LuTrash2, onClick: () => askDelete(r), danger: true },
+                    ]} />
+                  </Flex>
                 </Table.Cell>
               </Table.Row>
             ))}
@@ -480,7 +546,10 @@ function RegistrantTable({ batch }: { batch: Batch }) {
               </Flex>
             </Stack>
           )}</Dialog.Body>
-          <Dialog.Footer><Button variant="outline" onClick={() => setDetail(null)}>Tutup</Button><Button loading={saving} onClick={saveStatus} bg={COLORS.primary} color="white" _hover={{ bg: COLORS.primaryDark }}>Simpan Status</Button></Dialog.Footer>
+          <Dialog.Footer>
+            {detail && <Button variant="outline" colorPalette="green" onClick={() => sendWa(detail)} mr="auto"><Icon as={LuMessageCircle} /> Kirim WhatsApp{detail.waSent ? ' (sudah)' : ''}</Button>}
+            <Button variant="outline" onClick={() => setDetail(null)}>Tutup</Button><Button loading={saving} onClick={saveStatus} bg={COLORS.primary} color="white" _hover={{ bg: COLORS.primaryDark }}>Simpan Status</Button>
+          </Dialog.Footer>
         </Dialog.Content></Dialog.Positioner>
       </Dialog.Root>
       <ConfirmDialog state={confirm} onClose={() => setConfirm(null)} />

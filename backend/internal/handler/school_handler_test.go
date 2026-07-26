@@ -42,3 +42,18 @@ func TestSchoolHandler_GetIsPublic(t *testing.T) {
 }
 
 func proto(s string) *string { return &s }
+
+func TestSchoolHandler_RestoreBackupAuth(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	h := handler.NewSchoolHandler(service.NewSchoolService(repository.NewSchoolRepository(db), service.NewJWTService("test-secret", 24)))
+
+	// No claims → unauthenticated.
+	_, err := h.RestoreBackup(context.Background(), connect.NewRequest(&schoolv1.RestoreBackupRequest{Data: []byte("x")}))
+	require.Error(t, err)
+	assert.Equal(t, connect.CodeUnauthenticated, connect.CodeOf(err))
+
+	// Non-admin → permission denied.
+	_, err = h.RestoreBackup(schoolClaims("teacher"), connect.NewRequest(&schoolv1.RestoreBackupRequest{Data: []byte("x")}))
+	require.Error(t, err)
+	assert.Equal(t, connect.CodePermissionDenied, connect.CodeOf(err))
+}

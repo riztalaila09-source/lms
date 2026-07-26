@@ -24,7 +24,12 @@ type AssignmentService struct {
 	courseRepo     repository.CourseRepository
 	questionRepo   repository.AssignmentQuestionRepository
 	groupRepo      repository.AssignmentGroupRepository
+	notifier       Notifier // optional; nil = no notifications emitted
 }
+
+// SetNotifier attaches a notification emitter (composition root only). Optional
+// so the constructor and existing tests are unaffected.
+func (s *AssignmentService) SetNotifier(n Notifier) { s.notifier = n }
 
 func NewAssignmentService(
 	assignmentRepo repository.AssignmentRepository,
@@ -96,7 +101,28 @@ func (s *AssignmentService) CreateAssignment(ctx context.Context, callerID, call
 	if err := s.assignmentRepo.Create(ctx, a); err != nil {
 		return nil, fmt.Errorf("create assignment: %w", err)
 	}
+	s.notifyNewAssignment(ctx, a) // best-effort
 	return s.assignmentRepo.GetByID(ctx, a.ID)
+}
+
+// notifyNewAssignment tells enrolled students that a new assignment is out.
+func (s *AssignmentService) notifyNewAssignment(ctx context.Context, a *repository.Assignment) {
+	if s.notifier == nil {
+		return
+	}
+	enrollments, _, err := s.enrollmentRepo.ListStudents(ctx, a.CourseID, 1, 1000)
+	if err != nil || len(enrollments) == 0 {
+		return
+	}
+	ids := make([]string, 0, len(enrollments))
+	for _, e := range enrollments {
+		ids = append(ids, e.StudentID)
+	}
+	courseName := ""
+	if c, err := s.courseRepo.GetByID(ctx, a.CourseID); err == nil {
+		courseName = c.Name
+	}
+	s.notifier.NotifyUsers(ctx, ids, "tugas_baru", "Tugas baru: "+a.Title, courseName, "/tugas")
 }
 
 func (s *AssignmentService) GetAssignment(ctx context.Context, callerID, callerRole, id string) (*repository.Assignment, error) {
@@ -308,6 +334,10 @@ func (s *AssignmentService) GradeSubmission(ctx context.Context, callerID, calle
 	}
 	if err := s.submissionRepo.Grade(ctx, submissionID, score, feedback, time.Now().UTC()); err != nil {
 		return nil, fmt.Errorf("grade: %w", err)
+	}
+	if s.notifier != nil && sub.StudentID != "" {
+		s.notifier.NotifyUsers(ctx, []string{sub.StudentID}, "nilai",
+			"Nilai keluar: "+a.Title, fmt.Sprintf("Skor %d/%d", score, a.MaxScore), "/nilai")
 	}
 	return s.submissionRepo.GetByID(ctx, submissionID)
 }

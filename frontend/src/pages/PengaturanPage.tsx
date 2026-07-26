@@ -65,6 +65,7 @@ export default function PengaturanPage() {
   const [backupMsg, setBackupMsg] = useState('')
   const [backupErr, setBackupErr] = useState('')
   const [downloading, setDownloading] = useState(false)
+  const [restoring, setRestoring] = useState(false)
 
   // Game music (admin): current track name + presence, upload/remove state.
   const [gameMusicName, setGameMusicName] = useState('')
@@ -221,6 +222,23 @@ export default function PengaturanPage() {
       setBackupErr(err instanceof Error ? err.message : 'Gagal membuat backup')
     } finally {
       setDownloading(false)
+    }
+  }
+
+  const restoreBackup = async (file?: File) => {
+    if (!file) return
+    if (!confirm('PERINGATAN: Memulihkan backup akan MENGGANTI seluruh data saat ini dengan isi file backup. Lanjutkan?')) return
+    setRestoring(true)
+    setBackupErr('')
+    setBackupMsg('')
+    try {
+      const data = new Uint8Array(await file.arrayBuffer())
+      const res = await schoolClient.restoreBackup({ data })
+      setBackupMsg(res.message || 'Backup diunggah. Restart server untuk menerapkan.')
+    } catch (err: unknown) {
+      setBackupErr(err instanceof Error ? err.message : 'Gagal memulihkan backup')
+    } finally {
+      setRestoring(false)
     }
   }
 
@@ -443,11 +461,19 @@ export default function PengaturanPage() {
             <Card title={<><Icon as={LuDatabase} /> Backup Database</>}>
               <Stack gap="14px" maxW="640px">
                 <Text fontSize="13px" color={COLORS.muted}>
-                  Unduh salinan (snapshot) database secara utuh dan konsisten. Simpan file <b>.db</b> ini di tempat aman sebagai cadangan. Untuk memulihkan, ganti file database server dengan file hasil unduhan lalu mulai ulang server.
+                  Unduh salinan (snapshot) database secara utuh dan konsisten. Simpan file <b>.db</b> ini di tempat aman sebagai cadangan.
                 </Text>
                 <SimpleGrid columns={{ base: 1, sm: 2 }} gap="12px">
                   <Button loading={downloading} onClick={downloadBackup} bg={COLORS.primary} color="white" _hover={{ bg: COLORS.primaryDark }}><Icon as={LuDownload} /> Unduh Backup</Button>
+                  <Button as="label" cursor="pointer" variant="outline" colorPalette="orange" loading={restoring}>
+                    <Icon as={LuUpload} /> Pulihkan dari Backup
+                    <input type="file" accept=".db" hidden disabled={restoring}
+                      onChange={(e) => { restoreBackup(e.target.files?.[0]); e.currentTarget.value = '' }} />
+                  </Button>
                 </SimpleGrid>
+                <Text fontSize="12px" color={COLORS.muted}>
+                  Memulihkan akan <b>mengganti seluruh data</b> dengan isi file backup. Setelah diunggah &amp; divalidasi, <b>mulai ulang server</b> agar pemulihan diterapkan.
+                </Text>
                 {backupErr && <Text fontSize="12px" color={COLORS.danger}>{backupErr}</Text>}
                 {backupMsg && <Text fontSize="12px" color={COLORS.success}>{backupMsg}</Text>}
               </Stack>

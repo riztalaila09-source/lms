@@ -5,12 +5,14 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"os"
 	"strings"
 	"sync/atomic"
 	"time"
 
 	"github.com/google/uuid"
 
+	"lms/backend/internal/database"
 	"lms/backend/internal/repository"
 )
 
@@ -25,7 +27,19 @@ type SchoolService struct {
 	// deniedCaps caches the set of capability keys denied to teachers, so the
 	// permission interceptor can check it without a DB hit per request.
 	deniedCaps atomic.Pointer[map[string]bool]
+	// dbPath is the live SQLite file path, needed to stage a restore. Set by the
+	// composition root via SetDBPath; empty in tests → restore is unavailable.
+	dbPath string
+	// notifier emits in-app notifications (e.g. pengumuman). Optional; nil = off.
+	notifier Notifier
 }
+
+// SetDBPath tells the service where the live database file lives (composition
+// root only), enabling RestoreBackup to stage an uploaded snapshot.
+func (s *SchoolService) SetDBPath(p string) { s.dbPath = p }
+
+// SetNotifier attaches a notification emitter (composition root only). Optional.
+func (s *SchoolService) SetNotifier(n Notifier) { s.notifier = n }
 
 func NewSchoolService(repo repository.SchoolRepository, jwt *JWTService) *SchoolService {
 	s := &SchoolService{repo: repo, jwt: jwt}
@@ -98,6 +112,42 @@ func (s *SchoolService) ExportBackup(ctx context.Context, callerRole string) ([]
 	}
 	filename := fmt.Sprintf("lms-backup-%s.db", time.Now().Format("20060102-150405"))
 	return data, filename, nil
+}
+
+// RestoreBackup validates an uploaded SQLite snapshot and stages it to be
+// swapped in on the next server restart (the live DB file is locked while the
+// server runs). Admin-only. Returns a human message describing the next step.
+func (s *SchoolService) RestoreBackup(ctx context.Context, callerRole string, data []byte) (string, error) {
+	if callerRole != "admin" {
+		return "", ErrPermissionDenied
+	}
+	if s.dbPath == "" {
+		return "", fmt.Errorf("%w: restore tidak tersedia pada instance ini", ErrInvalidArgument)
+	}
+	if len(data) < 16 || string(data[:16]) != "SQLite format 3\x00" {
+		return "", fmt.Errorf("%w: file bukan database SQLite yang valid", ErrInvalidArgument)
+	}
+	// Write to a temp file and verify integrity + that it is an LMS database
+	// before staging, so a corrupt/foreign upload can never be swapped in.
+	tmp, err := os.CreateTemp("", "lms-restore-*.db")
+	if err != nil {
+		return "", fmt.Errorf("temp file: %w", err)
+	}
+	tmpName := tmp.Name()
+	defer os.Remove(tmpName)
+	if _, err := tmp.Write(data); err != nil {
+		tmp.Close()
+		return "", fmt.Errorf("write temp: %w", err)
+	}
+	tmp.Close()
+	if err := database.VerifySQLiteBackup(tmpName); err != nil {
+		return "", fmt.Errorf("%w: %v", ErrInvalidArgument, err)
+	}
+	pending := s.dbPath + database.PendingRestoreSuffix
+	if err := os.WriteFile(pending, data, 0o600); err != nil {
+		return "", fmt.Errorf("stage restore: %w", err)
+	}
+	return "Backup diunggah & valid. Restart server untuk menerapkan pemulihan.", nil
 }
 
 func (s *SchoolService) GetSchool(ctx context.Context) (*repository.School, error) {
@@ -202,7 +252,15 @@ func (s *SchoolService) SetContent(ctx context.Context, callerRole, typ string, 
 	if strings.TrimSpace(typ) == "" {
 		return nil, fmt.Errorf("%w: tipe konten wajib", ErrInvalidArgument)
 	}
-	return s.repo.SetContent(ctx, typ, items)
+	saved, err := s.repo.SetContent(ctx, typ, items)
+	if err != nil {
+		return nil, err
+	}
+	// Broadcast when an announcement is published so everyone gets a bell.
+	if typ == "pengumuman" && s.notifier != nil && len(saved) > 0 {
+		s.notifier.Broadcast(ctx, "pengumuman", "Pengumuman: "+saved[0].Title, saved[0].Subtitle, "/")
+	}
+	return saved, nil
 }
 
 func (s *SchoolService) ListSemesters(ctx context.Context) ([]*repository.Semester, error) {

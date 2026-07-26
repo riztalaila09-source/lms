@@ -127,6 +127,8 @@ message ExportBackupResponse {
   bytes  data     = 1;
   string filename = 2;
 }
+message RestoreBackupRequest { bytes data = 1; }
+message RestoreBackupResponse { string message = 1; }
 
 message CreateSemesterRequest { string semester = 1; string tahun_ajaran = 2; }
 message ListSemestersRequest {}
@@ -163,6 +165,7 @@ message PpdbRegistration {
   int32 gelombang = 23;
   string doc_link = 24;      // applicant-submitted Google Drive link
   repeated PpdbDoc docs = 25; // uploaded document files (metadata only)
+  bool wa_sent = 26;         // admin sudah menghubungi via WhatsApp
 }
 message PpdbDoc { string id = 1; string name = 2; }
 message PpdbDocFile { string name = 1; string data = 2; } // data URL for upload
@@ -199,6 +202,8 @@ message DeletePpdbRegistrationRequest { string id = 1; }
 message DeletePpdbRegistrationResponse {}
 message PublishPpdbAnnouncementRequest { string tahun_ajaran = 1; }
 message PublishPpdbAnnouncementResponse { int32 count = 1; }
+message MarkPpdbWaRequest { repeated string ids = 1; bool sent = 2; }
+message MarkPpdbWaResponse {}
 
 // ── PPDB gelombang (per tahun ajaran) ──
 message PpdbBatch {
@@ -282,11 +287,13 @@ service SchoolService {
   rpc GetAccessPolicy(GetAccessPolicyRequest) returns (AccessPolicyResponse);  // admin
   rpc SetAccessPolicy(SetAccessPolicyRequest) returns (AccessPolicyResponse);  // admin
   rpc ExportBackup(ExportBackupRequest) returns (ExportBackupResponse);        // admin
+  rpc RestoreBackup(RestoreBackupRequest) returns (RestoreBackupResponse);     // admin
   rpc SubmitPpdbRegistration(SubmitPpdbRegistrationRequest) returns (PpdbRegistration);   // public
   rpc ListPpdbRegistrations(ListPpdbRegistrationsRequest) returns (ListPpdbRegistrationsResponse); // kelola_sekolah
   rpc UpdatePpdbStatus(UpdatePpdbStatusRequest) returns (PpdbRegistration);    // kelola_sekolah
   rpc DeletePpdbRegistration(DeletePpdbRegistrationRequest) returns (DeletePpdbRegistrationResponse); // kelola_sekolah
   rpc PublishPpdbAnnouncement(PublishPpdbAnnouncementRequest) returns (PublishPpdbAnnouncementResponse); // kelola_sekolah
+  rpc MarkPpdbWa(MarkPpdbWaRequest) returns (MarkPpdbWaResponse); // kelola_sekolah
 
   // PPDB gelombang (admin), + active batch (public)
   rpc GetActivePpdbBatch(GetActivePpdbBatchRequest) returns (PpdbBatch);       // public

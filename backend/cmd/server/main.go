@@ -28,6 +28,7 @@ import (
 	"lms/backend/gen/game/v1/gamev1connect"
 	"lms/backend/gen/pkl/v1/pklv1connect"
 	"lms/backend/gen/material/v1/materialv1connect"
+	"lms/backend/gen/notification/v1/notificationv1connect"
 	"lms/backend/gen/parent/v1/parentv1connect"
 	"lms/backend/gen/user/v1/userv1connect"
 	"lms/backend/internal/config"
@@ -82,6 +83,11 @@ func main() {
 		_ = os.MkdirAll(filepath.Dir(cfg.Database.Path), 0o755)
 	}
 
+	// Swap in a staged backup (admin uploaded a restore) before opening the DB.
+	if err := database.ApplyPendingRestore(cfg.Database.Path); err != nil {
+		log.Printf("warning: apply pending restore: %v", err)
+	}
+
 	db, err := database.Open(cfg.Database.Path)
 	if err != nil {
 		log.Fatalf("open database: %v", err)
@@ -118,6 +124,7 @@ func main() {
 	classroomRepo := repository.NewClassroomRepository(db)
 	parentRepo := repository.NewParentRepository(db)
 	gameRepo := repository.NewGameRepository(db)
+	notificationRepo := repository.NewNotificationRepository(db)
 
 	// Business logic
 	userSvc := service.NewUserService(userRepo, jwtSvc, activityRepo)
@@ -130,11 +137,18 @@ func main() {
 	classSvc := service.NewClassService(classRepo, userRepo)
 	jurusanSvc := service.NewJurusanService(jurusanRepo)
 	schoolSvc := service.NewSchoolService(schoolRepo, jwtSvc)
+	schoolSvc.SetDBPath(cfg.Database.Path) // enable admin restore (stage-and-swap)
 	attendanceSvc := service.NewAttendanceService(attendanceRepo, courseRepo)
 	pklSvc := service.NewPklService(pklRepo)
 	classroomSvc := service.NewClassroomService(classroomRepo)
 	parentSvc := service.NewParentService(parentRepo, userRepo)
 	gameSvc := service.NewGameService(gameRepo, assignmentQuestionRepo, submissionRepo, assignmentRepo, userRepo)
+	notificationSvc := service.NewNotificationService(notificationRepo)
+
+	// Wire the notification emitter into the services that raise events.
+	notifier := service.NewNotifier(notificationRepo)
+	assignmentSvc.SetNotifier(notifier)
+	schoolSvc.SetNotifier(notifier)
 
 	// Handlers
 	userHandler := handler.NewUserHandler(userSvc, courseSvc, schoolSvc)
@@ -150,6 +164,7 @@ func main() {
 	classroomHandler := handler.NewClassroomHandler(classroomSvc)
 	parentHandler := handler.NewParentHandler(parentSvc)
 	gameHandler := handler.NewGameHandler(gameSvc)
+	notificationHandler := handler.NewNotificationHandler(notificationSvc)
 
 	// Load the central access policy (teacher edit/delete capabilities) into cache.
 	if err := schoolSvc.LoadAccessPolicy(context.Background()); err != nil {
@@ -176,6 +191,7 @@ func main() {
 	classroomPath, classroomAPI := classroomv1connect.NewClassroomServiceHandler(classroomHandler, interceptors)
 	parentPath, parentAPI := parentv1connect.NewParentServiceHandler(parentHandler, interceptors)
 	gamePath, gameAPI := gamev1connect.NewGameServiceHandler(gameHandler, interceptors)
+	notificationPath, notificationAPI := notificationv1connect.NewNotificationServiceHandler(notificationHandler, interceptors)
 
 	mux.Handle(userPath, userAPI)
 	mux.Handle(coursePath, courseAPI)
@@ -190,6 +206,7 @@ func main() {
 	mux.Handle(classroomPath, classroomAPI)
 	mux.Handle(parentPath, parentAPI)
 	mux.Handle(gamePath, gameAPI)
+	mux.Handle(notificationPath, notificationAPI)
 
 	// Serve material cover images as cacheable binary (NOT base64 in JSON), so
 	// the materials list payload stays tiny and images load lazily/cached.
